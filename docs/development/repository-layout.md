@@ -15,6 +15,7 @@
 │   ├── robustness.py       perturbation, subperiod, and universe evidence
 │   ├── regime.py           regime classification and conditional evidence
 │   ├── costs.py            cost models, stress, liquidity, and capacity
+│   ├── bias.py             point-in-time joins, revisions, and universe evidence
 │   ├── audit.py            versioned rules and scoring
 │   ├── report.py           JSON/Markdown/HTML presentation
 │   ├── study.py            high-level signal workflow

@@ -1,7 +1,8 @@
 # Performance architecture and benchmarking
 
 **Status:** benchmark artifact version 2 covers public signal/audit workflows, the three native
-kernels, and the v0.3 path-independent cost-stress surface. The measurements establish reproducible
+kernels, the v0.3 path-independent cost-stress surface, and the v0.4 point-in-time as-of path. The
+measurements establish reproducible
 baselines; no hardware-independent latency promise is claimed.
 
 Performance is a product requirement, but only measured workloads justify optimization decisions.

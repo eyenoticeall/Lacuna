@@ -121,9 +121,17 @@ benchmark supports the NumPy/Polars path; no unevidenced native cost path is shi
 
 ## Phase 6 — data correctness
 
-Point-in-time as-of joins, availability/revision semantics, future-data checks, survivorship status, universe drift, and index membership intervals.
+**v0.4 implemented:** point-in-time as-of joins with deterministic revision ties, explicit
+availability/revision semantics, direct future-data checks and optional materiality, structural
+revision diagnostics, three-state survivorship evidence, half-open membership selection with an
+availability firewall, consecutive universe drift, and declarative dataset validation.
 
 Exit criteria: safe joins never select unavailable records; unknown survivorship handling remains visible.
+
+The exit criteria are covered by exact-boundary, one-nanosecond-future, timezone, staleness,
+revision, delisted-asset, overlap, future-known-membership, drift, and dataset-defect fixtures;
+generated join/membership invariants; Polars/pandas/Arrow equivalence; a frozen `0.4.x` public
+contract; an end-to-end as-of benchmark; and clean-wheel exercise of the bias path.
 
 ## Phase 7 — advanced inference
 

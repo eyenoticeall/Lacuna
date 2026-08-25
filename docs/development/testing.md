@@ -115,6 +115,24 @@ The v0.3 gate additionally requires:
 - exact `0.3.x` public exports/signatures plus preservation of the `0.1.x` and `0.2.x` subsets;
 - a deterministic end-to-end stress benchmark with output checksum and memory evidence.
 
+### Data-correctness tests
+
+The v0.4 gate additionally requires:
+
+- exact and strict availability boundaries, one-nanosecond future rejection, staleness, and
+  timezone-aware ordering;
+- deterministic revision ties, unique version identities, monotone publication order, and explicit
+  latest-only/unknown states;
+- a planted delisted instrument, safe/biased/unknown source declarations, invalid and overlapping
+  half-open intervals, and late or missing membership availability;
+- future-known active-membership exclusion and selection invariance under input permutation;
+- planted universe additions/removals with hand-computed retention, Jaccard similarity, and drift;
+- dataset fixtures combining missing fields, nulls, duplicate keys, non-finite values, dtype defects,
+  and temporal-order failures;
+- eager/lazy Polars, pandas, and Arrow as-of equivalence;
+- exact `0.4.x` public exports/signatures plus preservation of the `0.1.x` through `0.3.x` subsets;
+- a deterministic end-to-end as-of benchmark with output checksum and memory evidence.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

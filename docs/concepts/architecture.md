@@ -138,7 +138,7 @@ Do not create every package as an empty placeholder. Add a package when its firs
 ## Current implementation
 
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
-and v0.3 trading-realism milestone:
+v0.3 trading-realism milestone, and v0.4 data-correctness milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -157,10 +157,12 @@ and v0.3 trading-realism milestone:
 - immutable cost-model estimates; commission, spread, slippage, impact, and borrow models;
 - deterministic cost stress, bracketed break-even solving, point-in-time liquidity diagnostics,
   and scenario capacity curves.
+- safe as-of joins, future-data and revision diagnostics, survivorship evidence, half-open
+  membership selection, universe drift, and declarative dataset validation.
 
-Full point-in-time joins, advanced inference, backtester integrations, and plugins remain later
-contracts. Pre-1.0 minor versions can change through documented migrations; the published `0.1.x`,
-`0.2.x`, and `0.3.x` contracts govern their respective release lines.
+Advanced inference, vendor/backtester integrations, and plugins remain later contracts. Pre-1.0
+minor versions can change through documented migrations; the published `0.1.x` through `0.4.x`
+contracts govern their respective release lines.
 
 ## Detailed guides
 

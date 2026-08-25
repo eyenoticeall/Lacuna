@@ -1,0 +1,40 @@
+{
+  "callables": [
+    {"module": "lacuna.bias", "qualname": "DatasetSpec", "signature": "(name, required, keys=(), non_null=(), numeric=(), temporal=(), temporal_order=())"},
+    {"module": "lacuna.bias", "qualname": "PointInTimeJoinResult", "signature": "(frame, evidence)"},
+    {"module": "lacuna.bias", "qualname": "MembershipResult", "signature": "(frame, evidence)"},
+    {"module": "lacuna.bias", "qualname": "asof_join", "signature": "(left, right, *, left_time='decision_time', right_time='available_time', by='instrument', effective_time=None, revision=None, revision_mode='unknown', tolerance=None, allow_exact_matches=True, unmatched='keep', suffix='_right')"},
+    {"module": "lacuna.bias", "qualname": "future_data_check", "signature": "(data, *, decision_time='decision_time', available_time='available_time', row_id=None, instrument='instrument', materiality=None, max_examples=100)"},
+    {"module": "lacuna.bias", "qualname": "revision_diagnostics", "signature": "(data, *, entity='instrument', effective_time='effective_time', available_time='available_time', revision='revision_id', value=None, source_mode='unknown')"},
+    {"module": "lacuna.bias", "qualname": "survivorship_diagnostics", "signature": "(data, *, identity=('index', 'instrument'), valid_from='valid_from', valid_to='valid_to', available_time='available_time', delisted=None, source_status=<SurvivorshipStatus.UNKNOWN: 'unknown'>, includes_delisted=None)"},
+    {"module": "lacuna.bias", "qualname": "membership_at", "signature": "(data, *, as_of, identity=('index', 'instrument'), valid_from='valid_from', valid_to='valid_to', available_time='available_time', source_status=<SurvivorshipStatus.UNKNOWN: 'unknown'>)"},
+    {"module": "lacuna.bias", "qualname": "universe_drift", "signature": "(data, *, snapshot_time='snapshot_time', instrument='instrument', universe=None, source_status=<SurvivorshipStatus.UNKNOWN: 'unknown'>, warning_threshold=0.5)"},
+    {"module": "lacuna.bias", "qualname": "validate_dataset", "signature": "(data, *, spec)"}
+  ],
+  "contract": "lacuna-public-api-v0.4",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3"
+  ],
+  "module_exports": {
+    "lacuna.bias": [
+      "AsOfTolerance",
+      "DatasetSpec",
+      "MembershipResult",
+      "PointInTimeJoinResult",
+      "RevisionMode",
+      "SurvivorshipStatus",
+      "UnmatchedPolicy",
+      "asof_join",
+      "future_data_check",
+      "membership_at",
+      "revision_diagnostics",
+      "survivorship_diagnostics",
+      "universe_drift",
+      "validate_dataset"
+    ]
+  },
+  "package_series": "0.4",
+  "root_exports": ["bias"]
+}

@@ -1,12 +1,19 @@
 # Bias detection and point-in-time safety
 
-**Status:** point-in-time joins and core leakage checks are a v0.1 contract. Full revision-aware vendor adapters, survivorship reconstruction, and automated materiality analysis are later milestones.
+**Status:** implemented for the v0.4 data-correctness milestone. Vendor-specific adapters,
+automated downstream materiality reruns, identifier-history reconstruction, and external source
+certification remain later work.
+
+The shipped `lacuna.bias` surface includes safe as-of joins, direct future-data checks, revision
+diagnostics, survivorship declarations, half-open membership selection, universe drift, and
+declarative dataset validation. Exact public behavior and examples are documented in
+[Point-in-time data correctness](../methodology/point-in-time-data-correctness.md).
 
 Bias checks are not post-hoc warnings. They enforce whether the data was knowable when a decision was made. Every analytical path that combines time-varying datasets must preserve this property or explicitly record why it cannot.
 
 ## Ownership
 
-The future `lacuna.bias` package owns:
+The `lacuna.bias` module owns:
 
 - look-ahead and label-leakage detection;
 - point-in-time join validation;
@@ -130,7 +137,10 @@ Sensitive source values should not be copied into findings. Stable identifiers a
 
 ## Execution ownership
 
-Sorted as-of matching, interval overlap, and large duplicate scans are strong Rust candidates after a correct Python reference exists. Source semantics, materiality orchestration, and finding construction remain in Python.
+Polars owns sorted as-of matching, interval overlap, grouping, and duplicate scans in v0.4. These
+operations are benchmarked as complete public workflows. A Rust implementation requires measured
+need, an independent reference path, and differential tests. Source semantics, materiality
+orchestration, and finding construction remain in Python.
 
 ## Required tests
 

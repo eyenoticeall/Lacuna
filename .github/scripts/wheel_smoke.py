@@ -18,6 +18,7 @@ PUBLIC_MODULES = (
     "lacuna.adapters",
     "lacuna.audit",
     "lacuna.benchmark",
+    "lacuna.bias",
     "lacuna.cli",
     "lacuna.config",
     "lacuna.costs",
@@ -97,6 +98,27 @@ cost_stress = lacuna.costs.stress(
 require(cost_stress.metrics["scenario_count"] == 2, "cost stress API failed")
 require(cost_stress.metrics["worst_net_pnl"] == 19.0, "cost stress valuation failed")
 
+point_in_time = lacuna.bias.asof_join(
+    {
+        "decision_time": [2, 4],
+        "instrument": ["A", "A"],
+    },
+    {
+        "available_time": [1, 3, 5],
+        "instrument": ["A", "A", "A"],
+        "value": [10.0, 30.0, 50.0],
+    },
+    revision_mode="not_applicable",
+)
+require(
+    point_in_time.frame.get_column("value").to_list() == [10.0, 30.0],
+    "point-in-time join selected the wrong versions",
+)
+require(
+    point_in_time.evidence.metrics["future_matches"] == 0,
+    "point-in-time join selected future data",
+)
+
 package = files("lacuna")
 require(package.joinpath("py.typed").is_file(), "wheel is missing py.typed")
 require(package.joinpath("_native.pyi").is_file(), "wheel is missing native type stubs")
@@ -113,6 +135,7 @@ print(
             "signal_mean_ic": signal_result.metrics["mean_ic"],
             "trial_count": adjusted.metrics["trial_count"],
             "cost_scenarios": cost_stress.metrics["scenario_count"],
+            "point_in_time_matches": point_in_time.evidence.metrics["matched_rows"],
         },
         indent=2,
         sort_keys=True,
