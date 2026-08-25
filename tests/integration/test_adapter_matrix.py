@@ -7,6 +7,7 @@ import polars as pl
 import pytest
 
 from lacuna.adapters import to_polars
+from lacuna.costs import CommissionModel, stress
 from lacuna.labels import forward_returns
 from lacuna.signal import ic, quantiles, turnover
 
@@ -30,6 +31,19 @@ def _records() -> tuple[dict[str, list[object]], dict[str, list[object]]]:
         ],
     }
     return signal, prices
+
+
+def _trade_records() -> dict[str, list[object]]:
+    return {
+        "decision_time": [0, 0, 1, 1],
+        "execution_time": [0, 0, 1, 1],
+        "instrument": ["A", "B", "A", "B"],
+        "side": ["buy", "sell", "sell", "buy"],
+        "quantity": [10.0, -20.0, -12.0, 18.0],
+        "price": [100.0, 50.0, 102.0, 49.0],
+        "reference_price": [100.0, 50.0, 102.0, 49.0],
+        "gross_pnl": [5.0, 4.0, -1.0, 3.0],
+    }
 
 
 def test_eager_and_lazy_polars_paths_are_semantically_equivalent() -> None:
@@ -128,3 +142,27 @@ def test_arrow_table_and_stream_inputs_match_polars() -> None:
     streamed = to_polars(reader)
     assert isinstance(streamed, pl.DataFrame | pl.LazyFrame)
     assert cast(pl.DataFrame, streamed).height == len(price_data["time"])
+
+
+def test_cost_analysis_matches_eager_lazy_pandas_and_arrow_inputs() -> None:
+    pd = pytest.importorskip("pandas")
+    pa = pytest.importorskip("pyarrow")
+    records = _trade_records()
+    frame = pl.DataFrame(records)
+    kwargs = {"spread_bps": (0.0, 5.0), "slippage_bps": (0.0, 5.0)}
+
+    expected = stress(frame, **kwargs)  # type: ignore[arg-type]
+    lazy = stress(frame.lazy(), **kwargs)  # type: ignore[arg-type]
+    pandas = stress(pd.DataFrame(records), **kwargs)  # type: ignore[arg-type]
+    arrow = stress(pa.table(records), **kwargs)  # type: ignore[arg-type]
+
+    for result in (lazy, pandas, arrow):
+        assert result.metrics == expected.metrics
+        assert result.tables == expected.tables
+    assert lazy.metadata.parameters["frame"]["materialized"] is True  # type: ignore[index]
+    assert pandas.metadata.parameters["frame"]["source_type"] == "pandas.DataFrame"  # type: ignore[index]
+    assert arrow.metadata.parameters["frame"]["source_type"] == "pyarrow.Table"  # type: ignore[index]
+
+    assert CommissionModel(notional_bps=2.0).estimate(
+        pa.table(records)
+    ).total_cost == pytest.approx(CommissionModel(notional_bps=2.0).estimate(frame).total_cost)

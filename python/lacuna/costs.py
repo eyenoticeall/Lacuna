@@ -1405,41 +1405,70 @@ def stress(
     total_notional = float(data.notional.sum())
     rows: list[dict[str, JsonValue]] = []
     findings: list[Finding] = []
-    for scenario in resolved_scenarios:
-        scenario_models: tuple[CostModel, ...] = (
-            CommissionModel(
-                notional_bps=scenario.commission_bps,
-                currency=currency,
-                columns=resolved_columns,
-                quantity_convention=quantity_convention,
-            ),
-            SpreadModel(
-                quoted_spread_bps=scenario.spread_bps,
-                mode="half",
-                currency=currency,
-                columns=resolved_columns,
-                quantity_convention=quantity_convention,
-                allow_on_observed_execution=allow_on_observed_execution,
-            ),
-            SlippageModel(
-                slippage_bps=scenario.slippage_bps,
-                currency=currency,
-                columns=resolved_columns,
-                quantity_convention=quantity_convention,
-                allow_on_observed_execution=allow_on_observed_execution,
-            ),
-            *base,
-        )
-        estimate = CompositeCostModel(scenario_models, name="stress_scenario").estimate(data.frame)
+    for component in ("commission", "spread", "slippage"):
+        _existing_component_guard(data.frame, component=component, allowed=False)
+    _observed_execution_guard(
+        data,
+        columns=resolved_columns,
+        allowed=allow_on_observed_execution,
+        component="spread or slippage",
+    )
+    base_components: dict[str, tuple[float | None, ...]] = {}
+    base_fingerprints: list[str] = []
+    for model in base:
+        estimate = model.estimate(data.frame)
+        if estimate.currency != currency:
+            raise MethodContractError("base model currency must match the stress surface currency")
+        if estimate.trade_count != data.frame.height:
+            raise DataContractError("base model estimate does not align to the trade rows")
+        overlap = set(base_components).intersection(estimate.components)
+        overlap.update({"commission", "spread", "slippage"}.intersection(estimate.components))
+        if overlap:
+            raise MethodContractError(
+                f"stress surface contains duplicate components: {', '.join(sorted(overlap))}"
+            )
+        base_components.update(estimate.components)
+        base_fingerprints.append(estimate.input_fingerprint)
         findings.extend(estimate.findings)
-        total_cost = estimate.total_cost
+    for scenario in resolved_scenarios:
+        components: dict[str, tuple[float | None, ...]] = {
+            "commission": tuple(
+                float(value) for value in data.notional * (scenario.commission_bps / 10_000.0)
+            ),
+            "spread": tuple(
+                float(value) for value in data.notional * (scenario.spread_bps / 20_000.0)
+            ),
+            "slippage": tuple(
+                float(value) for value in data.notional * (scenario.slippage_bps / 10_000.0)
+            ),
+            **base_components,
+        }
+        per_trade_costs: list[float | None] = []
+        for index in range(data.frame.height):
+            values = [component[index] for component in components.values()]
+            per_trade_costs.append(
+                None
+                if any(value is None for value in values)
+                else float(sum(cast(float, value) for value in values))
+            )
+        unknown_rows = sum(value is None for value in per_trade_costs)
+        known_total_cost = float(sum(value for value in per_trade_costs if value is not None))
+        total_cost = None if unknown_rows else known_total_cost
+        component_totals: dict[str, JsonValue] = {
+            name: (
+                None
+                if any(value is None for value in values)
+                else float(sum(cast(float, value) for value in values))
+            )
+            for name, values in components.items()
+        }
         if total_cost is None:
             net_pnl: float | None = None
             net_return: float | None = None
             net_sharpe: float | None = None
             status = "unknown_cost"
         else:
-            net_values = pnl - np.asarray(estimate.per_trade_costs, dtype=np.float64)
+            net_values = pnl - np.asarray(per_trade_costs, dtype=np.float64)
             net_pnl = gross_total - total_cost
             net_return = None if capital is None else net_pnl / capital
             net_sharpe = _sharpe(
@@ -1454,15 +1483,15 @@ def stress(
                 "slippage_bps": scenario.slippage_bps,
                 "commission_bps": scenario.commission_bps,
                 "gross_pnl": gross_total,
-                "component_costs": cast(Mapping[str, JsonValue], estimate.component_totals),
-                "known_total_cost": estimate.known_total_cost,
+                "component_costs": component_totals,
+                "known_total_cost": known_total_cost,
                 "total_cost": total_cost,
                 "net_pnl": net_pnl,
                 "net_return": net_return,
                 "net_sharpe": net_sharpe,
                 "turnover": None if capital is None else total_notional / capital,
                 "trade_count": data.frame.height,
-                "known_cost_rows": data.frame.height - estimate.unknown_rows,
+                "known_cost_rows": data.frame.height - unknown_rows,
                 "status": status,
             }
         )
@@ -1504,6 +1533,7 @@ def stress(
                     "trades": frame_records(data.frame),
                     "gross_pnl": gross_pnl,
                     "scenarios": tuple(scenario.to_parameters() for scenario in resolved_scenarios),
+                    "base_estimates": tuple(base_fingerprints),
                 },
                 namespace="cost-stress",
             ),

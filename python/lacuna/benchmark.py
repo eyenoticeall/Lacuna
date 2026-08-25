@@ -1,4 +1,4 @@
-"""Reproducible developer benchmarks for Lacuna's v0.1 public workflow."""
+"""Reproducible developer benchmarks for Lacuna's public analytical workflows."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from lacuna import signal
+from lacuna import costs, signal
 from lacuna.cv import PurgedKFold, SplitResult
 from lacuna.exceptions import MethodContractError
 from lacuna.labels import LabelResult, forward_returns
@@ -134,7 +134,7 @@ class BenchmarkSuite:
     generated_at: datetime
     environment: Mapping[str, object]
     schema_version: str = "1"
-    benchmark_version: int = 1
+    benchmark_version: int = 2
 
     def to_dict(self) -> dict[str, object]:
         """Return the complete benchmark artifact."""
@@ -208,6 +208,30 @@ def _panels(config: BenchmarkConfig) -> tuple[pl.DataFrame, pl.DataFrame]:
         }
     )
     return observations, prices
+
+
+def _trades(config: BenchmarkConfig) -> pl.DataFrame:
+    """Generate a deterministic normalized trade panel for cost-grid measurement."""
+
+    periods: IntArray = np.repeat(np.arange(config.periods, dtype=np.int64), config.instruments)
+    instruments: IntArray = np.tile(np.arange(config.instruments, dtype=np.int64), config.periods)
+    buy = instruments % 2 == 0
+    absolute_quantity = 100.0 + instruments.astype(np.float64)
+    quantity = np.where(buy, absolute_quantity, -absolute_quantity)
+    price = 50.0 + instruments.astype(np.float64) / max(config.instruments, 1)
+    gross_pnl = 0.002 * absolute_quantity * price * np.sin(periods + 1.0)
+    return pl.DataFrame(
+        {
+            "decision_time": periods,
+            "execution_time": periods,
+            "instrument": instruments,
+            "side": np.where(buy, "buy", "sell"),
+            "quantity": quantity,
+            "price": price,
+            "reference_price": price,
+            "gross_pnl": gross_pnl,
+        }
+    )
 
 
 def _without_created_at(result: AnalysisResult) -> dict[str, object]:
@@ -324,6 +348,7 @@ def run_benchmarks(
 
     resolved = config or BenchmarkConfig()
     observations, prices = _panels(resolved)
+    trades = _trades(resolved)
     labels = forward_returns(
         prices,
         horizons=resolved.horizon_names,
@@ -418,6 +443,16 @@ def run_benchmarks(
             ),
             resolved.rows,
             "input_rows/second",
+        ),
+        (
+            "costs.stress.reference",
+            lambda: costs.stress(
+                trades,
+                spread_bps=(0.0, 5.0, 10.0),
+                slippage_bps=(0.0, 5.0, 10.0),
+            ),
+            resolved.rows * 9,
+            "scenario_rows/second",
         ),
     ]
     native = native_status()

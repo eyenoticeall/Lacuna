@@ -143,5 +143,5 @@ def test_bench_command_emits_versioned_json(capsys: object) -> None:
     payload = json.loads(captured.out)
     assert exit_code == 0
     assert payload["schema_version"] == "1"
-    assert payload["benchmark_version"] == 1
+    assert payload["benchmark_version"] == 2
     assert captured.err == ""

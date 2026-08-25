@@ -287,6 +287,41 @@ def test_stress_supports_explicit_correlated_scenarios() -> None:
     assert rows[1]["net_pnl"] < rows[0]["net_pnl"]  # type: ignore[index]
 
 
+def test_stress_reuses_base_model_estimates_across_the_surface() -> None:
+    class CountingModel:
+        name = "custom"
+        version = 1
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def required_fields(self) -> tuple[str, ...]:
+            return CommissionModel().required_fields()
+
+        def estimate(self, trades: object, market: object | None = None) -> CostEstimate:
+            self.calls += 1
+            reference = CommissionModel(notional_bps=1.0).estimate(trades, market)
+            return CostEstimate(
+                model_name=self.name,
+                model_version=self.version,
+                currency=reference.currency,
+                components={self.name: reference.components["commission"]},
+                assumptions={},
+                input_fingerprint=reference.input_fingerprint,
+            )
+
+    model = CountingModel()
+    result = stress(
+        _trades(),
+        spread_bps=(0.0, 5.0, 10.0),
+        slippage_bps=(0.0, 5.0),
+        base_models=(model,),
+    )
+
+    assert result.metrics["scenario_count"] == 6
+    assert model.calls == 1
+
+
 def test_break_even_cost_finds_planted_solution_and_does_not_extrapolate() -> None:
     result = break_even_cost(
         _trades(),
