@@ -63,7 +63,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Build the source distribution
-        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           command: sdist
           maturin-version: v1.14.1
@@ -122,7 +122,7 @@ jobs:
           enable-cache: true
           cache-suffix: release-${{ matrix.platform }}
       - name: Build the native wheel
-        uses: PyO3/maturin-action@86b9d133d34bc1b40018696f782949dac11bd380 # v1.49.4
+        uses: PyO3/maturin-action@e83996d129638aa358a18fbd1dfb82f0b0fb5d3b # v1.51.0
         with:
           maturin-version: v1.14.1
           target: ${{ matrix.target }}
