@@ -35,21 +35,23 @@ def _signature(value: object) -> str:
     )
 
 
-def test_root_exports_match_the_v0_1_contract() -> None:
+def test_root_exports_preserve_the_v0_1_contract() -> None:
     contract = _contract()
-    assert lacuna.__all__ == contract["root_exports"]
+    expected = contract["root_exports"]
+    assert isinstance(expected, list)
+    assert set(expected).issubset(lacuna.__all__)
 
 
-def test_public_module_exports_match_the_v0_1_contract() -> None:
+def test_public_module_exports_preserve_the_v0_1_contract() -> None:
     contract = _contract()
     module_exports = contract["module_exports"]
     assert isinstance(module_exports, dict)
 
-    observed = {
-        module_name: list(importlib.import_module(module_name).__all__)
-        for module_name in module_exports
-    }
-    assert observed == module_exports
+    for module_name, expected in module_exports.items():
+        assert isinstance(module_name, str)
+        assert isinstance(expected, list)
+        observed = importlib.import_module(module_name).__all__
+        assert set(expected).issubset(observed)
 
 
 def test_public_call_signatures_match_the_v0_1_contract() -> None:

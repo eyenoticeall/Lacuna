@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 import numpy as np
+import polars as pl
 import pytest
 
 from lacuna.exceptions import DataContractError, MethodContractError
-from lacuna.validation import _bootstrap_indices, bootstrap
+from lacuna.experiment import ExperimentRegistry
+from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
+from lacuna.validation import _bootstrap_indices, bootstrap, multiple_testing, parameter_surface
 
 
 def test_iid_bootstrap_matches_its_deterministic_reference_indices() -> None:
@@ -158,3 +162,249 @@ def test_bootstrap_sequence_records_copy_diagnostics() -> None:
     assert diagnostics["execution_operations"] == (  # type: ignore[index]
         "project_and_cast_float64",
     )
+
+
+@pytest.mark.parametrize(
+    ("method", "expected"),
+    [
+        ("bonferroni", [0.04, 0.16, 0.12, 0.8]),
+        ("holm", [0.04, 0.09, 0.09, 0.2]),
+        ("benjamini_hochberg", [0.04, 0.05333333333333334, 0.05333333333333334, 0.2]),
+        (
+            "benjamini_yekutieli",
+            [0.08333333333333333, 0.1111111111111111, 0.1111111111111111, 0.41666666666666663],
+        ),
+    ],
+)
+def test_multiple_testing_matches_hand_computed_adjustments(
+    method: str, expected: list[float]
+) -> None:
+    result = multiple_testing(
+        [0.01, 0.04, 0.03, 0.2],
+        method=method,  # type: ignore[arg-type]
+    )
+
+    observed = [row["adjusted_p_value"] for row in result.table("adjusted_p_values")]  # type: ignore[index, union-attr]
+    assert observed == pytest.approx(expected)
+    assert result.metrics["trial_count"] == 4
+
+
+def test_multiple_testing_preserves_trial_identity_and_rank() -> None:
+    frame = pl.DataFrame(
+        {
+            "candidate": ["slow", "fast", "medium"],
+            "probability": [0.2, 0.01, 0.04],
+        }
+    )
+    result = multiple_testing(
+        frame,
+        trial="candidate",
+        p_value="probability",
+        method="holm",
+        alpha=0.05,
+    )
+
+    table = result.table("adjusted_p_values")
+    assert [row["trial_id"] for row in table] == ["slow", "fast", "medium"]  # type: ignore[index, union-attr]
+    assert [row["rank"] for row in table] == [3, 1, 2]  # type: ignore[index, union-attr]
+    assert result.metrics["rejected_count"] == 1
+    assert result.metadata.input_fingerprint is not None
+
+
+def test_multiple_testing_consumes_current_complete_registry_trials() -> None:
+    registry = ExperimentRegistry("p-value-study")
+    registry.record(parameters={"window": 20}, metric=0.01, metric_name="p_value")
+    registry.record(parameters={"window": 40}, metric=0.20, metric_name="p_value")
+
+    result = multiple_testing(registry, method="bonferroni")
+
+    assert result.metrics["trial_count"] == 2
+    assert result.metadata.parameters["input"]["source_type"] == (  # type: ignore[index]
+        "lacuna.experiment.ExperimentRegistry"
+    )
+
+    registry.record(
+        parameters={"window": 60},
+        status="failed",
+        error_category="NumericalError",
+    )
+    with pytest.raises(DataContractError, match="without a current completed"):
+        multiple_testing(registry)
+
+
+def test_multiple_testing_validates_family_contracts() -> None:
+    with pytest.raises(DataContractError, match=r"outside \[0, 1\]"):
+        multiple_testing([0.1, 1.1])
+    with pytest.raises(DataContractError, match="duplicate"):
+        multiple_testing(pl.DataFrame({"trial_id": [1, 1], "p_value": [0.1, 0.2]}))
+    with pytest.raises(DataContractError, match="null or NaN"):
+        multiple_testing([0.1, float("nan")])
+    with pytest.raises(MethodContractError, match="only supported for Bonferroni"):
+        multiple_testing([0.1, 0.2], method="holm", effective_trials=1.5)
+
+
+def test_effective_trial_count_is_explicit_bonferroni_evidence() -> None:
+    result = multiple_testing(
+        [0.02, 0.5, 0.8],
+        method="bonferroni",
+        effective_trials=1.5,
+    )
+
+    table = result.table("adjusted_p_values")
+    assert table[0]["adjusted_p_value"] == pytest.approx(0.03)  # type: ignore[index]
+    assert "user-supplied" in result.warnings[0]
+
+
+def _surface_result(value: float) -> AnalysisResult:
+    return AnalysisResult(
+        metadata=ResultMetadata(method="test.surface_evaluator", input_fingerprint="input:v1"),
+        metrics={"score": value},
+    )
+
+
+def test_parameter_surface_detects_an_isolated_interior_optimum() -> None:
+    def evaluate(parameters: Mapping[str, JsonValue]) -> AnalysisResult:
+        return _surface_result(10.0 if parameters["window"] == 2 else 1.0)
+
+    result = parameter_surface(
+        evaluate,
+        grid={"window": [0, 1, 2, 3, 4]},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:evaluation",
+        code_id="git:abc123",
+    )
+
+    assert result.metrics["selected_objective"] == 10.0
+    assert result.metrics["plateau_width"] == 1
+    assert result.metrics["neighbor_count"] == 2
+    assert {finding.code for finding in result.findings} >= {
+        "PARAMETER_ISOLATED_OPTIMUM",
+        "PARAMETER_SELECTION_REUSE",
+    }
+
+
+def test_parameter_surface_reports_plateau_and_boundary_support() -> None:
+    plateau = parameter_surface(
+        lambda parameters: _surface_result(10.0 if parameters["window"] in {1, 2, 3} else 8.0),
+        grid={"window": [0, 1, 2, 3, 4]},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:evaluation",
+        code_id="git:abc123",
+    )
+    boundary = parameter_surface(
+        lambda parameters: _surface_result(float(parameters["window"])),  # type: ignore[arg-type]
+        grid={"window": [0, 1, 2, 3, 4]},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:evaluation",
+        code_id="git:abc123",
+    )
+
+    assert plateau.metrics["plateau_width"] == 3
+    assert "PARAMETER_LOCAL_STABILITY" in {finding.code for finding in plateau.findings}
+    assert boundary.metrics["boundary_parameters"] == ("window",)
+    assert "PARAMETER_BOUNDARY_OPTIMUM" in {finding.code for finding in boundary.findings}
+
+
+def test_parameter_surface_preserves_failures_and_registry_lineage() -> None:
+    registry = ExperimentRegistry("surface")
+
+    def evaluate(parameters: Mapping[str, JsonValue]) -> AnalysisResult:
+        if parameters["window"] == 1:
+            raise RuntimeError("sensitive details must not be persisted")
+        return _surface_result(float(parameters["window"]))  # type: ignore[arg-type]
+
+    result = parameter_surface(
+        evaluate,
+        grid={"window": [0, 1, 2, 3]},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:evaluation",
+        selection_sample_id="sample:selection",
+        selected_parameters={"window": 2},
+        code_id="git:abc123",
+        registry=registry,
+    )
+
+    rows = result.table("parameter_surface")
+    assert len(rows) == 4  # type: ignore[arg-type]
+    assert result.metrics["failed_points"] == 1
+    assert [attempt.status.value for attempt in registry.attempts()] == [
+        "completed",
+        "failed",
+        "completed",
+        "completed",
+    ]
+    assert registry.attempts()[1].error_category == "RuntimeError"
+    assert "sensitive details" not in registry.to_result().to_json()
+    assert "PARAMETER_SELECTION_SEPARATION" in {finding.code for finding in result.findings}
+
+
+def test_parameter_surface_uses_manhattan_adjacency_in_multiple_dimensions() -> None:
+    result = parameter_surface(
+        lambda parameters: _surface_result(
+            -float(parameters["fast"]) - float(parameters["slow"])  # type: ignore[arg-type]
+        ),
+        grid={"slow": [10, 20], "fast": [1, 2]},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:evaluation",
+        code_id="git:abc123",
+    )
+
+    assert result.metrics["neighbor_count"] == 2
+    assert result.metrics["boundary_parameters"] == ("fast", "slow")
+
+
+def test_parameter_surface_records_an_all_failed_surface() -> None:
+    def evaluate(_: Mapping[str, JsonValue]) -> AnalysisResult:
+        raise ArithmeticError("not persisted")
+
+    result = parameter_surface(
+        evaluate,
+        grid={"window": [1, 2]},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:evaluation",
+        code_id="git:abc123",
+    )
+
+    assert result.metrics["successful_points"] == 0
+    assert "PARAMETER_SURFACE_NO_VALID_POINT" in {finding.code for finding in result.findings}
+
+
+def test_parameter_surface_validates_evaluator_and_grid_contracts() -> None:
+    with pytest.raises(MethodContractError, match="selected_parameters"):
+        parameter_surface(
+            lambda _: _surface_result(1.0),
+            grid={"window": [1, 2]},
+            objective="score",
+            evaluator_name="strategy.score",
+            sample_id="sample:evaluation",
+            code_id="git:abc123",
+            selected_parameters={"window": 3},
+        )
+    with pytest.raises(MethodContractError, match="duplicate"):
+        parameter_surface(
+            lambda _: _surface_result(1.0),
+            grid={"window": [1, 1]},
+            objective="score",
+            evaluator_name="strategy.score",
+            sample_id="sample:evaluation",
+            code_id="git:abc123",
+        )
+    with pytest.raises(DataContractError, match="finite numeric scalar"):
+        parameter_surface(
+            lambda _: AnalysisResult(
+                metadata=ResultMetadata(method="test.surface"),
+                metrics={"other": 1.0},
+            ),
+            grid={"window": [1]},
+            objective="score",
+            evaluator_name="strategy.score",
+            sample_id="sample:evaluation",
+            code_id="git:abc123",
+            failure_policy="raise",
+        )
