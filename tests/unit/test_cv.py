@@ -5,7 +5,7 @@ from datetime import date
 import polars as pl
 import pytest
 
-from lacuna.cv import PurgedKFold, WalkForward
+from lacuna.cv import CombinatorialPurgedKFold, PurgedKFold, WalkForward
 from lacuna.exceptions import DataContractError, MethodContractError
 
 
@@ -120,6 +120,67 @@ def test_native_and_reference_purge_paths_match() -> None:
     assert native.evidence.metadata.parameters["backend"] == "rust_native"
 
 
+def test_cpcv_exposes_every_combination_and_complete_paths() -> None:
+    result = CombinatorialPurgedKFold(
+        n_groups=6,
+        n_test_groups=2,
+        use_native=False,
+    ).split(_intervals())
+
+    assert len(result.folds) == 15
+    assert len(result.paths) == 5
+    assert result.evidence.metrics["n_combinations"] == 15
+    assert result.evidence.metrics["n_paths"] == 5
+    assert [row["test_groups"] for row in result.evidence.table("combinations")] == [
+        [0, 1],
+        [0, 2],
+        [0, 3],
+        [0, 4],
+        [0, 5],
+        [1, 2],
+        [1, 3],
+        [1, 4],
+        [1, 5],
+        [2, 3],
+        [2, 4],
+        [2, 5],
+        [3, 4],
+        [3, 5],
+        [4, 5],
+    ]
+    for path in result.paths:
+        assert path.test_indices == tuple(range(6))
+        assert len(path.fold_by_group) == 6
+        for group, fold_number in enumerate(path.fold_by_group):
+            assert group in result.evidence.table("combinations")[fold_number]["test_groups"]
+
+
+def test_cpcv_purges_and_embargoes_each_test_group() -> None:
+    frame = pl.DataFrame(
+        {
+            "observation_time": list(range(8)),
+            "label_start": list(range(8)),
+            "label_end": [value + 1 for value in range(8)],
+        }
+    )
+    result = CombinatorialPurgedKFold(
+        n_groups=4,
+        n_test_groups=2,
+        embargo=1,
+        use_native=False,
+    ).split(frame)
+    first = result.folds[0]
+    assert first.test_indices == (0, 1, 2, 3)
+    assert first.purged_indices == ()
+    assert first.embargoed_indices == (4,)
+    assert first.train_indices == (5, 6, 7)
+
+
+def test_cpcv_rejects_combinatorial_explosion() -> None:
+    with pytest.raises(MethodContractError, match="max_combinations"):
+        CombinatorialPurgedKFold(n_groups=20, n_test_groups=10, max_combinations=10_000)
+
+
 def test_splitters_reject_invalid_configuration_and_intervals() -> None:
     with pytest.raises(MethodContractError):
         WalkForward(train=0, test=1, step=1)
@@ -127,6 +188,8 @@ def test_splitters_reject_invalid_configuration_and_intervals() -> None:
         WalkForward(train="1Y", test=2, step=1)
     with pytest.raises(MethodContractError):
         PurgedKFold(n_splits=1)
+    with pytest.raises(MethodContractError):
+        CombinatorialPurgedKFold(n_groups=4, n_test_groups=4)
 
     invalid = _intervals().with_columns(
         pl.when(pl.col("observation_time") == 0)

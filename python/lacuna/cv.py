@@ -8,6 +8,8 @@ from bisect import bisect_right
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from itertools import combinations
+from math import comb
 from typing import Literal, TypeAlias
 
 import numpy as np
@@ -67,6 +69,54 @@ class SplitResult:
 
     def to_json(self, *, indent: int | None = 2) -> str:
         """Serialize split configuration and fold evidence."""
+
+        return self.evidence.to_json(indent=indent)
+
+
+@dataclass(frozen=True, slots=True)
+class CPCVPath:
+    """One reconstructed CPCV path over every chronological group."""
+
+    path: int
+    fold_by_group: tuple[int, ...]
+    test_indices: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CombinatorialSplitResult:
+    """Inspectable CPCV combinations and reconstructed backtest paths."""
+
+    folds: tuple[Fold, ...]
+    paths: tuple[CPCVPath, ...]
+    evidence: AnalysisResult
+
+    def __iter__(
+        self,
+    ) -> Iterator[
+        tuple[
+            np.ndarray[tuple[int], np.dtype[np.int64]], np.ndarray[tuple[int], np.dtype[np.int64]]
+        ]
+    ]:
+        for fold in self.folds:
+            yield (
+                np.asarray(fold.train_indices, dtype=np.int64),
+                np.asarray(fold.test_indices, dtype=np.int64),
+            )
+
+    @property
+    def fold_table(self) -> object:
+        """Return the JSON-compatible fold table used for visualization."""
+
+        return self.evidence.table("folds")
+
+    @property
+    def path_table(self) -> object:
+        """Return the group-to-fold assignments for every reconstructed path."""
+
+        return self.evidence.table("paths")
+
+    def to_json(self, *, indent: int | None = 2) -> str:
+        """Serialize split configuration, combinations, and path evidence."""
 
         return self.evidence.to_json(indent=indent)
 
@@ -473,4 +523,250 @@ class PurgedKFold:
         return SplitResult(folds=tuple(folds), evidence=evidence)
 
 
-__all__ = ["Duration", "Fold", "PurgedKFold", "SplitResult", "WalkForward"]
+@dataclass(frozen=True, slots=True)
+class CombinatorialPurgedKFold:
+    """Combinatorial purged cross-validation with explicit path reconstruction.
+
+    Distinct observation times are divided into contiguous groups. Every
+    ``n_test_groups`` combination is held out once, overlapping training-label
+    intervals are purged, and an observation-count embargo is applied after
+    each held-out group. The result includes every split and a deterministic
+    assignment of test-group predictions to complete chronological paths.
+    """
+
+    n_groups: int = 6
+    n_test_groups: int = 2
+    embargo: int = 0
+    max_combinations: int = 10_000
+    use_native: bool = True
+
+    def __post_init__(self) -> None:
+        if self.n_groups < 2:
+            raise MethodContractError("n_groups must be at least 2")
+        if not 1 <= self.n_test_groups < self.n_groups:
+            raise MethodContractError("n_test_groups must be between 1 and n_groups - 1")
+        if self.embargo < 0:
+            raise MethodContractError("embargo must be a non-negative observation count")
+        if self.max_combinations < 1:
+            raise MethodContractError("max_combinations must be positive")
+        if comb(self.n_groups, self.n_test_groups) > self.max_combinations:
+            raise MethodContractError(
+                "CPCV combination count exceeds max_combinations; reduce the group count "
+                "or raise the explicit safety limit"
+            )
+
+    def split(
+        self,
+        data: object,
+        *,
+        time: str = "observation_time",
+        label_start: str = "label_start",
+        label_end: str = "label_end",
+    ) -> CombinatorialSplitResult:
+        """Generate purged combinations and reconstruct full test paths."""
+
+        frame, diagnostics = eager_frame(data, required=[time, label_start, label_end])
+        if frame.is_empty():
+            raise DataContractError("CPCV input must contain at least one row")
+        if any(frame.get_column(column).null_count() for column in (time, label_start, label_end)):
+            raise DataContractError("CPCV time and label interval columns must not contain nulls")
+        if frame.schema[label_start] != frame.schema[label_end]:
+            raise DataContractError("label_start and label_end must have the same physical dtype")
+
+        indexed = frame.with_row_index("_source_index")
+        starts = series_time_i64(indexed.get_column(label_start))
+        ends = series_time_i64(indexed.get_column(label_end))
+        if any(end <= start for start, end in zip(starts, ends, strict=True)):
+            raise DataContractError("label intervals must satisfy label_start < label_end")
+        unique_times = _validated_times(indexed.get_column(time).unique().sort().to_list())
+        if len(unique_times) < self.n_groups:
+            raise DataContractError("n_groups cannot exceed the number of distinct periods")
+
+        period_groups = [
+            tuple(group.tolist()) for group in np.array_split(unique_times, self.n_groups)
+        ]
+        group_time_sets = [set(group) for group in period_groups]
+        group_rows = [
+            tuple(
+                indexed.filter(pl.col(time).is_in(group_times)).sort([time, "_source_index"])
+                .get_column("_source_index")
+                .to_list()
+            )
+            for group_times in group_time_sets
+        ]
+        test_combinations = tuple(combinations(range(self.n_groups), self.n_test_groups))
+        period_positions = {value: position for position, value in enumerate(unique_times)}
+        folds: list[Fold] = []
+        backends: set[str] = set()
+
+        for fold_number, test_groups in enumerate(test_combinations):
+            test_time_set: set[TimeValue] = set()
+            for group in test_groups:
+                test_time_set.update(group_time_sets[group])
+            test_indices: list[int] = (
+                indexed.filter(pl.col(time).is_in(test_time_set))
+                .get_column("_source_index")
+                .to_list()
+            )
+            candidate_indices: list[int] = (
+                indexed.filter(~pl.col(time).is_in(test_time_set))
+                .get_column("_source_index")
+                .to_list()
+            )
+            mask, backend = _purge_mask(
+                [starts[index] for index in candidate_indices],
+                [ends[index] for index in candidate_indices],
+                [starts[index] for index in test_indices],
+                [ends[index] for index in test_indices],
+                use_native=self.use_native,
+            )
+            backends.add(backend)
+            purged = [
+                index for index, overlaps in zip(candidate_indices, mask, strict=True) if overlaps
+            ]
+            retained = [
+                index
+                for index, overlaps in zip(candidate_indices, mask, strict=True)
+                if not overlaps
+            ]
+
+            embargo_times: set[TimeValue] = set()
+            if self.embargo:
+                for group in test_groups:
+                    final_period = max(period_positions[value] for value in period_groups[group])
+                    embargo_times.update(
+                        unique_times[final_period + 1 : final_period + 1 + self.embargo]
+                    )
+                embargo_times.difference_update(test_time_set)
+            embargoed = (
+                indexed.filter(
+                    pl.col("_source_index").is_in(retained) & pl.col(time).is_in(embargo_times)
+                )
+                .get_column("_source_index")
+                .to_list()
+            )
+            embargoed_set = set(embargoed)
+            retained = [index for index in retained if index not in embargoed_set]
+            folds.append(
+                Fold(
+                    fold=fold_number,
+                    train_indices=tuple(retained),
+                    test_indices=tuple(test_indices),
+                    purged_indices=tuple(purged),
+                    embargoed_indices=tuple(embargoed),
+                )
+            )
+
+        n_paths = comb(self.n_groups - 1, self.n_test_groups - 1)
+        fold_by_path = [[-1] * self.n_groups for _ in range(n_paths)]
+        for group in range(self.n_groups):
+            group_folds = [
+                fold_number
+                for fold_number, test_groups in enumerate(test_combinations)
+                if group in test_groups
+            ]
+            if len(group_folds) != n_paths:  # pragma: no cover - combinatorial invariant
+                raise RuntimeError("invalid CPCV group incidence count")
+            for path_index, fold_number in enumerate(group_folds):
+                fold_by_path[path_index][group] = fold_number
+
+        paths = tuple(
+            CPCVPath(
+                path=path_index,
+                fold_by_group=tuple(fold_numbers),
+                test_indices=tuple(index for rows in group_rows for index in rows),
+            )
+            for path_index, fold_numbers in enumerate(fold_by_path)
+        )
+        source_times = _validated_times(indexed.sort("_source_index").get_column(time).to_list())
+        path_rows: list[dict[str, JsonValue]] = []
+        for cpcv_path in paths:
+            for group, fold_number in enumerate(cpcv_path.fold_by_group):
+                group_times = period_groups[group]
+                path_rows.append(
+                    {
+                        "path": cpcv_path.path,
+                        "group": group,
+                        "fold": fold_number,
+                        "start": (
+                            min(group_times).isoformat()
+                            if isinstance(min(group_times), date)
+                            else min(group_times)
+                        ),
+                        "end": (
+                            max(group_times).isoformat()
+                            if isinstance(max(group_times), date)
+                            else max(group_times)
+                        ),
+                        "n_observations": len(group_rows[group]),
+                    }
+                )
+        group_table: list[dict[str, JsonValue]] = []
+        for group, (group_times, rows) in enumerate(zip(period_groups, group_rows, strict=True)):
+            group_table.append(
+                {
+                    "group": group,
+                    "start": (
+                        min(group_times).isoformat()
+                        if isinstance(min(group_times), date)
+                        else min(group_times)
+                    ),
+                    "end": (
+                        max(group_times).isoformat()
+                        if isinstance(max(group_times), date)
+                        else max(group_times)
+                    ),
+                    "n_periods": len(group_times),
+                    "n_observations": len(rows),
+                }
+            )
+        combination_table: list[dict[str, JsonValue]] = [
+            {"fold": fold_number, "test_groups": tuple(test_groups)}
+            for fold_number, test_groups in enumerate(test_combinations)
+        ]
+        fold_rows = [row for fold in folds for row in _role_rows(fold, source_times)]
+        evidence = AnalysisResult(
+            metadata=ResultMetadata(
+                method="cv.combinatorial_purged_kfold",
+                method_version=1,
+                parameters={
+                    "n_groups": self.n_groups,
+                    "n_test_groups": self.n_test_groups,
+                    "embargo_observations": self.embargo,
+                    "max_combinations": self.max_combinations,
+                    "interval_closure": "[label_start, label_end)",
+                    "time_column": time,
+                    "label_start_column": label_start,
+                    "label_end_column": label_end,
+                    "backend": "+".join(sorted(backends)),
+                    "path_assignment": "ordered_group_incidence",
+                    "input": diagnostics.to_parameters(),
+                },
+            ),
+            metrics={
+                "n_groups": self.n_groups,
+                "n_combinations": len(folds),
+                "n_paths": len(paths),
+                "purged_observations": sum(len(fold.purged_indices) for fold in folds),
+                "embargoed_observations": sum(len(fold.embargoed_indices) for fold in folds),
+            },
+            tables={
+                "groups": tuple(group_table),
+                "combinations": tuple(combination_table),
+                "folds": tuple(fold_rows),
+                "paths": tuple(path_rows),
+            },
+        )
+        return CombinatorialSplitResult(folds=tuple(folds), paths=paths, evidence=evidence)
+
+
+__all__ = [
+    "CPCVPath",
+    "CombinatorialPurgedKFold",
+    "CombinatorialSplitResult",
+    "Duration",
+    "Fold",
+    "PurgedKFold",
+    "SplitResult",
+    "WalkForward",
+]
