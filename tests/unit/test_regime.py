@@ -76,6 +76,9 @@ def test_quantile_regimes_detect_future_source_availability() -> None:
     )
 
     assert result.metrics["future_available_rows"] == 1
+    rows = result.table("regimes")
+    assert rows[0]["time"] == "2024-01-01T00:00:00Z"  # type: ignore[index]
+    assert rows[1]["available"] == "2024-01-03T00:00:00Z"  # type: ignore[index]
     assert "REGIME_SOURCE_NOT_AVAILABLE" in {finding.code for finding in result.findings}
 
 
@@ -174,6 +177,8 @@ def test_regime_analysis_validates_availability_and_overlap_semantics() -> None:
     )
 
     assert "REGIME_AVAILABILITY_LEAKAGE" in {finding.code for finding in leakage.findings}
+    observations = leakage.table("observations")
+    assert observations[0]["time"] == "2024-01-01T00:00:00Z"  # type: ignore[index]
     assert "REGIME_LABELS_OVERLAP" in {finding.code for finding in overlap.findings}
     with pytest.raises(DataContractError, match="duplicate"):
         regime_analysis(

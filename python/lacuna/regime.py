@@ -57,6 +57,25 @@ def _availability_violations(
     return int(frame.select((pl.col(available_time) > pl.col(time)).sum()).item())
 
 
+def _portable_records(frame: pl.DataFrame) -> tuple[JsonValue, ...]:
+    """Serialize temporal columns without requiring the host's IANA timezone database."""
+
+    expressions: list[pl.Expr] = []
+    for column, dtype in frame.schema.items():
+        if isinstance(dtype, pl.Datetime) and dtype.time_zone is not None:
+            expressions.append(
+                pl.col(column)
+                .dt.convert_time_zone("UTC")
+                .dt.strftime("%+")
+                .str.replace(r"\+00:00$", "Z")
+                .alias(column)
+            )
+        elif dtype == pl.Date or isinstance(dtype, pl.Datetime):
+            expressions.append(pl.col(column).cast(pl.String).alias(column))
+    normalized = frame.with_columns(expressions) if expressions else frame
+    return frame_records(normalized)
+
+
 def quantile_regimes(
     data: object,
     *,
@@ -240,7 +259,7 @@ def quantile_regimes(
                 evidence={"unknown_rows": unknown_count, "row_count": output.height},
             )
         )
-    records = tuple(frame_records(output))
+    records = _portable_records(output)
     input_fingerprint = fingerprint(
         {
             "rows": records,
@@ -580,7 +599,7 @@ def regime_analysis(
             )
         )
 
-    records = tuple(frame_records(ordered))
+    records = _portable_records(ordered)
     input_fingerprint = fingerprint(
         {
             "rows": records,
