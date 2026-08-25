@@ -79,11 +79,20 @@ def test_stratified_and_block_permutation_contracts_are_explicit() -> None:
 
     with pytest.raises(MethodContractError, match="paired_with"):
         permutation_test([1.0, 2.0, 3.0], scheme="unrestricted", permutations=100)
+    with pytest.raises(MethodContractError, match="invariant to reordering"):
+        permutation_test(
+            frame,
+            value="signal",
+            paired_with="outcome",
+            scheme="unrestricted",
+            permutations=100,
+        )
     with pytest.raises(MethodContractError, match="block_length"):
         permutation_test(
             frame,
             value="signal",
             paired_with="outcome",
+            statistic="pearson",
             scheme="block",
             permutations=100,
         )
@@ -105,19 +114,11 @@ def test_sharpe_inference_matches_the_published_moment_equations() -> None:
     skewness = float(np.mean(centered**3) / population_scale**3)
     kurtosis = float(np.mean(centered**4) / population_scale**4)
     periodic_sharpe = mean / standard_deviation
-    variance_factor = (
-        1.0
-        - skewness * periodic_sharpe
-        + (kurtosis - 1.0) * periodic_sharpe**2 / 4.0
-    )
+    variance_factor = 1.0 - skewness * periodic_sharpe + (kurtosis - 1.0) * periodic_sharpe**2 / 4.0
     periodic_se = math.sqrt(variance_factor / (values.size - 1))
-    expected_psr = NormalDist().cdf(
-        (periodic_sharpe - 0.1 / math.sqrt(12.0)) / periodic_se
-    )
+    expected_psr = NormalDist().cdf((periodic_sharpe - 0.1 / math.sqrt(12.0)) / periodic_se)
 
-    assert result.metrics["observed_sharpe"] == pytest.approx(
-        periodic_sharpe * math.sqrt(12.0)
-    )
+    assert result.metrics["observed_sharpe"] == pytest.approx(periodic_sharpe * math.sqrt(12.0))
     assert result.metrics["standard_error"] == pytest.approx(periodic_se * math.sqrt(12.0))
     assert result.metrics["probabilistic_sharpe_ratio"] == pytest.approx(expected_psr)
     interval_z = NormalDist().inv_cdf(0.975)
@@ -141,10 +142,12 @@ def test_deflated_sharpe_uses_and_exposes_the_complete_trial_family() -> None:
     )
 
     assert result.metrics["trial_count"] == 5
+    assert result.metrics["trial_sharpe_mean"] == pytest.approx(np.mean(trials))
+    assert result.metrics["trial_sharpe_standard_deviation"] == pytest.approx(
+        np.std(trials, ddof=1)
+    )
     assert result.metrics["deflated_sharpe_threshold"] is not None
-    assert result.metrics["deflated_sharpe_ratio"] <= result.metrics[
-        "probabilistic_sharpe_ratio"
-    ]
+    assert result.metrics["deflated_sharpe_ratio"] <= result.metrics["probabilistic_sharpe_ratio"]
     assert [row["sharpe"] for row in result.table("trial_sharpes")] == pytest.approx(trials)
 
 
@@ -172,9 +175,7 @@ def test_pbo_exposes_selection_rank_logit_and_partition_sensitivity() -> None:
     assert result.metrics["n_combinations"] == 6
     assert result.metrics["pbo"] == 0.0
     assert len(result.table("combinations")) == 6
-    assert {row["selected_strategy"] for row in result.table("combinations")} == {
-        "strategy_0"
-    }
+    assert {row["selected_strategy"] for row in result.table("combinations")} == {"strategy_0"}
     assert all(row["relative_rank"] == 0.75 for row in result.table("combinations"))
     assert [row["partitions"] for row in result.table("partition_sensitivity")] == [4, 2]
 
@@ -185,6 +186,11 @@ def test_pbo_refuses_ambiguous_selection_and_unequal_partitions() -> None:
         probability_of_backtest_overfitting(matrix, partitions=4, statistic="mean")
     with pytest.raises(DataContractError, match="row count must divide"):
         probability_of_backtest_overfitting(np.arange(30, dtype=float).reshape(10, 3), partitions=4)
+    with pytest.raises(MethodContractError, match="must be an integer"):
+        probability_of_backtest_overfitting(
+            np.arange(24, dtype=float).reshape(8, 3),
+            partitions=4.0,  # type: ignore[arg-type]
+        )
 
 
 def test_joint_stationary_bootstrap_preserves_cross_strategy_structure() -> None:

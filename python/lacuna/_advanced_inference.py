@@ -229,10 +229,17 @@ def permutation_test(
         )
     if alternative not in {"two_sided", "greater", "less"}:
         raise MethodContractError("alternative must be 'two_sided', 'greater', or 'less'")
+    if isinstance(permutations, bool) or not isinstance(permutations, int):
+        raise MethodContractError("permutations must be an integer")
     if permutations < 100:
         raise MethodContractError("permutations must be at least 100 for inferential output")
     if scheme != "sign_flip" and paired_with is None:
         raise MethodContractError(f"{scheme} permutation requires paired_with")
+    if scheme != "sign_flip" and statistic == "mean":
+        raise MethodContractError(
+            "the built-in mean is invariant to reordering; use sign_flip or a "
+            "paired/order-sensitive statistic"
+        )
     stratum = time if scheme == "within_date" else group if scheme == "within_group" else None
     stratum_kind: Literal["time", "group"] | None = (
         "time" if scheme == "within_date" else "group" if scheme == "within_group" else None
@@ -373,11 +380,11 @@ def sharpe_inference(
     non-Normal-return formulation.
     """
 
-    if not math.isfinite(benchmark):
+    if isinstance(benchmark, bool) or not math.isfinite(benchmark):
         raise MethodContractError("benchmark must be finite")
     if not 0.5 < confidence_level < 1.0:
         raise MethodContractError("confidence_level must be between 0.5 and 1")
-    if not math.isfinite(annualization) or annualization <= 0.0:
+    if isinstance(annualization, bool) or not math.isfinite(annualization) or annualization <= 0.0:
         raise MethodContractError("annualization must be positive and finite")
     values, source, excluded = _one_dimensional_values(
         data,
@@ -413,12 +420,17 @@ def sharpe_inference(
     deflated_threshold: float | None = None
     trial_count: int | None = None
     effective_trials: float | None = None
+    trial_sharpe_mean: float | None = None
+    trial_sharpe_standard_deviation: float | None = None
     warnings = [
         "PSR/DSR use an asymptotic Sharpe distribution; short samples and unstable "
         "fourth moments require caution."
     ]
     if trial_sharpes is not None:
-        trials: FloatArray = np.asarray(trial_sharpes, dtype=np.float64)
+        try:
+            trials: FloatArray = np.asarray(trial_sharpes, dtype=np.float64)
+        except (TypeError, ValueError) as error:
+            raise DataContractError("trial_sharpes must contain numeric values") from error
         if trials.ndim != 1 or trials.size < 2 or not np.isfinite(trials).all():
             raise DataContractError("trial_sharpes must contain at least two finite values")
         if not bool(np.isclose(trials, observed_sharpe, rtol=1e-10, atol=1e-12).any()):
@@ -428,7 +440,8 @@ def sharpe_inference(
         trial_count = int(trials.size)
         effective_trials = float(trial_count) if independent_trials is None else independent_trials
         if (
-            not math.isfinite(effective_trials)
+            isinstance(effective_trials, bool)
+            or not math.isfinite(effective_trials)
             or effective_trials < 1.0
             or effective_trials > trial_count
         ):
@@ -438,6 +451,8 @@ def sharpe_inference(
         periodic_trials = trials / scale
         trial_mean = float(periodic_trials.mean())
         trial_standard_deviation = float(periodic_trials.std(ddof=1))
+        trial_sharpe_mean = trial_mean * scale
+        trial_sharpe_standard_deviation = trial_standard_deviation * scale
         if effective_trials == 1.0 or trial_standard_deviation == 0.0:
             expected_maximum = trial_mean
         else:
@@ -516,6 +531,8 @@ def sharpe_inference(
             "deflated_sharpe_ratio": deflated_sharpe_ratio,
             "deflated_sharpe_threshold": deflated_threshold,
             "trial_count": trial_count,
+            "trial_sharpe_mean": trial_sharpe_mean,
+            "trial_sharpe_standard_deviation": trial_sharpe_standard_deviation,
             "n_raw": int(values.size + excluded),
             "n_effective": int(values.size),
             "excluded_rows": excluded,
@@ -649,6 +666,8 @@ def _pbo_for_partitions(
     tie_break: PBOTieBreak,
     max_combinations: int,
 ) -> tuple[float, list[dict[str, JsonValue]], int]:
+    if isinstance(partitions, bool) or not isinstance(partitions, int):
+        raise MethodContractError("PBO partitions must be an integer")
     if partitions < 2 or partitions % 2:
         raise MethodContractError("PBO partitions must be an even integer of at least 2")
     if matrix.shape[0] % partitions:
@@ -729,6 +748,8 @@ def probability_of_backtest_overfitting(
         raise MethodContractError("statistic must be 'mean' or 'sharpe'")
     if tie_break not in {"raise", "first"}:
         raise MethodContractError("tie_break must be 'raise' or 'first'")
+    if isinstance(max_combinations, bool) or not isinstance(max_combinations, int):
+        raise MethodContractError("max_combinations must be an integer")
     if max_combinations < 1:
         raise MethodContractError("max_combinations must be positive")
     matrix, names, source = _strategy_matrix(
@@ -885,6 +906,8 @@ def _resampling_configuration(
     resamples: int,
     seed: int | None,
 ) -> tuple[int, int]:
+    if isinstance(resamples, bool) or not isinstance(resamples, int):
+        raise MethodContractError("resamples must be an integer")
     if resamples < 100:
         raise MethodContractError("resamples must be at least 100 for inferential output")
     return _expected_block_length(size, expected_block_length), _resolved_seed(seed)

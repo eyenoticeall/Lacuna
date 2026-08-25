@@ -541,6 +541,21 @@ class CombinatorialPurgedKFold:
     use_native: bool = True
 
     def __post_init__(self) -> None:
+        integer_parameters = {
+            "n_groups": self.n_groups,
+            "n_test_groups": self.n_test_groups,
+            "embargo": self.embargo,
+            "max_combinations": self.max_combinations,
+        }
+        invalid = [
+            name
+            for name, value in integer_parameters.items()
+            if isinstance(value, bool) or not isinstance(value, int)
+        ]
+        if invalid:
+            raise MethodContractError(
+                f"CPCV integer parameters have invalid types: {', '.join(invalid)}"
+            )
         if self.n_groups < 2:
             raise MethodContractError("n_groups must be at least 2")
         if not 1 <= self.n_test_groups < self.n_groups:
@@ -588,7 +603,8 @@ class CombinatorialPurgedKFold:
         group_time_sets = [set(group) for group in period_groups]
         group_rows = [
             tuple(
-                indexed.filter(pl.col(time).is_in(group_times)).sort([time, "_source_index"])
+                indexed.filter(pl.col(time).is_in(group_times))
+                .sort([time, "_source_index"])
                 .get_column("_source_index")
                 .to_list()
             )

@@ -190,6 +190,8 @@ def test_splitters_reject_invalid_configuration_and_intervals() -> None:
         PurgedKFold(n_splits=1)
     with pytest.raises(MethodContractError):
         CombinatorialPurgedKFold(n_groups=4, n_test_groups=4)
+    with pytest.raises(MethodContractError, match="invalid types"):
+        CombinatorialPurgedKFold(n_groups=4.0)  # type: ignore[arg-type]
 
     invalid = _intervals().with_columns(
         pl.when(pl.col("observation_time") == 0)

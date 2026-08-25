@@ -71,9 +71,10 @@ The transformation declares the null:
 | `within_group` | permute only within each declared group | exchangeability holds within groups |
 | `block` | reorder non-overlapping chronological blocks | blocks are exchangeable; order within each block is preserved |
 
-Non-sign-flip schemes require `paired_with`; this prevents a meaningless permutation of a
-permutation-invariant one-sample mean. Built-in statistics are `mean` and `pearson`. A callable
-receives `(permuted_values, fixed_paired_values_or_none)` and must return a finite scalar.
+Non-sign-flip schemes require `paired_with` and reject the built-in, permutation-invariant `mean`.
+Built-in `mean` therefore belongs to sign-flip inference; built-in `pearson` belongs to paired
+permutation. A callable receives `(permuted_values, fixed_paired_values_or_none)` and must return a
+finite scalar.
 
 For `greater`, Lacuna counts permuted statistics at least as large as observed. `less` reverses the
 comparison. `two_sided` compares absolute magnitudes. All use the finite-resample correction:
