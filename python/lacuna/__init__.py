@@ -17,6 +17,13 @@ from lacuna.audit import (
     default_rules,
     run_audit,
 )
+from lacuna.benchmark import (
+    BenchmarkCase,
+    BenchmarkConfig,
+    BenchmarkSuite,
+    benchmark_config_for_tier,
+    run_benchmarks,
+)
 from lacuna.config import Config, config, configure, get_config
 from lacuna.exceptions import (
     ConfigurationError,
@@ -38,6 +45,9 @@ __all__ = [
     "AuditContext",
     "AuditReport",
     "AuditRule",
+    "BenchmarkCase",
+    "BenchmarkConfig",
+    "BenchmarkSuite",
     "Config",
     "ConfigurationError",
     "DataContractError",
@@ -53,6 +63,7 @@ __all__ = [
     "SignalStudy",
     "__version__",
     "audit",
+    "benchmark_config_for_tier",
     "config",
     "configure",
     "cv",
@@ -60,6 +71,7 @@ __all__ = [
     "get_config",
     "labels",
     "run_audit",
+    "run_benchmarks",
     "signal",
     "validation",
 ]

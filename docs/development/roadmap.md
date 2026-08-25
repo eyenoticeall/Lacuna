@@ -6,9 +6,9 @@ The roadmap is dependency-ordered. A later phase does not justify weakening an e
 
 **Implemented foundation:** packaging, typed configuration, result/finding models, Polars-first normalization, native bridge, baseline tests, CI, docs, and wheel build.
 
-The audit-result v1 JSON Schema and persisted JSON/Markdown compatibility fixtures are implemented.
-Remaining foundation hardening includes richer copy diagnostics and domain-specific input schema
-validators; benchmark harness expansion is tracked in the final v0.1 integration phase.
+The audit-result v1 JSON Schema, persisted JSON/Markdown compatibility fixtures, Python end-to-end
+benchmarks, and Criterion native-kernel benchmarks are implemented. Remaining post-v0.1 foundation
+hardening includes richer copy diagnostics and domain-specific input schema validators.
 
 ## Phase 1 — signal diagnostics
 

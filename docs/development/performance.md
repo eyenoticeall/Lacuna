@@ -1,5 +1,9 @@
 # Performance architecture and benchmarking
 
+**Status:** the v0.1 benchmark suite is implemented for public signal workflows and the three
+native kernels. The measurements establish reproducible baselines; no hardware-independent latency
+promise is claimed.
+
 Performance is a product requirement, but only measured workloads justify optimization decisions.
 
 ## Non-negotiable rules
@@ -43,6 +47,23 @@ Criterion benchmarks isolate kernels such as:
 
 Record input distribution, group sizes, null/tie characteristics, and thread count. A single uniformly random array is not representative of panel finance data.
 
+The implemented Criterion suite covers:
+
+- grouped average-rank IC at 10,000 and 100,000 rows with deterministic ties;
+- 200 bootstrap mean reductions over 1,000-observation samples;
+- interval purging for 100,000 training and 1,000 test intervals.
+
+Build or run it with:
+
+```bash
+cargo bench --bench kernels --no-run
+cargo bench --bench kernels
+```
+
+Criterion is a development-only dependency of `lacuna-core`. The committed configuration uses ten
+samples, a 250 ms warm-up, and a one-second measurement window so the suite remains practical while
+still producing statistical timing evidence.
+
 ### Python end-to-end benchmarks
 
 Measure the public call, including:
@@ -55,6 +76,20 @@ Measure the public call, including:
 
 Run equivalent Polars, pandas, NumPy, and Arrow inputs where supported. A fast kernel cannot compensate for an accidental full-data copy at its boundary.
 
+The implemented runner measures forward labels, reference/native IC, quantiles, turnover, decay,
+reference/native bootstrap, reference/native interval purge, and the complete `SignalStudy.audit`
+workflow. It invokes public APIs so validation, data movement, and result construction are included.
+
+```bash
+lacuna bench --tier smoke --out benchmark.json
+
+# The repository script exposes the same service.
+python benches/python/bench_signal.py --tier small --repetitions 5
+```
+
+Use `--no-native` to isolate reference paths. Output is canonical JSON on stdout unless `--out` is
+given; existing artifacts require `--overwrite`.
+
 ### Study benchmarks
 
 Complete workflow benchmarks measure shared scans and repeated analyses. They catch regressions caused by recomputing labels, collecting lazy input multiple times, or creating excessive Python objects.
@@ -65,12 +100,17 @@ Maintain deterministic generators for approximate scales:
 
 | Tier | Rows | Typical use |
 |---|---:|---|
+| Smoke | 4 thousand | correctness and runner integration |
 | Small | 100 thousand | local iteration and crossover behavior |
 | Medium | 5 million | pull-request benchmark subset |
 | Large | 50 million | scheduled CI or dedicated runner |
 | XL | 250 million | release/performance hardware only |
 
 Generators specify instruments, dates, group skew, missingness, ties, horizons, and label overlap. Save generator configuration rather than large proprietary data.
+
+The CLI exposes smoke, small, and medium tiers. Large and XL runs require an explicit custom
+`BenchmarkConfig` on dedicated hardware so they cannot be launched accidentally in an ordinary
+developer loop.
 
 ## Measurements
 
@@ -84,6 +124,18 @@ Track:
 - thread count and CPU model;
 - library/compiler build profile;
 - output equivalence checksum.
+
+The versioned Python artifact records resolved configuration, Python/NumPy/Polars/native versions,
+platform identity, per-case min/median/max wall time, throughput with units, traced Python peak
+bytes, process peak RSS when the operating system exposes it, and a SHA-256 checksum of nonvolatile
+result evidence. The equivalence checksum excludes the backend selector and rounds finite floats to
+12 significant digits, a tighter normalization than the declared native/reference tolerances.
+`tracemalloc` does not attribute every native allocation; the artifact says so
+explicitly rather than presenting it as total process memory.
+
+Generated timestamps and timings are volatile. Checksums exclude result creation timestamps and
+must remain stable across repetitions on the same method/backend. A checksum mismatch fails the
+benchmark run because comparing timings for different evidence would be meaningless.
 
 Report warm and cold behavior separately when caches or dynamic loading matter.
 

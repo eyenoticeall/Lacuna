@@ -14,7 +14,7 @@ import polars as pl
 
 from lacuna import __version__
 from lacuna.config import get_config
-from lacuna.exceptions import DataContractError, LacunaError
+from lacuna.exceptions import DataContractError, LacunaError, ReportError
 from lacuna.labels import PriceAdjustment
 from lacuna.native import native_status
 from lacuna.report import AuditReport
@@ -142,6 +142,31 @@ def _run_signal(arguments: argparse.Namespace) -> int:
     return _audit_exit_code(report, arguments.fail_on)
 
 
+def _run_bench(arguments: argparse.Namespace) -> int:
+    from lacuna.benchmark import benchmark_config_for_tier, run_benchmarks
+
+    config = benchmark_config_for_tier(
+        arguments.tier,
+        repetitions=arguments.repetitions,
+        warmups=arguments.warmups,
+        seed=arguments.seed,
+    )
+    content = run_benchmarks(config, use_native=not arguments.no_native).to_json() + "\n"
+    if arguments.out is None:
+        print(content, end="")
+        return 0
+    destination = Path(arguments.out)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    mode = "w" if arguments.overwrite else "x"
+    try:
+        with destination.open(mode, encoding="utf-8", newline="\n") as output:
+            output.write(content)
+    except FileExistsError as error:
+        raise ReportError(f"refusing to overwrite existing benchmark: {destination}") from error
+    print(f"wrote Lacuna benchmark to {destination}", file=sys.stderr)
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="lacuna",
@@ -230,6 +255,20 @@ def _parser() -> argparse.ArgumentParser:
         default="never",
         help="return exit code 3 when the selected finding state is present",
     )
+
+    bench = subcommands.add_parser("bench", help="run reproducible developer benchmarks")
+    bench.add_argument(
+        "--tier",
+        choices=("smoke", "small", "medium"),
+        default="smoke",
+        help="deterministic dataset scale",
+    )
+    bench.add_argument("--repetitions", type=_positive_int, default=3)
+    bench.add_argument("--warmups", type=_non_negative_int, default=1)
+    bench.add_argument("--seed", type=_non_negative_int, default=42)
+    bench.add_argument("--no-native", action="store_true", help="omit native benchmark cases")
+    bench.add_argument("--out", help="write the benchmark JSON to this path")
+    bench.add_argument("--overwrite", action="store_true", help="replace an existing artifact")
     return parser
 
 
@@ -245,6 +284,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if arguments.command == "signal":
         try:
             return _run_signal(arguments)
+        except (LacunaError, OSError, pl.exceptions.PolarsError) as error:
+            print(f"lacuna: error: {error}", file=sys.stderr)
+            return 1
+
+    if arguments.command == "bench":
+        try:
+            return _run_bench(arguments)
         except (LacunaError, OSError, pl.exceptions.PolarsError) as error:
             print(f"lacuna: error: {error}", file=sys.stderr)
             return 1

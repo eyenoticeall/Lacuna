@@ -124,3 +124,24 @@ def test_signal_command_rejects_unsupported_input_format(tmp_path: object, capsy
     captured = capsys.readouterr()  # type: ignore[attr-defined]
     assert exit_code == 1
     assert "unsupported input format" in captured.err
+
+
+def test_bench_command_emits_versioned_json(capsys: object) -> None:
+    exit_code = main(
+        [
+            "bench",
+            "--tier",
+            "smoke",
+            "--repetitions",
+            "1",
+            "--warmups",
+            "0",
+            "--no-native",
+        ]
+    )
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    payload = json.loads(captured.out)
+    assert exit_code == 0
+    assert payload["schema_version"] == "1"
+    assert payload["benchmark_version"] == 1
+    assert captured.err == ""

@@ -1,0 +1,495 @@
+"""Reproducible developer benchmarks for Lacuna's v0.1 public workflow."""
+
+from __future__ import annotations
+
+import gc
+import hashlib
+import json
+import platform
+import statistics
+import sys
+import time
+import tracemalloc
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import TypeAlias
+
+import numpy as np
+import numpy.typing as npt
+import polars as pl
+
+from lacuna import signal
+from lacuna.cv import PurgedKFold, SplitResult
+from lacuna.exceptions import MethodContractError
+from lacuna.labels import LabelResult, forward_returns
+from lacuna.native import native_status
+from lacuna.report import AuditReport
+from lacuna.study import SignalStudy
+from lacuna.types import AnalysisResult
+from lacuna.validation import bootstrap
+
+BenchmarkOutput: TypeAlias = AnalysisResult | AuditReport | LabelResult | SplitResult
+BenchmarkCallable: TypeAlias = Callable[[], BenchmarkOutput]
+IntArray: TypeAlias = npt.NDArray[np.int64]
+
+
+@dataclass(frozen=True, slots=True)
+class BenchmarkConfig:
+    """Deterministic dataset and measurement configuration."""
+
+    periods: int = 40
+    instruments: int = 100
+    horizons: tuple[int, ...] = (1, 5, 20)
+    quantiles: int = 5
+    bootstrap_resamples: int = 200
+    repetitions: int = 3
+    warmups: int = 1
+    seed: int = 42
+
+    def __post_init__(self) -> None:
+        if self.periods < 3 or self.instruments < 3:
+            raise MethodContractError("benchmarks require at least 3 periods and 3 instruments")
+        if not self.horizons or any(horizon < 1 for horizon in self.horizons):
+            raise MethodContractError("benchmark horizons must be positive")
+        if len(self.horizons) != len(set(self.horizons)):
+            raise MethodContractError("benchmark horizons must be unique")
+        if max(self.horizons) >= self.periods:
+            raise MethodContractError("benchmark horizons must be shorter than the panel")
+        if not 2 <= self.quantiles <= self.instruments:
+            raise MethodContractError("benchmark quantiles must be between 2 and instruments")
+        if self.bootstrap_resamples < 100:
+            raise MethodContractError("benchmark bootstrap_resamples must be at least 100")
+        if self.repetitions < 1 or self.warmups < 0:
+            raise MethodContractError(
+                "benchmark repetitions must be positive and warmups non-negative"
+            )
+        if self.seed < 0:
+            raise MethodContractError("benchmark seed must be non-negative")
+
+    @property
+    def rows(self) -> int:
+        """Return rows in each generated panel."""
+
+        return self.periods * self.instruments
+
+    @property
+    def horizon_names(self) -> tuple[str, ...]:
+        """Return public trading-observation horizon names."""
+
+        return tuple(f"{horizon}D" for horizon in self.horizons)
+
+    def to_dict(self) -> dict[str, object]:
+        """Return JSON-compatible resolved configuration."""
+
+        return {
+            "periods": self.periods,
+            "instruments": self.instruments,
+            "rows": self.rows,
+            "horizons": list(self.horizon_names),
+            "quantiles": self.quantiles,
+            "bootstrap_resamples": self.bootstrap_resamples,
+            "repetitions": self.repetitions,
+            "warmups": self.warmups,
+            "seed": self.seed,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BenchmarkCase:
+    """One measured public operation with an equivalence checksum."""
+
+    name: str
+    backend: str
+    median_seconds: float
+    minimum_seconds: float
+    maximum_seconds: float
+    throughput: float
+    throughput_unit: str
+    python_traced_peak_bytes: int
+    checksum: str
+
+    def to_dict(self) -> dict[str, object]:
+        """Return a JSON-compatible measurement record."""
+
+        return {
+            "name": self.name,
+            "backend": self.backend,
+            "median_seconds": self.median_seconds,
+            "minimum_seconds": self.minimum_seconds,
+            "maximum_seconds": self.maximum_seconds,
+            "throughput": self.throughput,
+            "throughput_unit": self.throughput_unit,
+            "python_traced_peak_bytes": self.python_traced_peak_bytes,
+            "checksum": self.checksum,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BenchmarkSuite:
+    """Versioned benchmark artifact; timings are environment-specific evidence."""
+
+    config: BenchmarkConfig
+    cases: tuple[BenchmarkCase, ...]
+    generated_at: datetime
+    environment: Mapping[str, object]
+    schema_version: str = "1"
+    benchmark_version: int = 1
+
+    def to_dict(self) -> dict[str, object]:
+        """Return the complete benchmark artifact."""
+
+        return {
+            "schema_version": self.schema_version,
+            "benchmark_version": self.benchmark_version,
+            "generated_at": self.generated_at.astimezone(UTC).isoformat().replace("+00:00", "Z"),
+            "config": self.config.to_dict(),
+            "environment": dict(self.environment),
+            "cases": [case.to_dict() for case in self.cases],
+        }
+
+    def to_json(self, *, indent: int | None = 2) -> str:
+        """Serialize with stable key ordering."""
+
+        return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
+
+
+def benchmark_config_for_tier(
+    tier: str,
+    *,
+    repetitions: int = 3,
+    warmups: int = 1,
+    seed: int = 42,
+) -> BenchmarkConfig:
+    """Resolve the committed smoke/small/medium benchmark tiers."""
+
+    sizes = {
+        "smoke": (40, 100, 200),
+        "small": (200, 500, 1_000),
+        "medium": (1_000, 5_000, 2_000),
+    }
+    try:
+        periods, instruments, resamples = sizes[tier]
+    except KeyError as error:
+        raise MethodContractError("benchmark tier must be smoke, small, or medium") from error
+    return BenchmarkConfig(
+        periods=periods,
+        instruments=instruments,
+        bootstrap_resamples=resamples,
+        repetitions=repetitions,
+        warmups=warmups,
+        seed=seed,
+    )
+
+
+def _panels(config: BenchmarkConfig) -> tuple[pl.DataFrame, pl.DataFrame]:
+    times_by_instrument = np.tile(np.arange(config.periods, dtype=np.int64), config.instruments)
+    instruments_by_time = np.tile(np.arange(config.instruments, dtype=np.int64), config.periods)
+    instrument_blocks: IntArray = np.repeat(
+        np.arange(config.instruments, dtype=np.int64), config.periods
+    )
+    times_by_period: IntArray = np.repeat(
+        np.arange(config.periods, dtype=np.int64), config.instruments
+    )
+    rates = 0.000_01 + 0.000_5 * instrument_blocks / max(config.instruments - 1, 1)
+    prices = pl.DataFrame(
+        {
+            "time": times_by_instrument,
+            "instrument": instrument_blocks,
+            "close": 100.0 * np.exp(rates * times_by_instrument),
+        }
+    )
+    signal_values = instruments_by_time.astype(np.float64) + 0.01 * np.sin(times_by_period)
+    observations = pl.DataFrame(
+        {
+            "time": times_by_period,
+            "instrument": instruments_by_time,
+            "signal": signal_values,
+        }
+    )
+    return observations, prices
+
+
+def _without_created_at(result: AnalysisResult) -> dict[str, object]:
+    payload = result.to_dict()
+    metadata = payload["metadata"]
+    assert isinstance(metadata, dict)
+    metadata.pop("created_at")
+    return payload
+
+
+def _output_payload(output: BenchmarkOutput) -> tuple[dict[str, object], str]:
+    if isinstance(output, AuditReport):
+        result = output.result
+        return _without_created_at(result), "workflow"
+    if isinstance(output, LabelResult):
+        frame = output.frame
+        summary = frame.select(
+            pl.len().alias("rows"),
+            pl.col("forward_return").sum().alias("return_sum"),
+            pl.col("forward_return").min().alias("return_min"),
+            pl.col("forward_return").max().alias("return_max"),
+        ).row(0, named=True)
+        return {
+            "evidence": _without_created_at(output.evidence),
+            "frame_summary": summary,
+        }, "polars"
+    result = output.evidence if isinstance(output, SplitResult) else output
+    parameters = result.metadata.parameters
+    backend = parameters.get("backend")
+    return _without_created_at(result), str(backend or "polars")
+
+
+def _checksum(payload: Mapping[str, object]) -> str:
+    normalized = _equivalence_value(payload)
+    encoded = json.dumps(normalized, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _equivalence_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _equivalence_value(item) for key, item in value.items() if key != "backend"
+        }
+    if isinstance(value, list | tuple):
+        return [_equivalence_value(item) for item in value]
+    if isinstance(value, float):
+        return float(format(value, ".12g"))
+    return value
+
+
+def _measure(
+    name: str,
+    operation: BenchmarkCallable,
+    *,
+    work_items: int,
+    throughput_unit: str,
+    config: BenchmarkConfig,
+) -> BenchmarkCase:
+    for _ in range(config.warmups):
+        operation()
+    timings: list[float] = []
+    checksums: set[str] = set()
+    backend = "unknown"
+    for _ in range(config.repetitions):
+        gc.collect()
+        started = time.perf_counter()
+        output = operation()
+        elapsed = time.perf_counter() - started
+        payload, backend = _output_payload(output)
+        timings.append(elapsed)
+        checksums.add(_checksum(payload))
+    if len(checksums) != 1:
+        raise RuntimeError(f"benchmark case {name!r} produced non-deterministic evidence")
+
+    gc.collect()
+    tracemalloc.start()
+    memory_output = operation()
+    _, peak_bytes = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    memory_payload, memory_backend = _output_payload(memory_output)
+    memory_checksum = _checksum(memory_payload)
+    if memory_checksum not in checksums or memory_backend != backend:
+        raise RuntimeError(f"benchmark case {name!r} changed during memory measurement")
+
+    median_seconds = statistics.median(timings)
+    return BenchmarkCase(
+        name=name,
+        backend=backend,
+        median_seconds=median_seconds,
+        minimum_seconds=min(timings),
+        maximum_seconds=max(timings),
+        throughput=work_items / median_seconds if median_seconds else float(work_items),
+        throughput_unit=throughput_unit,
+        python_traced_peak_bytes=peak_bytes,
+        checksum=checksums.pop(),
+    )
+
+
+def _process_peak_rss_bytes() -> int | None:
+    try:
+        import resource
+    except ImportError:  # pragma: no cover - Windows
+        return None
+    peak = int(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    return peak if platform.system() == "Darwin" else peak * 1024
+
+
+def run_benchmarks(
+    config: BenchmarkConfig | None = None,
+    *,
+    use_native: bool = True,
+) -> BenchmarkSuite:
+    """Measure public v0.1 paths without enforcing machine-specific speed budgets."""
+
+    resolved = config or BenchmarkConfig()
+    observations, prices = _panels(resolved)
+    labels = forward_returns(
+        prices,
+        horizons=resolved.horizon_names,
+        price_adjustment="raw",
+    )
+    interval_count = min(resolved.rows, 100_000)
+    starts: IntArray = np.arange(interval_count, dtype=np.int64)
+    interval_frame = pl.DataFrame(
+        {
+            "observation_time": starts,
+            "label_start": starts,
+            "label_end": starts + 1 + starts % max(resolved.horizons),
+        }
+    )
+    bootstrap_values = np.sin(np.arange(max(resolved.periods, 20), dtype=np.float64) * 0.17)
+
+    cases: list[tuple[str, BenchmarkCallable, int, str]] = [
+        (
+            "labels.forward_returns",
+            lambda: forward_returns(
+                prices,
+                horizons=resolved.horizon_names,
+                price_adjustment="raw",
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.ic.reference",
+            lambda: signal.ic(observations, labels, use_native=False),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.quantiles",
+            lambda: signal.quantiles(
+                observations,
+                labels,
+                quantiles=resolved.quantiles,
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.turnover",
+            lambda: signal.turnover(observations, quantiles=resolved.quantiles),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.decay.reference",
+            lambda: signal.decay(
+                observations,
+                labels,
+                quantile_count=resolved.quantiles,
+                use_native=False,
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "validation.bootstrap.reference",
+            lambda: bootstrap(
+                bootstrap_values,
+                method="stationary",
+                expected_block_length=max(2, round(len(bootstrap_values) ** (1 / 3))),
+                resamples=resolved.bootstrap_resamples,
+                seed=resolved.seed,
+                use_native=False,
+            ),
+            resolved.bootstrap_resamples,
+            "resamples/second",
+        ),
+        (
+            "cv.purged_kfold.reference",
+            lambda: PurgedKFold(n_splits=5, embargo=2, use_native=False).split(interval_frame),
+            interval_count,
+            "intervals/second",
+        ),
+        (
+            "study.audit",
+            lambda: SignalStudy(
+                signal=observations,
+                prices=prices,
+                horizons=resolved.horizon_names,
+                price_adjustment="raw",
+                quantiles=resolved.quantiles,
+            ).audit(
+                bootstrap_resamples=resolved.bootstrap_resamples,
+                seed=resolved.seed,
+                use_native=use_native,
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+    ]
+    native = native_status()
+    if use_native and native.available:
+        cases.extend(
+            [
+                (
+                    "signal.ic.native",
+                    lambda: signal.ic(observations, labels, use_native=True),
+                    resolved.rows,
+                    "input_rows/second",
+                ),
+                (
+                    "validation.bootstrap.native",
+                    lambda: bootstrap(
+                        bootstrap_values,
+                        method="stationary",
+                        expected_block_length=max(2, round(len(bootstrap_values) ** (1 / 3))),
+                        resamples=resolved.bootstrap_resamples,
+                        seed=resolved.seed,
+                        use_native=True,
+                    ),
+                    resolved.bootstrap_resamples,
+                    "resamples/second",
+                ),
+                (
+                    "cv.purged_kfold.native",
+                    lambda: PurgedKFold(n_splits=5, embargo=2, use_native=True).split(
+                        interval_frame
+                    ),
+                    interval_count,
+                    "intervals/second",
+                ),
+            ]
+        )
+    measurements = tuple(
+        _measure(
+            name,
+            operation,
+            work_items=work_items,
+            throughput_unit=unit,
+            config=resolved,
+        )
+        for name, operation, work_items, unit in cases
+    )
+    return BenchmarkSuite(
+        config=resolved,
+        cases=measurements,
+        generated_at=datetime.now(UTC),
+        environment={
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "processor": platform.processor() or None,
+            "polars": pl.__version__,
+            "numpy": np.__version__,
+            "native_available": native.available,
+            "native_version": native.version,
+            "process_peak_rss_bytes": _process_peak_rss_bytes(),
+            "memory_measurement": "tracemalloc peak; native allocations may not be attributed",
+            "timing_clock": "time.perf_counter",
+            "checksum_normalization": (
+                "backend excluded; finite floats rounded to 12 significant digits"
+            ),
+        },
+    )
+
+
+__all__ = [
+    "BenchmarkCase",
+    "BenchmarkConfig",
+    "BenchmarkSuite",
+    "benchmark_config_for_tier",
+    "run_benchmarks",
+]

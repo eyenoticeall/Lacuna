@@ -11,3 +11,10 @@ name = "lacuna_core"
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+criterion = "0.7"
+
+[[bench]]
+name = "kernels"
+harness = false
