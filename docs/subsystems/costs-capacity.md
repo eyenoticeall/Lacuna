@@ -1,6 +1,7 @@
 # Transaction costs, market impact, and capacity
 
-**Status:** post-v0.1 subsystem. Interfaces should remain usable independently of any backtest engine.
+**Status:** implemented for the v0.3 trading-realism milestone. Interfaces remain usable
+independently of any backtest engine.
 
 This subsystem asks how fragile a strategy is to plausible trading friction. It does not claim to simulate an exchange.
 
@@ -30,18 +31,22 @@ Side and quantity conventions are explicit. Recommended normalized signed quanti
 
 ## Cost model protocol
 
-Target protocol:
+Implemented protocol:
 
 ```python
 class CostModel(Protocol):
-    name: str
-    version: int
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def version(self) -> int: ...
 
     def required_fields(self) -> tuple[str, ...]: ...
     def estimate(self, trades, market=None) -> CostEstimate: ...
 ```
 
-`CostEstimate` includes per-trade components where feasible, aggregate totals, units, assumptions, excluded rows, and findings.
+`CostEstimate` includes aligned per-trade components, complete and known-only totals, currency unit,
+assumptions, explicit unknown rows, findings, and a stable input/configuration fingerprint.
 
 Models are pure for the same inputs/configuration. They do not read live market state.
 
@@ -97,11 +102,11 @@ The result exposes each component separately.
 
 ## Stress surfaces
 
-Target API:
+Implemented API:
 
 ```python
 stress = lc.costs.stress(
-    strategy,
+    trades,
     spread_bps=[0, 2, 5, 10, 20],
     slippage_bps=[0, 2, 5, 10],
 )
@@ -119,13 +124,18 @@ turnover and sample support
 status/warnings
 ```
 
-The implementation reuses path-independent sufficient statistics when valid. It must not reuse them for nonlinear/path-dependent models that require recomputation.
+The implementation validates the trade table once, reuses the notional vector for all linear grid
+points, and evaluates each optional base model once. The reuse count and results are tested. It does
+not claim that a path-dependent execution simulation can use the same sufficient statistics.
 
 ## Cost uncertainty
 
-Scenarios may be a grid, discrete set, or sampled distribution. Correlated assumptions—such as wider spread during high volatility—must be representable.
+Scenarios may be a Cartesian grid or an explicit discrete `CostScenario` set. The latter represents
+correlated assumptions—such as wider spread together with higher slippage—without creating every
+cross-product combination.
 
-Report parameter distributions and seeds. A single “base cost” is never presented as certain.
+Sampled parameter distributions are not implemented in v0.3. A future randomized scenario method
+must report its distribution and seed. A single “base cost” is never presented as certain.
 
 ## Break-even cost
 
@@ -176,7 +186,9 @@ Nonlinear capacity models document where monotonicity should still hold.
 
 ## Execution ownership
 
-Polars can own trade joins and scenario projections. Rust is suitable for large path-independent sweeps, grouped reductions, and capacity grids after benchmarking. Generic root finding or distributions should use mature numerical libraries.
+Polars owns normalization/grouping and NumPy owns validated vector arithmetic in v0.3. The
+versioned end-to-end benchmark includes stress grids, output checksums, and traced memory. A Rust
+path remains contingent on large-grid crossover evidence and would require differential tests.
 
 ## Required tests
 
@@ -189,4 +201,8 @@ Polars can own trade joins and scenario projections. Rust is suitable for large 
 - Planted square-root impact curve.
 - Point-in-time lag for liquidity estimates.
 - Scenario determinism and component reconciliation.
-- Native/reference differential and memory benchmarks for stress grids.
+- Versioned end-to-end throughput, checksum, and memory benchmark for stress grids.
+- Native/reference differential tests if and only if a native cost path is introduced.
+
+The user-facing formulas, exact temporal policies, examples, and interpretation limits are in
+[Trading costs, liquidity, and capacity](../methodology/trading-costs-capacity.md).

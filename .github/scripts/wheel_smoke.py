@@ -20,6 +20,7 @@ PUBLIC_MODULES = (
     "lacuna.benchmark",
     "lacuna.cli",
     "lacuna.config",
+    "lacuna.costs",
     "lacuna.cv",
     "lacuna.experiment",
     "lacuna.labels",
@@ -79,6 +80,23 @@ regimes = lacuna.regime.quantile_regimes(
 )
 require(regimes.metrics["classified_rows"] == 3, "regime API failed")
 
+cost_stress = lacuna.costs.stress(
+    {
+        "decision_time": [0, 1],
+        "execution_time": [0, 1],
+        "instrument": ["A", "B"],
+        "side": ["buy", "sell"],
+        "quantity": [10.0, -10.0],
+        "price": [100.0, 100.0],
+        "reference_price": [100.0, 100.0],
+        "gross_pnl": [10.0, 10.0],
+    },
+    spread_bps=(0.0, 10.0),
+    slippage_bps=(0.0,),
+)
+require(cost_stress.metrics["scenario_count"] == 2, "cost stress API failed")
+require(cost_stress.metrics["worst_net_pnl"] == 19.0, "cost stress valuation failed")
+
 package = files("lacuna")
 require(package.joinpath("py.typed").is_file(), "wheel is missing py.typed")
 require(package.joinpath("_native.pyi").is_file(), "wheel is missing native type stubs")
@@ -94,6 +112,7 @@ print(
             "schema": schema["title"],
             "signal_mean_ic": signal_result.metrics["mean_ic"],
             "trial_count": adjusted.metrics["trial_count"],
+            "cost_scenarios": cost_stress.metrics["scenario_count"],
         },
         indent=2,
         sort_keys=True,

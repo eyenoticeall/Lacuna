@@ -1,0 +1,38 @@
+{
+  "callables": [
+    {"module": "lacuna.costs", "qualname": "TradeColumns", "signature": "(decision_time='decision_time', execution_time='execution_time', instrument='instrument', side='side', quantity='quantity', price='price', reference_price='reference_price')"},
+    {"module": "lacuna.costs", "qualname": "CostEstimate", "signature": "(model_name, model_version, currency, components, assumptions, input_fingerprint, findings=(), unit=<CostUnit.CURRENCY: 'currency'>)"},
+    {"module": "lacuna.costs", "qualname": "CommissionModel", "signature": "(fixed_per_trade=0.0, per_unit=0.0, notional_bps=0.0, minimum=0.0, currency='USD', columns=<factory>, quantity_convention='signed', allow_existing=False)"},
+    {"module": "lacuna.costs", "qualname": "SpreadModel", "signature": "(quoted_spread_bps=None, mode='half', bid='bid', ask='ask', currency='USD', columns=<factory>, quantity_convention='signed', allow_on_observed_execution=False, allow_existing=False)"},
+    {"module": "lacuna.costs", "qualname": "SlippageModel", "signature": "(fixed_per_unit=0.0, slippage_bps=0.0, currency='USD', columns=<factory>, quantity_convention='signed', allow_on_observed_execution=False, allow_existing=False)"},
+    {"module": "lacuna.costs", "qualname": "VolatilitySlippageModel", "signature": "(coefficient, volatility='volatility', volatility_available_time=None, volatility_horizon='execution_horizon', estimator='user_supplied', currency='USD', columns=<factory>, quantity_convention='signed', allow_on_observed_execution=False)"},
+    {"module": "lacuna.costs", "qualname": "ParticipationImpactModel", "signature": "(coefficient, exponent=1.0, volume='volume', volatility=None, market_available_time=None, volume_horizon='execution_horizon', volatility_horizon=None, max_participation=None, impact_cap=None, currency='USD', columns=<factory>, quantity_convention='signed')"},
+    {"module": "lacuna.costs", "qualname": "SquareRootImpactModel", "signature": "(coefficient, volume='adv', volatility='volatility', market_available_time=None, volume_horizon='daily', volatility_horizon='daily', max_participation=None, impact_cap=None, currency='USD', columns=<factory>, quantity_convention='signed')"},
+    {"module": "lacuna.costs", "qualname": "BorrowCostModel", "signature": "(borrow_rate='borrow_rate', holding_days='holding_days', borrow_available_time=None, day_count=365.0, missing='unknown', conservative_rate=None, currency='USD', columns=<factory>, quantity_convention='signed', allow_existing=False)"},
+    {"module": "lacuna.costs", "qualname": "CompositeCostModel", "signature": "(models, name='composite', version=1)"},
+    {"module": "lacuna.costs", "qualname": "CostScenario", "signature": "(name, spread_bps=0.0, slippage_bps=0.0, commission_bps=0.0)"},
+    {"module": "lacuna.costs", "qualname": "CapacityScenario", "signature": "(name, impact_coefficient, spread_bps=0.0, slippage_bps=0.0)"},
+    {"module": "lacuna.costs", "qualname": "stress", "signature": "(trades, *, gross_pnl='gross_pnl', spread_bps=(0.0, 2.0, 5.0, 10.0, 20.0), slippage_bps=(0.0, 2.0, 5.0, 10.0), commission_bps=(0.0,), scenarios=None, base_models=(), capital=None, period='execution_time', annualization=None, currency='USD', columns=None, quantity_convention='signed', allow_on_observed_execution=False)"},
+    {"module": "lacuna.costs", "qualname": "break_even_cost", "signature": "(trades, *, gross_pnl='gross_pnl', metric='net_pnl', threshold=0.0, lower_bps=0.0, upper_bps=1000.0, tolerance_bps=1e-06, max_iterations=100, capital=None, period='execution_time', annualization=None, columns=None, quantity_convention='signed')"},
+    {"module": "lacuna.costs", "qualname": "liquidity_diagnostics", "signature": "(trades, *, volume='adv', available_time=None, classification_mode, max_participation=0.1, volume_horizon='daily', estimation_lag='user_declared', columns=None, quantity_convention='signed')"},
+    {"module": "lacuna.costs", "qualname": "capacity_curve", "signature": "(trades, *, capital, base_capital, scenarios, gross_pnl='gross_pnl', volume='adv', volatility='volatility', available_time=None, classification_mode, max_participation=0.1, volume_horizon='daily', volatility_horizon='daily', estimation_lag='user_declared', period='execution_time', annualization=None, columns=None, quantity_convention='signed')"}
+  ],
+  "contract": "lacuna-public-api-v0.3",
+  "inherited_contracts": ["lacuna-public-api-v0.1", "lacuna-public-api-v0.2"],
+  "module_exports": {
+    "lacuna.adapters": ["FrameSummary", "PolarsFrame", "frame_summary", "require_columns", "to_polars"],
+    "lacuna.audit": ["Applicability", "ApplicabilityState", "AuditContext", "AuditRule", "audit", "default_rules", "run_audit"],
+    "lacuna.benchmark": ["BenchmarkCase", "BenchmarkConfig", "BenchmarkSuite", "benchmark_config_for_tier", "run_benchmarks"],
+    "lacuna.costs": ["BorrowCostModel", "BreakEvenMetric", "CapacityScenario", "CommissionModel", "CompositeCostModel", "CostEstimate", "CostModel", "CostScenario", "CostUnit", "LiquidityMode", "MissingBorrowPolicy", "ParticipationImpactModel", "QuantityConvention", "SlippageModel", "SpreadMode", "SpreadModel", "SquareRootImpactModel", "TradeColumns", "VolatilitySlippageModel", "break_even_cost", "capacity_curve", "liquidity_diagnostics", "stress"],
+    "lacuna.cv": ["Duration", "Fold", "PurgedKFold", "SplitResult", "WalkForward"],
+    "lacuna.experiment": ["CANONICALIZATION_VERSION", "REGISTRY_SCHEMA_VERSION", "AttemptRecord", "AttemptStatus", "ExperimentRegistry", "SelectionRecord", "canonical_json", "fingerprint"],
+    "lacuna.labels": ["Horizon", "LabelResult", "PriceAdjustment", "forward_returns"],
+    "lacuna.regime": ["ClassificationMode", "QuantileMethod", "quantile_regimes", "regime_analysis"],
+    "lacuna.report": ["AuditReport", "render_html", "render_markdown"],
+    "lacuna.robustness": ["Distribution", "FailurePolicy", "ObjectiveDirection", "PerturbationSpec", "Subperiod", "UniverseScenario", "continuous_perturbation", "subperiod_analysis", "universe_perturbation"],
+    "lacuna.signal": ["CorrelationMethod", "decay", "ic", "quantiles", "turnover"],
+    "lacuna.validation": ["BootstrapMethod", "IntervalMethod", "MultipleTestingMethod", "ObjectiveDirection", "Statistic", "SurfaceFailurePolicy", "bootstrap", "multiple_testing", "parameter_surface"]
+  },
+  "package_series": "0.3",
+  "root_exports": ["AnalysisResult", "Applicability", "ApplicabilityState", "AuditContext", "AuditReport", "AuditRule", "BenchmarkCase", "BenchmarkConfig", "BenchmarkSuite", "Config", "ConfigurationError", "DataContractError", "ExperimentRegistry", "Finding", "FindingState", "LabelResult", "LacunaError", "MethodContractError", "NativeExtensionError", "ReportError", "ResultMetadata", "Severity", "SignalStudy", "__version__", "audit", "benchmark_config_for_tier", "config", "configure", "costs", "cv", "default_rules", "experiment", "get_config", "labels", "regime", "robustness", "run_audit", "run_benchmarks", "signal", "validation"]
+}

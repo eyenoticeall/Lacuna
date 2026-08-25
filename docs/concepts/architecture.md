@@ -137,7 +137,8 @@ Do not create every package as an empty placeholder. Add a package when its firs
 
 ## Current implementation
 
-The repository currently implements the v0.1 signal-validation path and v0.2 robustness milestone:
+The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
+and v0.3 trading-realism milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -153,10 +154,13 @@ The repository currently implements the v0.1 signal-validation path and v0.2 rob
 - Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli corrections;
 - parameter surfaces, seeded perturbations, subperiods, and timestamped universe scenarios;
 - trailing/retrospective regime classification and conditional concentration evidence.
+- immutable cost-model estimates; commission, spread, slippage, impact, and borrow models;
+- deterministic cost stress, bracketed break-even solving, point-in-time liquidity diagnostics,
+  and scenario capacity curves.
 
-Costs/capacity, full point-in-time joins, advanced inference, backtester integrations, and plugins
-remain later contracts. Pre-1.0 minor versions can change through documented migrations; the
-published `0.1.x` and `0.2.x` contracts govern their respective release lines.
+Full point-in-time joins, advanced inference, backtester integrations, and plugins remain later
+contracts. Pre-1.0 minor versions can change through documented migrations; the published `0.1.x`,
+`0.2.x`, and `0.3.x` contracts govern their respective release lines.
 
 ## Detailed guides
 

@@ -13,7 +13,7 @@ such as `0.2.0rc1`.
 | --- | --- | --- |
 | `0.1.x` | Phases 0–3: foundations, signal diagnostics, validation core, audit/reports | Released |
 | `0.2.x` | Phase 4: robustness, regimes, experiment lineage, basic multiple-testing correction | Released |
-| `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Complete Phase 5 contracts and exit criteria |
+| `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Released |
 | `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Complete Phase 6 contracts and exit criteria |
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Validated reference and simulation suites for every method |
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Core dependency surface remains unchanged |
@@ -106,9 +106,18 @@ tests, and the frozen `0.2.x` public API contract.
 
 ## Phase 5 — trading realism
 
-Cost-model protocol, commission/spread/slippage models, stress surfaces, break-even costs, impact scenarios, and capacity curves.
+**v0.3 implemented:** an immutable cost-model protocol and estimates; commission, observed/assumed
+spread, fixed/proportional/volatility-scaled slippage, participation/square-root impact, and borrow;
+deterministic grid/correlated stress scenarios; monotonic bracketed break-even solving; point-in-time
+or retrospective liquidity evidence; and multi-scenario capacity curves.
 
 Exit criteria: cost monotonicity properties pass; outputs show assumptions and uncertainty rather than one false-precision capacity number.
+
+The exit criteria are covered by hand-computed component fixtures, monotonicity/symmetry/
+reconciliation properties, double-application guards, future-market-data tests, planted
+break-even/impact/capacity cases, explicit unknown liquidity and borrow evidence, Polars/pandas/Arrow
+equivalence, a frozen `0.3.x` public contract, and a versioned end-to-end stress benchmark. The
+benchmark supports the NumPy/Polars path; no unevidenced native cost path is shipped.
 
 ## Phase 6 — data correctness
 

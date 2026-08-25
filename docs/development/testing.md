@@ -99,6 +99,22 @@ The v0.2 gate additionally requires:
   planted outcome concentration;
 - exact `0.2.x` public exports/signatures and preservation of the `0.1.x` compatibility subset.
 
+### Trading-realism tests
+
+The v0.3 gate additionally requires:
+
+- hand-computed commission, observed/assumed spread, slippage, impact, and borrow fixtures;
+- property tests for non-negative cost monotonicity, side symmetry, zero-size identity, component
+  reconciliation, and nonlinear impact growth;
+- explicit failures for invalid units/signs, component duplication, currency mismatch, and likely
+  double application;
+- planted break-even roots, no-crossing evidence, monotonicity checks, and tolerance behavior;
+- future/missing liquidity and borrow evidence that stays unknown rather than becoming zero;
+- planted capacity erosion and participation-constraint breaches across multiple capital points;
+- eager/lazy Polars, pandas, and Arrow equivalence;
+- exact `0.3.x` public exports/signatures plus preservation of the `0.1.x` and `0.2.x` subsets;
+- a deterministic end-to-end stress benchmark with output checksum and memory evidence.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

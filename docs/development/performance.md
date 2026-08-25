@@ -1,8 +1,8 @@
 # Performance architecture and benchmarking
 
-**Status:** the v0.1 benchmark suite is implemented for public signal workflows and the three
-native kernels. The measurements establish reproducible baselines; no hardware-independent latency
-promise is claimed.
+**Status:** benchmark artifact version 2 covers public signal/audit workflows, the three native
+kernels, and the v0.3 path-independent cost-stress surface. The measurements establish reproducible
+baselines; no hardware-independent latency promise is claimed.
 
 Performance is a product requirement, but only measured workloads justify optimization decisions.
 
@@ -77,8 +77,13 @@ Measure the public call, including:
 Run equivalent Polars, pandas, NumPy, and Arrow inputs where supported. A fast kernel cannot compensate for an accidental full-data copy at its boundary.
 
 The implemented runner measures forward labels, reference/native IC, quantiles, turnover, decay,
-reference/native bootstrap, reference/native interval purge, and the complete `SignalStudy.audit`
-workflow. It invokes public APIs so validation, data movement, and result construction are included.
+reference/native bootstrap, reference/native interval purge, the complete `SignalStudy.audit`
+workflow, and a nine-point `costs.stress` grid. It invokes public APIs so validation, data movement,
+result construction, scenario projection, output checksums, and traced Python memory are included.
+
+The cost benchmark currently supports the NumPy/Polars reference implementation. It does not imply
+a native cost path: native/reference differential testing becomes mandatory if measurements later
+justify one.
 
 ```bash
 lacuna bench --tier smoke --out benchmark.json

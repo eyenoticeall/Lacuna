@@ -14,6 +14,7 @@
 │   ├── experiment.py       canonical identities and append-only trial lineage
 │   ├── robustness.py       perturbation, subperiod, and universe evidence
 │   ├── regime.py           regime classification and conditional evidence
+│   ├── costs.py            cost models, stress, liquidity, and capacity
 │   ├── audit.py            versioned rules and scoring
 │   ├── report.py           JSON/Markdown/HTML presentation
 │   ├── study.py            high-level signal workflow

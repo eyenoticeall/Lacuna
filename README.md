@@ -24,13 +24,14 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.2** adds experiment lineage and robustness analysis to the initial signal-validation
-> path. The additive `0.2.x` public API is frozen and regression-tested while preservation of the
-> `0.1.x` contract remains executable. Lacuna remains pre-1.0 software; later minor versions may
-> evolve through documented migrations.
+> Lacuna **v0.3** adds transparent trading-cost stress, liquidity evidence, break-even analysis,
+> borrow support, and capacity curves to the signal-validation and robustness paths. The additive
+> `0.3.x` public API is frozen and regression-tested while preservation of the `0.1.x` and `0.2.x`
+> contracts remains executable. Lacuna remains pre-1.0 software; later minor versions may evolve
+> through documented migrations.
 
 > [!NOTE]
-> [`v0.2.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.2.0)
+> [`v0.3.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.3.0)
 > as checksummed, provenance-attested wheels and a source distribution. The PyPI distribution name
 > `lacuna` belongs to an unrelated project, so do not install that package expecting this software.
 
@@ -84,6 +85,7 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 | Multiplicity | Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli adjustment over explicit or registered trial families |
 | Robustness | Parameter surfaces, seeded continuous perturbation, declared subperiods, and timestamped universe composition evidence |
 | Regimes | Fixed/trailing/retrospective quantile classifiers, availability checks, conditional evidence, and outcome concentration |
+| Trading realism | Composable commissions, spread, slippage, impact, and borrow; stress grids, break-even costs, point-in-time liquidity, and capacity curves |
 
 ## Quick start
 
@@ -167,6 +169,27 @@ for lookback, p_value in [(20, 0.03), (40, 0.01), (60, 0.20)]:
 adjusted = lc.validation.multiple_testing(registry, method="holm")
 ```
 
+Stress normalized trades across explicit friction assumptions without hiding missing evidence:
+
+```python
+surface = lc.costs.stress(
+    trades,
+    spread_bps=(0, 2, 5, 10, 20),
+    slippage_bps=(0, 2, 5, 10),
+    capital=10_000_000,
+    annualization=252,
+)
+
+curve = lc.costs.capacity_curve(
+    trades,
+    capital=(1_000_000, 5_000_000, 10_000_000),
+    base_capital=1_000_000,
+    scenarios=(lc.costs.CapacityScenario("base", impact_coefficient=0.10),),
+    classification_mode="point_in_time",
+    available_time="market_available_time",
+)
+```
+
 For local Parquet, CSV, Arrow IPC, or Feather files:
 
 ```bash
@@ -201,10 +224,10 @@ uv run lacuna signal \
 
 ## Roadmap
 
-Versions `0.1` and `0.2` cover foundations, signal diagnostics, temporal validation, dependent
-bootstrap, audit/reporting, experiment lineage, multiple-testing correction, and robustness across
-parameters, time, universes, and regimes. The next milestone is `0.3`: transaction costs, stress
-surfaces, liquidity, and capacity evidence.
+Versions `0.1` through `0.3` cover foundations, signal diagnostics, temporal validation, dependent
+bootstrap, audit/reporting, experiment lineage, multiple-testing correction, robustness, and
+trading-realism evidence. The next milestone is `0.4`: point-in-time data correctness, revision
+semantics, survivorship diagnostics, and safe availability-time joins.
 
 See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
 and the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for architecture and statistical
@@ -221,8 +244,8 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes implemented v0.1/v0.2 behavior from later contracts. Contributors and
-coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
+The documentation distinguishes implemented v0.1–v0.3 behavior from later contracts. Contributors
+and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 
 ## Principles

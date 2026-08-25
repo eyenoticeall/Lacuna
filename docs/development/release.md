@@ -66,7 +66,9 @@ from lacuna import _native
 assert lacuna.__version__ == _native.version()
 ```
 
-It then runs a minimal native kernel, imports every public package, checks `py.typed` and stubs, and exercises the CLI `doctor` command.
+It then runs a minimal native kernel, imports every public package, checks `py.typed` and stubs,
+exercises experiment/multiplicity and regime APIs, values a two-point cost-stress surface, and
+exercises the CLI `doctor` command.
 
 The canonical audit schema is available both as the repository publication artifact at
 `schemas/audit-result-v1.schema.json` and as the installed

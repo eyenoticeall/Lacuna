@@ -50,6 +50,7 @@ nav:
       - Experiment lineage and multiple testing: methodology/experiments-multiple-testing.md
       - Robustness analysis: methodology/robustness-analysis.md
       - Regime analysis: methodology/regime-analysis.md
+      - Trading costs, liquidity, and capacity: methodology/trading-costs-capacity.md
       - Audit score: methodology/audit-scoring.md
   - Agent handbook:
       - Overview: agents/index.md

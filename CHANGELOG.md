@@ -4,6 +4,43 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.3.0] - 2026-08-26
+
+### Added
+
+- Add a runtime-checkable cost-model protocol, configurable normalized trade columns, and immutable
+  `CostEstimate` values with named per-trade components, complete/known-only totals, explicit
+  unknown rows, assumptions, findings, units, and stable fingerprints.
+- Add fixed/per-unit/notional commission, observed or assumed half/full spread, fixed/proportional
+  slippage, volatility-scaled slippage, general participation impact, square-root impact, and
+  annualized borrow models.
+- Add component composition with strict row/currency/name reconciliation and safeguards against
+  silently applying costs again to observed execution prices or existing component columns.
+- Add deterministic Cartesian cost grids and explicit correlated `CostScenario` sets with gross/net
+  P&L, return, Sharpe, turnover, component reconciliation, support, and unknown-cost status.
+- Add monotonicity-checked, bracketed all-in-cost break-even solving for net P&L, net return, net
+  Sharpe, and CAGR, including complete solver traces and no silent extrapolation.
+- Add point-in-time or explicitly retrospective liquidity diagnostics with participation coverage,
+  distribution summaries, constraints, and unknown/future-volume evidence.
+- Add multi-scenario square-root-impact capacity curves across strictly increasing capital values,
+  including liquidity coverage, participation, component costs, net performance, and constraint
+  status without inventing one capacity number.
+- Add hand-computed, property, planted, temporal, missing-data, component, adapter, packaging-smoke,
+  and frozen `0.3.x` public API contract tests while preserving the `0.1.x` and `0.2.x` contracts.
+- Add a complete trading-cost/capacity methodology guide and promote the subsystem architecture from
+  target design to implemented behavior.
+
+### Changed
+
+- Advance the implementation roadmap through Phase 5 and designate point-in-time data correctness
+  as the next milestone for the `0.4.x` series.
+- Reuse validated path-independent sufficient statistics and one-time base-model estimates across
+  stress surfaces.
+- Advance the reproducible benchmark artifact to version 2 with a nine-point public cost-stress
+  case measuring scenario throughput, output equivalence checksum, and traced memory.
+- Require `lacuna.costs` in wheels/source distributions and exercise a cost surface in clean-wheel
+  smoke tests.
+
 ## [0.2.0] - 2026-08-26
 
 ### Added
