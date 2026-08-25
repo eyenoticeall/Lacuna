@@ -191,11 +191,17 @@ jobs:
           enable-cache: true
           cache-suffix: interoperability
       - name: Install optional adapters and statistical references
-        run: uv sync --frozen --group dev --extra pandas --extra statistics
+        run: >-
+          uv sync --frozen --group dev
+          --extra duckdb
+          --extra ml
+          --extra pandas
+          --extra statistics
       - name: Compare dataframe adapters and independent references
         run: >-
           uv run --no-sync pytest
           tests/integration/test_adapter_matrix.py
+          tests/integration/test_optional_interoperability.py
           tests/reference
           --junitxml=junit.xml
       - name: Retain interoperability evidence

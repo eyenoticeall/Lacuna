@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Literal
 
 from lacuna import signal as signal_api
-from lacuna.adapters import PolarsFrame, to_polars
+from lacuna.adapters.polars import PolarsFrame, to_polars
 from lacuna.audit import AuditContext, AuditRule, run_audit
 from lacuna.cv import SplitResult
 from lacuna.exceptions import MethodContractError

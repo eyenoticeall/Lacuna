@@ -11,7 +11,7 @@ from typing import Literal, TypeAlias
 
 import polars as pl
 
-from lacuna.adapters import require_columns, to_polars
+from lacuna.adapters.polars import require_columns, to_polars
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import JsonValue
 

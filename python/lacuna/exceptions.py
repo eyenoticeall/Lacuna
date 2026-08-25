@@ -23,3 +23,7 @@ class NativeExtensionError(LacunaError, RuntimeError):
 
 class ReportError(LacunaError, RuntimeError):
     """Raised when a report cannot be rendered or persisted safely."""
+
+
+class PluginError(LacunaError, RuntimeError):
+    """Raised when plugin discovery, negotiation, or explicit activation fails."""

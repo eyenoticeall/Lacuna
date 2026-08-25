@@ -1,6 +1,17 @@
 """Public API for quantitative signal diagnostics and validation."""
 
-from lacuna import bias, costs, cv, experiment, labels, regime, robustness, signal, validation
+from lacuna import (
+    bias,
+    costs,
+    cv,
+    experiment,
+    labels,
+    plugins,
+    regime,
+    robustness,
+    signal,
+    validation,
+)
 from lacuna._version import __version__
 from lacuna.audit import (
     Applicability,
@@ -25,6 +36,7 @@ from lacuna.exceptions import (
     LacunaError,
     MethodContractError,
     NativeExtensionError,
+    PluginError,
     ReportError,
 )
 from lacuna.experiment import ExperimentRegistry
@@ -53,6 +65,7 @@ __all__ = [
     "LacunaError",
     "MethodContractError",
     "NativeExtensionError",
+    "PluginError",
     "ReportError",
     "ResultMetadata",
     "Severity",
@@ -69,6 +82,7 @@ __all__ = [
     "experiment",
     "get_config",
     "labels",
+    "plugins",
     "regime",
     "robustness",
     "run_audit",
