@@ -1,0 +1,20 @@
+[package]
+name = "lacuna-python"
+description = "Python bindings for the Lacuna native core."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib"]
+doctest = false
+test = false
+
+[dependencies]
+lacuna-core = { path = "../lacuna-core" }
+pyo3 = "0.29.2"
+
+[lints]
+workspace = true

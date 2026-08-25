@@ -1,0 +1,26 @@
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+.coverage
+.hypothesis/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.venv/
+htmlcov/
+
+# Rust and packaging
+target/
+dist/
+
+# Documentation
+site/
+
+# Editors
+.idea/
+.vscode/
+*.swp

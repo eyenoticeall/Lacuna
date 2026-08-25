@@ -1,0 +1,116 @@
+[build-system]
+requires = ["maturin>=1.9,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "lacuna"
+version = "0.0.1"
+description = "Open-source quantitative research validation for finding where alpha breaks."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT OR Apache-2.0"
+keywords = [
+  "backtesting",
+  "finance",
+  "quantitative-research",
+  "statistics",
+  "validation",
+]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Financial and Insurance Industry",
+  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Rust",
+  "Topic :: Scientific/Engineering :: Information Analysis",
+  "Typing :: Typed",
+]
+dependencies = [
+  "numpy>=2.0",
+  "polars>=1.30",
+]
+
+[project.optional-dependencies]
+statistics = ["scipy>=1.15"]
+report = ["jinja2>=3.1", "plotly>=6.0"]
+pandas = ["pandas>=2.2", "pyarrow>=19"]
+ml = ["scikit-learn>=1.6"]
+duckdb = ["duckdb>=1.3"]
+all = [
+  "duckdb>=1.3",
+  "jinja2>=3.1",
+  "pandas>=2.2",
+  "plotly>=6.0",
+  "pyarrow>=19",
+  "scikit-learn>=1.6",
+  "scipy>=1.15",
+]
+
+[project.scripts]
+lacuna = "lacuna.cli:main"
+
+[dependency-groups]
+dev = [
+  "hypothesis>=6.130",
+  "maturin>=1.9,<2.0",
+  "mypy>=1.15",
+  "pytest>=8.3",
+  "pytest-cov>=6.0",
+  "ruff>=0.11",
+]
+docs = ["mkdocs-material>=9.6"]
+
+[tool.maturin]
+manifest-path = "rust/lacuna-python/Cargo.toml"
+python-source = "python"
+module-name = "lacuna._native"
+bindings = "pyo3"
+strip = true
+
+[tool.uv]
+cache-keys = [
+  { file = "pyproject.toml" },
+  { file = "Cargo.toml" },
+  { file = "rust/**/*.toml" },
+  { file = "rust/**/*.rs" },
+  { file = "python/**/*.py" },
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["python", "tests"]
+extend-exclude = ["LACUNA_TECHNICAL_SPEC.md"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["python/lacuna"]
+
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["lacuna"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

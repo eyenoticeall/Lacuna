@@ -1,0 +1,13 @@
+[package]
+name = "lacuna-core"
+description = "Performance-critical kernels for Lacuna."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "lacuna_core"
+
+[lints]
+workspace = true

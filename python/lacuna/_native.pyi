@@ -1,0 +1,6 @@
+"""Types for the PyO3 extension."""
+
+from collections.abc import Sequence
+
+def version() -> str: ...
+def checked_mean(values: Sequence[float]) -> float: ...
