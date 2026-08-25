@@ -4,6 +4,38 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.4.0] - 2026-08-26
+
+### Added
+
+- Add deterministic point-in-time as-of joins with explicit decision/availability semantics,
+  identity matching, exact-boundary and staleness policies, stable left order, explicit unmatched
+  handling, revision-tie resolution, and a verified zero-future-match invariant.
+- Add direct future-data diagnostics with missing-availability preservation, equal-boundary counts,
+  bounded affected-row evidence, and optional absolute materiality.
+- Add structural revision-history diagnostics with unique version identities, monotone publication
+  ordering, per-fact version summaries, and explicit point-in-time/latest-only/unknown source modes.
+- Add three-state survivorship evidence, planted delisting support, half-open membership interval
+  validation, overlap and late-availability detection, and no unknown-to-pass conversion.
+- Add availability-safe historical membership selection that rejects ambiguous interval sources and
+  visibly excludes otherwise-active rows that were not yet observable.
+- Add consecutive universe additions, removals, retention, Jaccard similarity, and drift evidence
+  with explicit source survivorship status.
+- Add reusable `DatasetSpec` contracts and structured validation for required fields, empty inputs,
+  null constraints, key uniqueness, numeric/temporal dtypes, non-finite values, and temporal order.
+- Add exact temporal/revision/survivorship fixtures, generated latest-nonfuture and half-open
+  interval invariants, and eager/lazy Polars, pandas, and Arrow equivalence.
+- Publish a complete point-in-time data-correctness methodology guide and freeze the additive
+  `0.4.x` public API while preserving executable `0.1.x` through `0.3.x` contracts.
+
+### Changed
+
+- Complete roadmap Phase 6 and designate advanced inference as the next guarded milestone.
+- Advance the reproducible benchmark artifact to version 3 with a public point-in-time as-of case,
+  deterministic checksum, left-row throughput, and traced-memory evidence.
+- Require `lacuna.bias` in wheel/source distributions and exercise the availability firewall in
+  clean-wheel smoke tests.
+
 ## [0.3.0] - 2026-08-26
 
 ### Added
