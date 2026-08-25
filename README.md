@@ -24,17 +24,14 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna is a **v0.1 release candidate**. The initial signal-validation path is implemented and
-> tested, and the `0.1.x` public API contract is now reviewable and regression-tested. It remains
+> Lacuna **v0.1** is the initial public release. The signal-validation path is implemented and
+> tested, and the `0.1.x` public API contract is frozen and regression-tested. Lacuna remains
 > pre-1.0 software; later minor versions may evolve through documented migrations.
 
 > [!NOTE]
-> [`v0.1.0-rc.1` is available for independent testing](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.1.0-rc.1).
-> Lacuna needs results from two non-implementers before the candidate can graduate. Follow the
-> [tester protocol](docs/development/release-candidate-feedback.md), then submit the
-> [structured feedback form](https://github.com/eyenoticeall/Lacuna/issues/new?template=rc-feedback.yml).
-> Progress and qualifying reports are tracked in
-> [GitHub issue #2](https://github.com/eyenoticeall/Lacuna/issues/2).
+> [`v0.1.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.1.0)
+> as checksummed, provenance-attested wheels and a source distribution. The PyPI distribution name
+> `lacuna` belongs to an unrelated project, so do not install that package expecting this software.
 
 ## Why Lacuna?
 
@@ -243,8 +240,7 @@ contract.
 
 Version-matching tags additionally build target-smoke-tested stable-ABI wheels for Linux x86_64,
 Linux aarch64, macOS arm64, and Windows x86_64, then publish checksums and GitHub provenance. See the
-[release engineering contract](docs/development/release.md) and
-[independent feedback protocol](docs/development/release-candidate-feedback.md).
+[release engineering contract](docs/development/release.md).
 
 Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete local documentation site can be built with `uv run mkdocs serve`. Security concerns should follow [SECURITY.md](SECURITY.md).
 

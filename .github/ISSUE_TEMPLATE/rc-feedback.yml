@@ -1,6 +1,6 @@
-name: v0.1 release-candidate feedback
+name: v0.1 release feedback
 description: Report installation, interoperability, correctness, or usability findings from independent research.
-title: "[v0.1 RC feedback]: "
+title: "[v0.1 feedback]: "
 body:
   - type: markdown
     attributes:
@@ -13,7 +13,7 @@ body:
     attributes:
       label: Release tested
       description: Include the exact Lacuna version or GitHub release tag.
-      placeholder: v0.1.0-rc.1 / 0.1.0rc1
+      placeholder: v0.1.0 / 0.1.0
     validations:
       required: true
   - type: dropdown
@@ -88,7 +88,7 @@ body:
       options:
         - label: I removed credentials, proprietary data, and sensitive strategy details.
           required: true
-        - label: I searched existing v0.1 RC feedback for the same behavior.
+        - label: I searched existing v0.1 feedback for the same behavior.
           required: true
         - label: I understand that Lacuna is research-validation software, not investment advice or a trading system.
           required: true

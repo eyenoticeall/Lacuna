@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "lacuna"
-version = "0.1.0rc1"
+version = "0.1.0"
 description = "Open-source quantitative research validation for finding where alpha breaks."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,7 +17,7 @@ keywords = [
   "validation",
 ]
 classifiers = [
-  "Development Status :: 2 - Pre-Alpha",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Financial and Insurance Industry",
   "License :: OSI Approved :: Apache Software License",

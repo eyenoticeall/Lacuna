@@ -4,6 +4,21 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.1.0] - 2026-08-26
+
+### Changed
+
+- Promote the fully verified `0.1.0-rc.1` implementation and its frozen `0.1.x` public contract to
+  Lacuna's initial stable release.
+- Publish stable version tags as GitHub Releases while retaining prerelease treatment for SemVer
+  candidate tags.
+- Record the maintainer decision to waive independent-user acceptance for `0.1.0` because no testers
+  were available; this release makes no claim of external user validation.
+
+### Removed
+
+- Retire the candidate-specific acceptance protocol and public validation tracker references.
+
 ## [0.1.0-rc.1] - 2026-08-26
 
 ### Added
