@@ -69,7 +69,7 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 | Data boundary | Polars-first normalization for lazy/eager, NumPy, pandas, and Arrow-compatible inputs |
 | Result contract | Immutable metadata, findings, metrics, tables, and safe JSON serialization |
 | Quality | Python, property, integration, and Rust tests; Ruff, mypy, and CI configuration |
-| Project docs | Getting started, architecture, methodology principles, governance, and roadmap |
+| Project docs | Architecture, subsystem contracts, developer handbook, agent playbooks, methodology, and roadmap |
 
 ## Quick start
 
@@ -151,9 +151,10 @@ ic = lc.signal.ic(signal, forward_returns, method="spearman", by="date")
 │   └── lacuna-python/      # PyO3 extension
 ├── tests/                  # unit, property, and integration tests
 ├── benches/                # benchmark entry points
-├── docs/                   # tutorials, concepts, and methodology
+├── docs/                   # engineering handbook and subsystem contracts
 ├── examples/               # executable examples
 ├── logos/                  # Lacuna brand assets
+├── AGENTS.md               # repository contract for coding agents
 ├── pyproject.toml          # Python package and tooling
 └── Cargo.toml              # Rust workspace
 ```
@@ -167,6 +168,19 @@ ic = lc.signal.ic(signal, forward_returns, method="spearman", by="date")
 5. **Robustness and realism** — parameter stability, regimes, cost stress, capacity, and point-in-time correctness.
 
 See the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for the architecture, statistical scope, and version milestones.
+
+## Engineering handbook
+
+The technical specification is backed by implementation-oriented documentation:
+
+- [architecture and dependency boundaries](docs/concepts/architecture.md);
+- [semantic time, identity, and table contracts](docs/concepts/data-model.md);
+- [structured evidence and finding contracts](docs/concepts/evidence-model.md);
+- [developer workflow, testing, native, performance, and release guides](docs/development/index.md);
+- [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
+- [coding-agent playbooks and review checklist](docs/agents/index.md).
+
+The documentation distinguishes the implemented Phase 0 foundation, the v0.1 contract, and later work. Contributors and coding agents should begin with [AGENTS.md](AGENTS.md) before implementing target APIs.
 
 ## Principles
 
@@ -195,7 +209,7 @@ cargo test --workspace
 uv build --wheel
 ```
 
-Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). Security concerns should follow [SECURITY.md](SECURITY.md).
+Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete local documentation site can be built with `uv run mkdocs serve`. Security concerns should follow [SECURITY.md](SECURITY.md).
 
 ## License
 
