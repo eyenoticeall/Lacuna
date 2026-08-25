@@ -11,11 +11,20 @@ from typing import TypeAlias
 
 import polars as pl
 
-from lacuna.adapters import frame_summary, require_columns, to_polars
+from lacuna.adapters import require_columns, to_polars
 from lacuna.exceptions import DataContractError
 from lacuna.types import JsonValue
 
 NullPolicy: TypeAlias = str
+
+
+def _source_type(data: object) -> str:
+    if isinstance(data, pl.LazyFrame):
+        return "polars.LazyFrame"
+    if isinstance(data, pl.DataFrame):
+        return "polars.DataFrame"
+    module = type(data).__module__.split(".", maxsplit=1)[0]
+    return f"{module}.{type(data).__name__}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +56,6 @@ def eager_frame(
     """Normalize supported tabular input and deliberately materialize it."""
 
     normalized = to_polars(data, schema=schema)
-    summary = frame_summary(normalized)
     require_columns(normalized, required)
     if isinstance(normalized, pl.LazyFrame):
         materialized = True
@@ -56,7 +64,7 @@ def eager_frame(
         materialized = False
         frame = normalized
     return frame, FrameDiagnostics(
-        source_type=summary.source_type,
+        source_type=_source_type(data),
         rows=frame.height,
         columns=tuple(frame.columns),
         materialized=materialized,

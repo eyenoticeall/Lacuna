@@ -15,7 +15,11 @@
 ├── tests/
 │   ├── unit/
 │   ├── property/
+│   ├── reference/
+│   ├── schema/
+│   ├── golden/
 │   └── integration/
+├── schemas/                 versioned machine-readable result contracts
 ├── benches/
 ├── examples/
 ├── docs/
@@ -139,6 +143,8 @@ Tests are organized by purpose rather than by mirroring every source directory:
 - `property` for invariants;
 - `statistical` for simulation calibration;
 - `integration` for language and adapter boundaries;
-- `regression` for fixed bugs and persisted schema compatibility.
+- `regression` for fixed bugs and persisted schema compatibility;
+- `golden` for byte-stable representative artifacts;
+- `schema` for compatibility validation against published contracts.
 
 Add directories when their first tests land. Large generated datasets belong in reproducible fixture builders or external benchmark storage, not Git.

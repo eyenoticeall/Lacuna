@@ -208,10 +208,15 @@ JSON is the canonical machine-readable report. It should have a published schema
 
 Large tables should be referenced as typed artifacts rather than embedded without bound. Consumers must reject unsupported major schema versions.
 
-The v0.1 JSON is `AnalysisResult` schema version `1`. It contains canonical finite values, audit
+The v0.1 JSON is `AnalysisResult` schema version `1`, published at
+`schemas/audit-result-v1.schema.json`. It contains canonical finite values, audit
 method and score versions, rule versions, summary metrics, findings, compact score tables, warnings,
 and result-method provenance. Artifact manifests and large external evidence tables are later bundle
 features.
+
+The schema is exercised against `tests/fixtures/audit-result-v1.json`; the same representative
+result also has a byte-stable Markdown fixture. Consumers must select a validator by
+`schema_version` and reject unsupported major versions rather than guessing compatibility.
 
 ## Markdown and terminal output
 

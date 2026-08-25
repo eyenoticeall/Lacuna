@@ -47,3 +47,18 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
+
+  optional-adapters:
+    name: Optional adapters and references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Sync optional test environment
+        run: uv sync --group dev --extra pandas --extra statistics
+      - name: Test adapter and reference suites
+        run: uv run --extra pandas --extra statistics pytest tests/integration/test_adapter_matrix.py tests/reference
