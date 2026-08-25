@@ -3,6 +3,11 @@ site_description: Quantitative research validation for finding where alpha break
 docs_dir: docs
 theme:
   name: material
+  features:
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
   palette:
     scheme: slate
     primary: black
@@ -12,10 +17,43 @@ nav:
   - Getting started: getting-started/index.md
   - Concepts:
       - Architecture: concepts/architecture.md
+      - Semantic data model: concepts/data-model.md
+      - Evidence model: concepts/evidence-model.md
+  - Engineering:
+      - Handbook: development/index.md
+      - Repository layout: development/repository-layout.md
+      - Python API design: development/python-api.md
+      - Native Rust core: development/native-core.md
+      - Data boundary: development/data-boundary.md
+      - Testing strategy: development/testing.md
+      - Performance: development/performance.md
+      - Contributing a method: development/contributing-a-method.md
+      - Release engineering: development/release.md
+      - Implementation roadmap: development/roadmap.md
+  - Subsystems:
+      - Signals and labels: subsystems/signal-labels.md
+      - Financial validation: subsystems/financial-validation.md
+      - Robustness: subsystems/robustness.md
+      - Costs and capacity: subsystems/costs-capacity.md
+      - Bias and point-in-time safety: subsystems/bias-point-in-time.md
+      - Audit and reporting: subsystems/audit-reporting.md
+      - Experiments and reproducibility: subsystems/experiments-reproducibility.md
+      - Adapters, execution, and plugins: subsystems/adapters-execution-plugins.md
   - Methodology:
       - Principles: methodology/principles.md
+  - Agent handbook:
+      - Overview: agents/index.md
+      - Implementation playbook: agents/implementation-playbook.md
+      - Review checklist: agents/review-checklist.md
+  - Reference:
+      - Glossary: reference/glossary.md
+      - Architecture decisions: reference/architecture-decisions.md
 markdown_extensions:
   - admonition
   - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
   - pymdownx.highlight
   - pymdownx.superfences

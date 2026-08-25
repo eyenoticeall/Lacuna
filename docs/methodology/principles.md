@@ -8,3 +8,5 @@ The initial contracts encode two important distinctions:
 - Missing evidence is represented as `UNKNOWN`; it is never silently promoted to `PASS`.
 
 Method-specific pages will include formulas, assumptions, reference comparisons, numerical tolerances, and situations where a method should not be used before that method is considered complete.
+
+For implementation-level requirements, see [Contributing a method](../development/contributing-a-method.md), [Testing strategy](../development/testing.md), and the relevant [subsystem guide](../subsystems/financial-validation.md).

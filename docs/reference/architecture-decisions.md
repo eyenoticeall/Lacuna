@@ -1,0 +1,188 @@
+# Architecture decisions
+
+This page expands the decision summary in the technical specification into implementation guidance. All listed decisions are **accepted**. A decision is changed through an explicit replacement or superseding record, not by quietly violating it in code.
+
+## Decision index
+
+| ID | Decision | Principal consequence |
+| --- | --- | --- |
+| ADR-001 | Python is the public API | Python owns policy, orchestration, and user experience |
+| ADR-002 | Rust handles Lacuna-specific hot paths | Native work requires evidence and a coarse stable boundary |
+| ADR-003 | Arrow is the interoperability contract | Prefer columnar buffers over dataframe-specific internals |
+| ADR-004 | Polars is the preferred dataframe | Optimize Polars first while accepting pandas and NumPy |
+| ADR-005 | Lacuna is not a backtester | Consume backtest artifacts; do not build an event engine |
+| ADR-006 | Structured results precede visualization | Reports are reproducible projections of evidence |
+| ADR-007 | Missing evidence is unknown | Audits never turn absence into an implicit pass |
+| ADR-008 | Performance regression is testable | Stable benchmarks accompany correctness tests |
+| ADR-009 | GPU is outside v0.1 | Establish a strong CPU architecture before GPU complexity |
+| ADR-010 | Query engines are optional adapters | Keep core lean, embeddable, and semantically controlled |
+
+## ADR-001 — Python public API
+
+**Context:** quantitative researchers rely on Python's data, statistics, notebook, and orchestration ecosystem. A Rust-first public interface would raise adoption and extension costs.
+
+**Decision:** Python is the primary user interface.
+
+**Consequences:**
+
+- public validation, configuration, result construction, audit orchestration, and errors are designed in Python;
+- type hints and stable Python objects define compatibility;
+- Rust is replaceable behind internal dispatch and cannot become the only definition of methodology;
+- study objects and the CLI delegate to public Python services.
+
+**Revisit when:** another language requires a first-class client. Prefer a language-neutral artifact/service boundary rather than leaking PyO3 details.
+
+## ADR-002 — Rust hot-path core
+
+**Context:** large panel, grouping, rolling, ranking, resampling, and overlap workloads can exceed practical pure-Python performance and memory behavior.
+
+**Decision:** performance-critical Lacuna-specific kernels use Rust.
+
+**Consequences:**
+
+- optimization follows profiling and a correct reference;
+- `lacuna-core` remains Python-independent and `lacuna-python` owns PyO3 conversion;
+- calls are coarse-grained, typed, panic-safe, and tested differentially;
+- interpreter-lock and shared thread-budget behavior are part of the contract;
+- packaging must ship reliable native wheels.
+
+**Revisit when:** an existing vectorized/query implementation meets the performance and semantic contract more simply. Rust is an option, not a quota.
+
+## ADR-003 — Arrow interoperability contract
+
+**Context:** dataframe ecosystems differ, but many can exchange typed columnar buffers through Arrow.
+
+**Decision:** Arrow-compatible columnar memory is the primary native data contract.
+
+**Consequences:**
+
+- conversions target Arrow-compatible arrays/streams rather than proprietary dataframe objects;
+- null bitmaps, offsets, chunking, dictionary values, timestamp metadata, and lifetimes require validation;
+- zero-copy is preferred where safe but never promised unconditionally;
+- import/export compatibility is tested across supported containers.
+
+**Revisit when:** a major input class cannot express required semantics or a safer standard supersedes Arrow for the relevant boundary.
+
+## ADR-004 — Polars preferred dataframe
+
+**Context:** Lacuna's workloads are large, columnar, group-heavy, and benefit from lazy execution. Polars aligns with the Rust/Arrow architecture.
+
+**Decision:** optimize first for Polars while accepting pandas and NumPy.
+
+**Consequences:**
+
+- examples and primary dataframe paths use Polars;
+- APIs accept capabilities/semantic fields rather than expose Polars-only internals;
+- pandas support is an optional adapter with documented copy/index behavior;
+- NumPy remains suitable for dense numerical inputs;
+- lazy operations stay lazy only when semantic equivalence is preserved.
+
+**Revisit when:** usage and benchmark evidence show another dataframe deserves equal first-class optimization.
+
+## ADR-005 — No backtester
+
+**Context:** full event-driven execution engines require brokerage simulation, order lifecycle, portfolio accounting, and market microstructure scope that would dilute Lacuna's validation focus.
+
+**Decision:** Lacuna does not become a full backtester.
+
+**Consequences:**
+
+- Lacuna consumes signals, returns, trades, positions, and assumptions from other systems;
+- backtester adapters make timing, gross/net, cost, calendar, and delisting semantics explicit;
+- Lacuna may construct forward labels and research diagnostics but does not own order routing or portfolio simulation;
+- integrations remain translation layers, not forks of external engines.
+
+**Revisit when:** never for convenience alone. A proposal must show that validation is impossible without narrowly scoped simulation and preserve the product boundary.
+
+## ADR-006 — Structured result before visualization
+
+**Context:** plots without source evidence are difficult to reproduce, review, serialize, or reuse in audits.
+
+**Decision:** every analysis returns structured, serializable results before rendering.
+
+**Consequences:**
+
+- `AnalysisResult` carries metrics, typed tables, findings, provenance, warnings, and versions;
+- plots and reports reference stored tables and rendering configuration;
+- JSON is the canonical machine representation;
+- renderers cannot change statistical conclusions.
+
+**Revisit when:** a truly streaming visualization cannot retain full evidence. It must still emit a sufficient summarized/result artifact with declared information loss.
+
+## ADR-007 — No implicit pass for unknown evidence
+
+**Context:** audits can look reassuring when unavailable checks are omitted or default to success.
+
+**Decision:** missing required evidence is `UNKNOWN`.
+
+**Consequences:**
+
+- applicability is explicit for every rule;
+- `UNKNOWN` differs from `NOT_APPLICABLE` and from a confirmed failure;
+- report summaries expose evidence coverage alongside scores;
+- scoring has an explicit, versioned unknown policy;
+- latest-only or ambiguous data cannot claim point-in-time safety.
+
+**Revisit when:** the state vocabulary changes. The epistemic distinction between absent evidence and successful evidence must remain.
+
+## ADR-008 — Performance regression is testable
+
+**Context:** high performance is part of Lacuna's value, and accidental copies or dispatch changes can erase it without breaking correctness tests.
+
+**Decision:** maintain stable benchmark cases alongside correctness tests.
+
+**Consequences:**
+
+- benchmarks cover Rust kernels and end-to-end Python boundaries;
+- representative data scales, shapes, null density, grouping, and chunking are fixed and versioned;
+- latency, throughput, peak memory, copies, and threads are measured;
+- regressions are evaluated statistically, with roughly 10% as an investigation threshold rather than a single-run verdict;
+- performance improvements still require correctness equivalence.
+
+**Revisit when:** CI hardware/noise makes fixed thresholds unreliable. Improve normalization and sampling before dropping regression protection.
+
+## ADR-009 — GPU is not v0.1
+
+**Context:** initial workloads are primarily memory-, grouping-, rolling-, and resampling-bound. GPU execution adds packaging, transfer, determinism, precision, and optional-dependency complexity.
+
+**Decision:** optimize the CPU architecture before adding GPU execution.
+
+**Consequences:**
+
+- no GPU runtime is required by core or v0.1;
+- APIs must not be designed around a hypothetical device backend;
+- CPU memory locality, streaming, vectorization, and parallelism receive priority;
+- a future GPU proposal needs end-to-end workload evidence including transfer and reproducibility costs.
+
+**Revisit when:** supported real workloads show a substantial, repeatable end-to-end benefit that CPU changes cannot reasonably deliver.
+
+## ADR-010 — Optional query engines
+
+**Context:** DuckDB and DataFusion can provide query pushdown and scale benefits, but mandatory engines would increase installation and semantic complexity.
+
+**Decision:** DuckDB and DataFusion are optional adapters, not core dependencies.
+
+**Consequences:**
+
+- core remains usable without either engine;
+- query plans are selected through capability-aware execution planning;
+- pushdown requires verified equivalence for nulls, timezones, ordering, aggregation, and overflow;
+- generated queries are inspectable and parameterized safely;
+- unsupported semantics fall back or fail clearly rather than changing results.
+
+**Revisit when:** an engine becomes required for a well-defined product tier. Core embeddability and an explicit compatibility boundary must still be preserved.
+
+## Recording future decisions
+
+Add a new decision when a change is hard to reverse, affects several packages, changes a trust boundary, or alters public methodology/compatibility. Include:
+
+- sequential ID and concise title;
+- status and date;
+- context and constraints;
+- decision and considered alternatives;
+- positive and negative consequences;
+- migration and validation requirements;
+- concrete revisit triggers;
+- links to superseded decisions.
+
+Method parameter choices normally belong in methodology documentation and method versions, not architecture decisions. Use an ADR when the choice changes ownership, dependency direction, platform strategy, or a cross-cutting invariant.
