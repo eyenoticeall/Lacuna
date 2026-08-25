@@ -4,6 +4,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.1.0-rc.1] - 2026-08-26
+
 ### Added
 
 - Initial mixed Python/Rust project scaffold.
@@ -28,6 +30,13 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   dtypes, key compatibility, and runtime policy values before analytical execution.
 - Freeze the `0.1.x` root/module export surface and primary call signatures in an executable public
   API contract with documented compatibility and migration rules.
+- Build tagged CPython 3.11 stable-ABI wheels for Linux x86_64/aarch64, macOS arm64, and Windows
+  x86_64; smoke-test each target artifact, validate the complete distribution set, publish checksums,
+  and generate GitHub provenance before creating a prerelease.
+- Add an independent-user release-candidate protocol and structured feedback issue form with explicit
+  acceptance criteria and a non-fabricated evidence register.
+- Keep RC1 registry publication disabled because the PyPI `lacuna` distribution is owned by an
+  unrelated project; distribute checksummed and attested wheels through GitHub Releases instead.
 
 ### Fixed
 

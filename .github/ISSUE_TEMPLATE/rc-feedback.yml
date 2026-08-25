@@ -1,0 +1,94 @@
+name: v0.1 release-candidate feedback
+description: Report installation, interoperability, correctness, or usability findings from independent research.
+title: "[v0.1 RC feedback]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Lacuna independently. Do not attach proprietary data, credentials,
+        trading secrets, or a report that contains sensitive source values. A small synthetic
+        reproducer is ideal when behavior looks incorrect.
+  - type: input
+    id: release
+    attributes:
+      label: Release tested
+      description: Include the exact Lacuna version or GitHub release tag.
+      placeholder: v0.1.0-rc.1 / 0.1.0rc1
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation source
+      options:
+        - GitHub release wheel
+        - PyPI wheel
+        - Source distribution
+        - Repository checkout
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, CPU architecture, Python version, and primary dataframe library/version.
+      placeholder: Ubuntu 24.04, aarch64, Python 3.13, Polars 1.x
+    validations:
+      required: true
+  - type: dropdown
+    id: input_container
+    attributes:
+      label: Primary input container
+      options:
+        - Polars DataFrame
+        - Polars LazyFrame
+        - pandas
+        - PyArrow
+        - NumPy
+        - More than one container
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Research workflow tested
+      description: Describe the signal shape, horizons, validation path, and report outputs without sharing sensitive values.
+      placeholder: Cross-sectional daily signal, 5D/20D labels, purged folds, stationary bootstrap, HTML audit.
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Outcome
+      options:
+        - Completed successfully and results were independently plausible
+        - Completed successfully but usability or diagnostics need improvement
+        - Produced a possible numerical or methodological discrepancy
+        - Failed during installation or import
+        - Failed during analysis or reporting
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and comparison
+      description: Include doctor output, a minimal reproducer, expected behavior, observed behavior, and any independent calculation used for comparison.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: copy_diagnostics
+    attributes:
+      label: Copy and materialization diagnostics
+      description: Were adapter_copy, materialization_reason, and execution_operations accurate and useful for your input?
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Submission checks
+      options:
+        - label: I removed credentials, proprietary data, and sensitive strategy details.
+          required: true
+        - label: I searched existing v0.1 RC feedback for the same behavior.
+          required: true
+        - label: I understand that Lacuna is research-validation software, not investment advice or a trading system.
+          required: true

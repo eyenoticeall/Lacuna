@@ -30,6 +30,7 @@ nav:
       - Performance: development/performance.md
       - Contributing a method: development/contributing-a-method.md
       - Release engineering: development/release.md
+      - Release-candidate feedback: development/release-candidate-feedback.md
       - Implementation roadmap: development/roadmap.md
   - Subsystems:
       - Signals and labels: subsystems/signal-labels.md

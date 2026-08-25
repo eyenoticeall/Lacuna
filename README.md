@@ -233,6 +233,11 @@ minimum-Rust check, plus a clean source-distribution-to-wheel smoke test. See th
 [CI architecture](docs/development/continuous-integration.md) for the job graph and branch-protection
 contract.
 
+Version-matching tags additionally build target-smoke-tested stable-ABI wheels for Linux x86_64,
+Linux aarch64, macOS arm64, and Windows x86_64, then publish checksums and GitHub provenance. See the
+[release engineering contract](docs/development/release.md) and
+[independent feedback protocol](docs/development/release-candidate-feedback.md).
+
 Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete local documentation site can be built with `uv run mkdocs serve`. Security concerns should follow [SECURITY.md](SECURITY.md).
 
 ## License

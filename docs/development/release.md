@@ -28,6 +28,13 @@ Target wheels:
 
 Normal users should not need a Rust toolchain.
 
+The `0.1` native surface is compatible with PyO3's `abi3-py311` mode: it exchanges owned Python
+sequences and scalar results rather than borrowing Arrow buffers through version-specific CPython
+APIs. The release therefore builds one CPython 3.11 stable-ABI wheel per platform and smoke-tests it
+under Python 3.13 on the target architecture. The ordinary CI matrix separately verifies the full
+Python 3.11–3.14 range. Revisit `abi3` before introducing native Arrow capsules, buffer borrowing, or
+another CPython API that the stable ABI cannot represent safely.
+
 ## Pre-release gate
 
 1. Working tree and lockfiles are clean.
@@ -87,6 +94,48 @@ PyPI and GitHub release
 ```
 
 Do not rebuild release artifacts from a different source state after approval.
+
+## Tagged release workflow
+
+`.github/workflows/release.yml` runs only for a pushed `v*` tag and rejects the event unless:
+
+- Python, Rust, source-code, changelog, and tag versions agree;
+- the annotated tag resolves to the checked-out commit;
+- that commit is an ancestor of `main`;
+- the commit's stable `CI gate` check concluded successfully;
+- the public API fixture belongs to the same package series.
+
+The release builds a source distribution plus Linux x86_64, Linux aarch64, macOS arm64, and Windows
+x86_64 wheels. Every wheel is installed into a new environment on its target architecture and runs
+the package/native/schema/CLI smoke contract. A separate job downloads the complete matrix, rejects
+missing or unexpected filenames and tags, inspects wheel and source contents, and writes
+`SHA256SUMS`.
+
+Only the final publication job has `contents: write`, attestation, and OIDC permissions. Build jobs
+remain read-only. GitHub receives an explicitly marked prerelease with the verified artifacts and
+checksum manifest; GitHub provenance attestations are generated from that manifest.
+
+Registry publication is deliberately disabled for RC1. The PyPI distribution name `lacuna` is
+already owned by an unrelated project, so this repository must not configure a trusted publisher or
+upload credentials for that name. Choose and review a distinct distribution name before adding a
+PyPI job; the Python import package can remain `lacuna`. RC1 is distributed through its checksummed,
+attested GitHub release artifacts.
+
+For a candidate tag, use the Cargo/SemVer spelling:
+
+```text
+v0.1.0-rc.1
+```
+
+Python package metadata normalizes that identity to `0.1.0rc1`. The release verifier owns this
+mapping and prevents the two surfaces from drifting.
+
+## Candidate feedback gate
+
+Artifact publication begins the release-candidate evaluation; it does not complete it. The
+[release-candidate feedback protocol](release-candidate-feedback.md) requires independent users,
+multiple platforms/input boundaries, an external numerical comparison, and disposition of all
+release blockers before the candidate can graduate.
 
 ## Pre-1.0 policy
 
