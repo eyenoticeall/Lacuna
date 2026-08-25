@@ -17,6 +17,7 @@
 │   ├── regime.py           regime classification and conditional evidence
 │   ├── costs.py            cost models, stress, liquidity, and capacity
 │   ├── bias.py             point-in-time joins, revisions, and universe evidence
+│   ├── plugins.py          metadata discovery and explicit trusted activation
 │   ├── audit.py            versioned rules and scoring
 │   ├── report.py           JSON/Markdown/HTML presentation
 │   ├── study.py            high-level signal workflow
@@ -26,6 +27,8 @@
 ├── rust/
 │   ├── lacuna-core/        language-independent kernels
 │   └── lacuna-python/      thin PyO3 bridge
+├── extensions/
+│   └── lacuna-options/     independent pure-Python options-research distribution
 ├── tests/
 │   ├── unit/
 │   ├── property/
@@ -119,6 +122,11 @@ Core remains lean:
 - the compiled extension.
 
 SciPy, reporting, pandas/PyArrow, ML, and DuckDB live behind extras. A domain module must not import an optional dependency at module import time unless the user invoked that feature. Missing extras raise a focused installation error naming the extra.
+
+Workspace extension packages may depend on core while retaining their own distribution name,
+version, changelog, public API fixture, build backend, tests, and compatibility range. Core must not
+import them. Release coordination may publish compatible artifacts together without pretending the
+versions are identical.
 
 Before adding a mandatory dependency, document:
 

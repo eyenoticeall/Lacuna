@@ -4,6 +4,29 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Added
+
+- Add DuckDB Arrow-stream ingestion without pandas or SQL construction, and a dependency-free
+  scikit-learn bridge over frozen walk-forward, purged, and combinatorial temporal folds.
+- Add immutable vendor schemas with explicit availability, revision, timezone, adjustment, and
+  identifier declarations, plus generic return/trade/position adapters that require complete
+  backtest semantics.
+- Add domain-specific Python entry-point groups, metadata-only discovery, deterministic conflict
+  selection, explicit trusted-code activation, and protocol-major/capability negotiation with
+  structured evidence.
+- Add the independently versioned `lacuna-options` 0.1 distribution with normalized empirical
+  chains, carry forwards, log-forward moneyness, deterministic delta buckets, and supplied-model IV
+  residual evidence.
+- Freeze additive core `0.6.x` and independent extension `0.1.x` public export/signature fixtures,
+  and add real DuckDB/scikit-learn integration plus options property/adversarial tests.
+
+### Changed
+
+- Extend CI, clean-wheel smoke testing, release-set inspection, checksums, and provenance to cover
+  the separately built options wheel/source distribution without adding core runtime dependencies.
+- Publish the Phase 8 adapter, plugin, options, package-version, security, testing, and post-phase
+  integration contracts throughout the developer and agent handbook.
+
 ## [0.5.0] - 2026-08-26
 
 ### Added

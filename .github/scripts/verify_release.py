@@ -81,6 +81,14 @@ def options_version(root: Path) -> str:
     changelog = (options_root / "CHANGELOG.md").read_text(encoding="utf-8")
     if f"## [{project_version}] - " not in changelog:
         fail(f"lacuna-options CHANGELOG has no dated release heading for {project_version}")
+    release_numbers = project_version.split(".")
+    release_series = ".".join(release_numbers[:2])
+    contract_path = options_root / f"tests/fixtures/public-api-v{release_series}.json"
+    if not contract_path.is_file():
+        fail(f"lacuna-options public API contract does not exist for series {release_series}")
+    api_contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    if api_contract.get("package_series") != release_series:
+        fail("lacuna-options public API contract package series does not match the release")
     return project_version
 
 
@@ -248,6 +256,8 @@ def _verify_options_sdist(path: Path, version: str) -> None:
         f"{prefix}src/lacuna_options/_version.py",
         f"{prefix}src/lacuna_options/chain.py",
         f"{prefix}src/lacuna_options/py.typed",
+        f"{prefix}tests/fixtures/public-api-v0.1.json",
+        f"{prefix}tests/test_public_api.py",
     }
     with tarfile.open(path, mode="r:gz") as archive:
         names = {member.name for member in archive.getmembers()}

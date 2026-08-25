@@ -1,0 +1,58 @@
+{
+  "callables": [
+    {"module": "lacuna.adapters", "qualname": "AdaptedFrame", "signature": "(frame, evidence)"},
+    {"module": "lacuna.adapters", "qualname": "VendorSchema", "signature": "(schema_id, columns, required, schema_version=1, availability='unknown', revisions='unknown', timezone=None, timezone_columns=(), price_adjustment=None, identifier_policy='vendor_native')"},
+    {"module": "lacuna.adapters", "qualname": "BacktestSemantics", "signature": "(returns, return_frequency, compounding, position_timing, execution_delay, price_field, price_adjustment, costs, borrow, timezone, calendar, session, missing_instruments, delistings)"},
+    {"module": "lacuna.adapters", "qualname": "BacktestSchema", "signature": "(schema_id, artifact, columns, semantics, schema_version=1)"},
+    {"module": "lacuna.adapters", "qualname": "SklearnCV", "signature": "(splitter, data, *, time=None, label_start='label_start', label_end='label_end')"},
+    {"module": "lacuna.adapters", "qualname": "SklearnCV.split", "signature": "(self, X, y=None, groups=None)"},
+    {"module": "lacuna.adapters", "qualname": "SklearnCV.get_n_splits", "signature": "(self, X=None, y=None, groups=None)"},
+    {"module": "lacuna.adapters", "qualname": "adapt_vendor", "signature": "(data, schema, *, collect=False)"},
+    {"module": "lacuna.adapters", "qualname": "adapt_backtest", "signature": "(data, schema, *, collect=False)"},
+    {"module": "lacuna.adapters", "qualname": "from_duckdb", "signature": "(source, *, batch_size=100000, required=(), collect=True)"},
+    {"module": "lacuna.adapters", "qualname": "as_sklearn_cv", "signature": "(splitter, data, *, time=None, label_start='label_start', label_end='label_end')"},
+    {"module": "lacuna.plugins", "qualname": "PluginDescriptor", "signature": "(plugin_id, protocol_version, capabilities, config_schema=<factory>, method_versions=<factory>, required_dependencies=())"},
+    {"module": "lacuna.plugins", "qualname": "PluginCandidate", "signature": "(name, group, value, distribution, distribution_version, _entry_point)"},
+    {"module": "lacuna.plugins", "qualname": "ActivatedPlugin", "signature": "(candidate, descriptor, implementation, evidence)"},
+    {"module": "lacuna.plugins", "qualname": "discover_plugins", "signature": "(*, group=None)"},
+    {"module": "lacuna.plugins", "qualname": "select_plugin", "signature": "(name, *, group, distribution=None)"},
+    {"module": "lacuna.plugins", "qualname": "activate_plugin", "signature": "(candidate, *, config=None, required_capability=None, protocol_major=1)"}
+  ],
+  "contract": "lacuna-public-api-v0.6",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5"
+  ],
+  "module_exports": {
+    "lacuna.adapters": [
+      "AdaptedFrame",
+      "AvailabilityPolicy",
+      "BacktestArtifactKind",
+      "BacktestSchema",
+      "BacktestSemantics",
+      "RevisionPolicy",
+      "SklearnCV",
+      "SupportedSplitter",
+      "VendorSchema",
+      "adapt_backtest",
+      "adapt_vendor",
+      "as_sklearn_cv",
+      "from_duckdb"
+    ],
+    "lacuna.plugins": [
+      "ENTRY_POINT_GROUPS",
+      "ActivatedPlugin",
+      "PluginCandidate",
+      "PluginDescriptor",
+      "PluginGroup",
+      "activate_plugin",
+      "discover_plugins",
+      "select_plugin"
+    ]
+  },
+  "package_series": "0.6",
+  "root_exports": ["PluginError", "adapters", "plugins"]
+}

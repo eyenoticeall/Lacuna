@@ -1,6 +1,7 @@
 """Public API for quantitative signal diagnostics and validation."""
 
 from lacuna import (
+    adapters,
     bias,
     costs,
     cv,
@@ -71,6 +72,7 @@ __all__ = [
     "Severity",
     "SignalStudy",
     "__version__",
+    "adapters",
     "audit",
     "benchmark_config_for_tier",
     "bias",

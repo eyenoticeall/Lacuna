@@ -21,10 +21,11 @@ Quality ───────────────┐
 Python compatibility ─┤
 Rust stable + MSRV ───┤
 Interoperability ─────┼──> Package ──> CI gate
+Optional extensions ─┤
 Documentation ────────┘
 ```
 
-The first five layers run in parallel. Packaging starts only after all of them pass, so a source
+The prerequisite layers run in parallel. Packaging starts only after all of them pass, so a source
 distribution and wheel are never presented as validated artifacts when a prerequisite failed. The
 final gate checks every required result explicitly; a failed or skipped prerequisite cannot turn into
 a successful branch-protection check.
@@ -38,8 +39,9 @@ a successful branch-protection check.
 | `Rust` | rustfmt, Clippy with warnings denied, workspace tests, and Criterion benchmark compilation under `Cargo.lock` |
 | `Rust / MSRV 1.85` | Every target compiles and the workspace tests pass on the declared minimum Rust version |
 | `Interoperability` | pandas, Arrow, Polars, NumPy, lazy/eager, and SciPy-reference comparisons with optional extras installed |
+| `Optional extensions` | Locked workspace install; extension Ruff/mypy; branch-aware options tests and independent API contract |
 | `Documentation` | Strict MkDocs build with the rendered handbook retained for inspection |
-| `Package` | Build the sdist, rebuild a wheel from it, install into a clean environment, then exercise imports, typing resources, schema, CLI, public signal API, and native kernels |
+| `Package` | Build core sdist/wheel plus options wheel/sdist, install all wheels into a clean environment, then exercise both distributions, typing resources, schema, CLI, public APIs, adapters/plugins, and native kernels |
 | `CI gate` | Stable aggregate result intended for branch protection |
 
 Every job has a bounded timeout. The Python matrix uses `fail-fast: false` so one compatibility
@@ -67,6 +69,7 @@ CI retains evidence for diagnosis without turning the repository into permanent 
 - JUnit XML from every Python platform/version for 7 days;
 - primary-runtime branch coverage XML for 7 days;
 - optional-adapter/reference JUnit XML for 7 days;
+- options-extension coverage and JUnit XML for 7 days;
 - the rendered documentation site for 7 days;
 - the verified Linux source distribution and wheel for 14 days.
 
@@ -93,6 +96,8 @@ uv run ruff format --check .
 uv run ruff check .
 uv run mypy
 uv run pytest --cov=lacuna --cov-branch --cov-fail-under=80
+uv run pytest extensions/lacuna-options/tests --cov=lacuna_options --cov-branch --cov-fail-under=85
+uv run mypy --config-file extensions/lacuna-options/pyproject.toml extensions/lacuna-options/src/lacuna_options
 
 cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
@@ -123,10 +128,11 @@ thresholds on shared runners. Release credentials and provenance attestations re
 tag-driven workflow. Performance regression policy requires controlled baselines rather than treating
 variable hosted-runner timings as exact measurements.
 
-The separate `Release` workflow consumes a version-matching tag only after the tagged commit's
-`CI gate` succeeded. It builds and target-smoke-tests the complete stable-ABI wheel matrix, validates
-the source distribution and packaged resources as one set, generates checksums and provenance, and
-creates a GitHub prerelease for SemVer candidate tags or a normal release for stable tags. Any future
+The separate `Release` workflow consumes a version-matching core tag only after the tagged commit's
+`CI gate` succeeded. It builds and target-smoke-tests the complete stable-ABI core wheel matrix,
+builds and jointly smoke-tests the independently versioned universal options distribution, validates
+both source distributions and every packaged resource as one set, generates checksums and provenance,
+and creates a GitHub prerelease for SemVer candidate tags or a normal release for stable tags. Any future
 PyPI trusted-publishing job must be isolated in its own
 environment and permission boundary after a non-conflicting distribution name is selected. RC1 does
 not publish to PyPI, and neither does `0.1.0`. See [Release engineering](release.md) for the tag and

@@ -75,6 +75,8 @@ Review Lacuna changes in risk order. A clean style check cannot compensate for t
 - [ ] Bundles validate paths and digests and avoid proprietary data by default.
 - [ ] Secrets, tokens, signed URLs, environment values, and table contents are not logged.
 - [ ] Plugins require explicit activation and are identified in provenance.
+- [ ] Plugin discovery reads metadata only; serialized results/configuration cannot trigger loading.
+- [ ] Extension packages preserve their independent version, dependency range, and API fixture.
 - [ ] SQL uses validation and parameter binding; untrusted artifacts are not unpickled.
 
 ## 8. Tests, docs, and compatibility

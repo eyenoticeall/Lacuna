@@ -126,6 +126,31 @@ reference_price
 
 Optional microstructure fields include bid, ask, mid, volume, ADV, volatility, commission, borrow rate, venue, order ID, and strategy ID.
 
+### Option-chain frame
+
+The separately packaged `lacuna-options` extension normalizes:
+
+```text
+time
+instrument
+underlying
+expiration
+strike
+option_type
+bid
+ask
+underlying_price
+rate
+dividend
+[mid, iv, delta, gamma, vega, theta, open_interest, volume]
+```
+
+Quote time and expiration use the same Date/Datetime physical type and timezone. Expiration is
+strictly later; prices and strikes are finite with explicit bid/ask ordering; `call`/`put` is never
+inferred from symbol text. The extension derives `time_to_expiry_years`, carry `forward`, and
+`log_moneyness` from caller-declared inputs and year basis. See
+[Options-research extension](../subsystems/options-extension.md).
+
 ### Experiment trial
 
 ```text

@@ -156,6 +156,26 @@ The v0.5 gate additionally requires:
 - exact `0.5.x` public exports/signatures plus preservation of every `0.1.x` through `0.4.x` subset;
 - deterministic benchmark artifact v4 cases and a clean-wheel advanced-inference smoke path.
 
+### Optional-integration and extension tests
+
+The v0.6 gate additionally requires:
+
+- collision-safe vendor/backtest canonical mappings, immutable schema declarations, lazy/eager
+  behavior, timezone validation, and complete assumption evidence;
+- a real DuckDB relation-to-Arrow-to-Polars path without pandas and an optional-dependency-free
+  structural smoke double;
+- actual scikit-learn estimator evaluation through precomputed Lacuna folds plus X/y/groups failure
+  cases;
+- metadata-only entry-point discovery, deterministic conflict selection, no load before activation,
+  trusted factory failure translation, protocol-major mismatch, capability mismatch, and immutable
+  activation evidence;
+- exact additive core `0.6.x` exports/signatures while preserving `0.1.x` through `0.5.x`;
+- a separate exact `lacuna-options` `0.1.x` contract, option schema/adversarial fixtures, and
+  generated carry/moneyness/residual identities;
+- an isolated extension coverage gate and a clean joint install of core plus extension wheels;
+- release-set verification for four native core wheels, the universal extension wheel, two source
+  distributions, checksums, and provenance.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

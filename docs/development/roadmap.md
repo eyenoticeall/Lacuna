@@ -16,7 +16,7 @@ such as `0.2.0rc1`.
 | `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Released |
 | `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Released |
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Released |
-| `0.6.x` | Phase 8: separately optional adapters and extensions | Core dependency surface remains unchanged |
+| `0.6.x` | Phase 8: separately optional adapters and extensions | Implementation complete; release verification pending |
 | `0.7`–`0.9` | Cross-phase integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
@@ -154,9 +154,53 @@ differentially tested implementation.
 
 ## Phase 8 — extensions
 
-Options research, ML adapters, vendor schemas, and framework adapters remain separate extensions. They do not expand core dependencies or turn Lacuna into a backtester.
+**v0.6 implementation candidate:** optional integrations are explicit boundaries rather than new
+research methodology. Core adds no mandatory runtime dependency.
 
-## v0.1 boundary
+Delivered in dependency order:
+
+1. Immutable `AdaptedFrame` evidence and collision-safe canonical/source normalization.
+2. DuckDB result-to-Arrow-stream ingestion without pandas or SQL construction.
+3. A dependency-free scikit-learn CV protocol bridge over frozen Lacuna temporal folds.
+4. Versioned vendor mappings with availability, revision, timezone, adjustment, and identity
+   declarations.
+5. Generic returns/trades/positions mappings that require complete backtest timing, gross/net,
+   compounding, costs, borrow, calendar, session, missing-asset, and delisting semantics.
+6. Domain-specific entry-point groups with metadata-only discovery, deterministic conflict handling,
+   explicit trusted activation, and protocol/capability negotiation.
+7. A separate `lacuna-options` 0.1 distribution with validated empirical chains, carry forwards,
+   log-forward moneyness, absolute-delta buckets, and supplied-expectation IV residuals.
+
+Exit criteria: optional packages do not load at core import time; real DuckDB and scikit-learn paths
+interoperate; discovery never imports targets; activation is explicit and evidenced; adapters reject
+ambiguous temporal/methodological semantics; core `0.6.x` and extension `0.1.x` public contracts are
+frozen independently; both distributions build, clean-install together, and enter the checksummed,
+attested release set.
+
+The implementation and focused gates satisfy these criteria. Stable `v0.6.0` remains contingent on
+the exact release-preparation commit passing the complete CI matrix and tag workflow.
+
+Deferred beyond the phase: DataFusion/query pushdown, framework-specific vectorbt/LEAN/Nautilus
+helpers, plugin isolation or marketplace behavior, universal IV/Greeks solvers, SVI calibration,
+arbitrage repair, and delta-hedged options attribution. They require their own semantic and numerical
+contracts and are not implied by the generic boundaries.
+
+## Integration and v1 hardening (`0.7`–`0.9`)
+
+After Phase 8, work is driven by cross-phase use rather than unchecked feature count:
+
+- run complete signal-to-audit workflows over vendor/backtester inputs and extension evidence;
+- reconcile configuration, provenance, and error behavior across every public subsystem;
+- profile realistic end-to-end workloads and optimize only evidenced bottlenecks;
+- test migrations and persisted evidence across release lines;
+- collect independent-user feedback and harden installation, diagnostics, and documentation;
+- close every remaining v1 definition item in the technical specification or explicitly remove it
+  from the stable contract.
+
+`0.7`–`0.9` do not promise one feature per minor version. A release needs a coherent compatibility
+milestone, migration story, and complete evidence gate.
+
+## Historical v0.1 boundary
 
 v0.1 turns a cross-sectional signal into a rigorous diagnostics report. It excludes live trading, full backtesting, distributed execution, GPU kernels, advanced impact simulation, and a plugin marketplace.
 

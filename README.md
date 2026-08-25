@@ -24,11 +24,11 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.5** adds CPCV paths, explicit permutation nulls, Sharpe/PSR/DSR inference, CSCV/PBO,
-> joint stationary bootstrap, White Reality Check, and Hansen SPA. The additive `0.5.x` public API
-> is frozen and regression-tested while preservation of the `0.1.x` through `0.4.x` contracts
-> remains executable. Lacuna remains pre-1.0 software; later minor versions may
-> evolve through documented migrations.
+> The main branch now contains the **v0.6 implementation candidate**: DuckDB Arrow streaming,
+> scikit-learn temporal folds, explicit vendor/backtest schemas, trusted plugin activation, and the
+> separate `lacuna-options` 0.1 package. The additive core `0.6.x` and extension `0.1.x` contracts
+> are independently frozen and regression-tested. The latest stable release remains v0.5.0 until
+> the exact v0.6 release commit passes CI and the tagged release gate.
 
 > [!NOTE]
 > [`v0.5.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.5.0)
@@ -87,6 +87,8 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 | Regimes | Fixed/trailing/retrospective quantile classifiers, availability checks, conditional evidence, and outcome concentration |
 | Trading realism | Composable commissions, spread, slippage, impact, and borrow; stress grids, break-even costs, point-in-time liquidity, and capacity curves |
 | Data correctness | Availability-safe as-of joins, revision/future-data checks, survivorship states, half-open membership, universe drift, and dataset contracts |
+| Optional integrations | DuckDB Arrow streams, scikit-learn CV, immutable vendor schemas, explicit backtest artifact semantics, and metadata-only plugin discovery |
+| Options extension | Separate typed package with normalized chains, carry forwards, log-forward moneyness, delta buckets, and empirical IV residuals |
 
 ## Quick start
 
@@ -236,6 +238,30 @@ members = lc.bias.membership_at(
 )
 ```
 
+Cross external boundaries without hiding their semantics:
+
+```python
+duckdb_frame = lc.adapters.from_duckdb(executed_relation)
+
+cv = lc.adapters.as_sklearn_cv(
+    lc.cv.PurgedKFold(n_splits=5, embargo=1),
+    label_intervals,
+)
+
+candidates = lc.plugins.discover_plugins(group="audit_rules")  # metadata only
+plugin = lc.plugins.activate_plugin(candidates[0], required_capability="audit.signal")
+```
+
+The options package is independently versioned and imported separately:
+
+```python
+import lacuna_options as lo
+
+chain = lo.validate_chain(option_quotes, year_basis=365.25)
+bucketed = lo.delta_buckets(chain)
+residuals = lo.empirical_residual(chain, expected="fair_iv")
+```
+
 For local Parquet, CSV, Arrow IPC, or Feather files:
 
 ```bash
@@ -257,6 +283,8 @@ uv run lacuna signal \
 ├── rust/
 │   ├── lacuna-core/        # language-independent kernels
 │   └── lacuna-python/      # PyO3 extension
+├── extensions/
+│   └── lacuna-options/     # independently versioned optional distribution
 ├── tests/                  # unit, property, reference, schema, golden, and integration tests
 ├── benches/                # Python and Criterion benchmark entry points
 ├── schemas/                # published result compatibility schemas
@@ -272,8 +300,10 @@ uv run lacuna signal \
 
 Versions `0.1` through `0.5` cover foundations, signal diagnostics, temporal validation, dependent
 bootstrap, audit/reporting, experiment lineage, multiple-testing correction, robustness,
-trading-realism evidence, point-in-time data correctness, and advanced inference. The next
-milestone is `0.6`: optional adapters and extensions that do not expand the core dependency surface.
+trading-realism evidence, point-in-time data correctness, and advanced inference. The implemented
+`0.6` candidate adds optional adapters/plugins and the separate options package without expanding
+the core dependency surface. Versions `0.7`–`0.9` are reserved for cross-phase integration,
+migration, performance, and real-user hardening before a stable `1.0.0` contract.
 
 See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
 and the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for architecture and statistical
@@ -290,7 +320,7 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes implemented v0.1–v0.5 behavior from later contracts. Contributors
+The documentation distinguishes released v0.1–v0.5 behavior, the implemented v0.6 candidate, and later contracts. Contributors
 and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 

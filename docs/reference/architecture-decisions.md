@@ -16,6 +16,8 @@ This page expands the decision summary in the technical specification into imple
 | ADR-008 | Performance regression is testable | Stable benchmarks accompany correctness tests |
 | ADR-009 | GPU is outside v0.1 | Establish a strong CPU architecture before GPU complexity |
 | ADR-010 | Query engines are optional adapters | Keep core lean, embeddable, and semantically controlled |
+| ADR-011 | Extensions are independently versioned distributions | Optional domains evolve without coupling core SemVer or dependencies |
+| ADR-012 | Plugin discovery never authorizes execution | Installed metadata is safe to enumerate; loading is an explicit trust decision |
 
 ## ADR-001 — Python public API
 
@@ -171,6 +173,46 @@ This page expands the decision summary in the technical specification into imple
 - unsupported semantics fall back or fail clearly rather than changing results.
 
 **Revisit when:** an engine becomes required for a well-defined product tier. Core embeddability and an explicit compatibility boundary must still be preserved.
+
+## ADR-011 — Independently versioned extensions
+
+**Context:** options research and other specialist domains have heavier dependencies, different
+release cadence, and model-specific contracts that should not enlarge or destabilize core.
+
+**Decision:** optional domain extensions are separate distributions with independent versions,
+dependency ranges, changelogs, API fixtures, tests, and build metadata.
+
+**Consequences:**
+
+- core never imports an extension and remains usable without it;
+- an extension may depend inward on reviewed core data/evidence contracts;
+- one GitHub Release may carry compatible core and extension artifacts without aligning versions;
+- release verification and provenance cover each distribution independently and the joint install;
+- a compatibility-range change is reviewed and documented like another public API decision.
+
+**Revisit when:** a capability becomes foundational to nearly every core workflow and its dependency/
+release risk is demonstrably acceptable. Migration must preserve old extension identities.
+
+## ADR-012 — Explicit plugin trust transition
+
+**Context:** Python entry points are useful discovery metadata, but loading a target imports and can
+execute arbitrary code with the current process permissions.
+
+**Decision:** discovery reads distribution metadata only. Selection resolves conflicts without
+loading. Only an explicit activation API crosses into trusted in-process execution and records the
+identity, protocol, capabilities, configuration, and dependency declarations.
+
+**Consequences:**
+
+- import-time and report-deserialization paths never activate plugins;
+- entry-point groups are domain-specific and protocol-major-versioned;
+- name conflicts, incompatible majors, and missing capabilities fail before use;
+- activation evidence must not be described as sandboxing or isolation;
+- safer future out-of-process execution can implement another activation backend without weakening
+  the metadata boundary.
+
+**Revisit when:** a process-isolated protocol is implemented and threat-modeled. Metadata-only
+discovery and caller-visible authorization remain requirements.
 
 ## Recording future decisions
 

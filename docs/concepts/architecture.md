@@ -131,6 +131,7 @@ The target Python packages have narrow responsibilities:
 | `audit` | rule applicability, findings, aggregation, scoring policy |
 | `report` | Markdown/JSON/HTML rendering from result objects |
 | `adapters` | supported edge-format normalization only |
+| `plugins` | metadata discovery, explicit trusted activation, and protocol negotiation |
 | `experiment` | trials, registries, fingerprints, reproducibility |
 
 Do not create every package as an empty placeholder. Add a package when its first cohesive public capability is implemented.
@@ -138,8 +139,8 @@ Do not create every package as an empty placeholder. Add a package when its firs
 ## Current implementation
 
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
-v0.3 trading-realism milestone, v0.4 data-correctness milestone, and v0.5 advanced-inference
-milestone:
+v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
+milestone, and the implementation candidate for the v0.6 optional-integration milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -162,10 +163,17 @@ milestone:
   membership selection, universe drift, and declarative dataset validation.
 - CPCV paths, explicit permutation nulls, Sharpe/PSR/DSR/MinTRL, CSCV/PBO, joint stationary
   bootstrap, White Reality Check, and Hansen SPA.
+- DuckDB Arrow-stream ingestion, a scikit-learn temporal CV bridge, immutable vendor schemas, and
+  explicit backtest artifact/semantics adapters without new core runtime dependencies;
+- metadata-only plugin discovery, conflict-safe selection, explicit trusted-code activation, and
+  independent protocol-major/capability negotiation;
+- a separately packaged and independently versioned `lacuna-options` extension for normalized
+  chains, carry forwards, log-forward moneyness, delta buckets, and empirical surface residuals.
 
-Vendor/backtester integrations and plugins remain later contracts. Pre-1.0 minor versions can
-change through documented migrations; the published `0.1.x` through `0.5.x` contracts govern their
-respective release lines.
+DataFusion, framework-specific adapters, automatic execution planning, model-based option pricing/
+calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
+through documented migrations; the published `0.1.x` through `0.5.x` contracts and the reviewed
+`0.6.x` candidate fixture govern their respective lines.
 
 ## Detailed guides
 

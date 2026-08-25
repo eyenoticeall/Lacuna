@@ -7,10 +7,11 @@ Lacuna is an open-source quantitative research validation library for discoverin
 !!! warning "Pre-1.0 status"
 
     The repository implements the v0.1 signal-validation path, v0.2 robustness/experiment
-    milestone, v0.3 trading-realism milestone, v0.4 data-correctness milestone, and v0.5
-    advanced-inference milestone: CPCV paths, permutation, Sharpe/PSR/DSR, CSCV/PBO, Reality Check,
-    and Hansen SPA. It remains pre-1.0: later minor APIs may change through documented migrations,
-    and target subsystem contracts do not imply release.
+    milestone, v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5
+    advanced-inference milestone, and the v0.6 implementation candidate for optional adapters,
+    explicit plugins, and the separately versioned options package. It remains pre-1.0: later minor
+    APIs may change through documented migrations, and a completed implementation is not a release
+    until the exact tagged commit passes the release gate.
 
 ## Choose a path
 
@@ -22,6 +23,7 @@ Lacuna is an open-source quantitative research validation library for discoverin
 | understand time and table semantics | [Semantic data model](concepts/data-model.md) |
 | add a statistical method | [Contributing a method](development/contributing-a-method.md) |
 | implement a particular product area | [Subsystem contracts](subsystems/signal-labels.md) |
+| integrate DuckDB, sklearn, vendors, backtests, plugins, or options | [Adapters and plugins](subsystems/adapters-execution-plugins.md) / [Options extension](subsystems/options-extension.md) |
 | direct a coding agent | [Agent handbook](agents/index.md) |
 | look up project terminology | [Glossary](reference/glossary.md) |
 

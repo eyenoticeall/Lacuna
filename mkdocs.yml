@@ -40,6 +40,7 @@ nav:
       - Audit and reporting: subsystems/audit-reporting.md
       - Experiments and reproducibility: subsystems/experiments-reproducibility.md
       - Adapters, execution, and plugins: subsystems/adapters-execution-plugins.md
+      - Options-research extension: subsystems/options-extension.md
   - Methodology:
       - Principles: methodology/principles.md
       - Forward-return labels: methodology/forward-returns.md

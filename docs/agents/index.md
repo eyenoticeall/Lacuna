@@ -19,6 +19,8 @@ When these disagree, do not quietly choose one. Preserve working behavior unless
 | implement a statistical method | method-contribution guide + subsystem guide; advanced-inference guide for selection/bootstrap work | reference, assumptions, fixtures, method version |
 | optimize in Rust | native-core + performance guides | profile, differential tests, transfer-inclusive benchmark |
 | add a data container/source | data-boundary + adapters guide | semantic mapping, copy plan, eager/lazy tests |
+| add or activate a plugin | adapters/plugins guide + security rules | metadata-only discovery, explicit trust, protocol/evidence tests |
+| change an extension package | extension subsystem + release guide | independent version/API fixture, isolated build and joint smoke test |
 | fix a temporal bug | data model + bias/CV guide | boundary fixture, leakage analysis, affected outputs |
 | add an audit rule | evidence model + audit guide | applicability cases, rule version, score effect |
 | change report output | audit/report guide | schema compatibility, escaping, golden diff |

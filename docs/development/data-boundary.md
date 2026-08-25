@@ -33,7 +33,7 @@ An adapter may not:
 | pandas dataframe/series | optional adapter through Arrow-compatible conversion |
 | NumPy 1D | named value column |
 | NumPy 2D | require explicit column schema |
-| DuckDB result | optional Arrow stream, no pandas intermediate |
+| DuckDB result | implemented Arrow record-batch stream, no pandas intermediate |
 
 The implemented `to_polars` helper is a physical normalization foundation, not a domain validator.
 
@@ -132,6 +132,16 @@ pandas is an edge format. The optional adapter documents:
 - copy behavior for each common dtype family.
 
 Never treat a pandas index as `time` or `instrument` without an explicit argument or named adapter contract.
+
+## DuckDB behavior
+
+`from_duckdb` accepts an already executed trusted relation/connection exposing an Arrow reader. It
+prefers `to_arrow_reader(batch_size)` and records use of the legacy `fetch_record_batch` path. The
+adapter performs no SQL parsing or interpolation, preserves Arrow null/timezone metadata through
+Polars normalization, and can return an eager or lazy normalized frame according to `collect`.
+
+This is a conversion boundary, not query pushdown. A caller constructing SQL must use DuckDB's
+parameter binding and validate any dynamic identifiers; Lacuna never treats a string as a query.
 
 ## Arrow safety
 

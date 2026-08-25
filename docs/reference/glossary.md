@@ -220,3 +220,18 @@ Terms in this glossary are normative where they describe Lacuna data and evidenc
 
 **Plugin**
 : Explicitly activated trusted Python extension contributing a versioned Lacuna capability.
+
+**Plugin candidate**
+: Installed entry-point metadata that has been discovered but whose target module has not been
+  imported or executed.
+
+**Plugin descriptor**
+: Immutable identity and compatibility declaration returned by an activated plugin, including its
+  protocol, capabilities, configuration schema, method versions, and optional dependencies.
+
+**Extension distribution**
+: Optional package that depends inward on Lacuna core while retaining an independent version,
+  compatibility range, public API fixture, and release lifecycle.
+
+**Log-forward moneyness**
+: Options coordinate `log(strike / forward)` under explicitly declared carry and year-basis inputs.
