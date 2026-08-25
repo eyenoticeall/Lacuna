@@ -1,6 +1,6 @@
 """Public API for quantitative signal diagnostics and validation."""
 
-from lacuna import cv, labels, signal, validation
+from lacuna import cv, experiment, labels, regime, robustness, signal, validation
 from lacuna._version import __version__
 from lacuna.audit import (
     Applicability,
@@ -27,6 +27,7 @@ from lacuna.exceptions import (
     NativeExtensionError,
     ReportError,
 )
+from lacuna.experiment import ExperimentRegistry
 from lacuna.labels import LabelResult
 from lacuna.report import AuditReport
 from lacuna.study import SignalStudy
@@ -45,6 +46,7 @@ __all__ = [
     "Config",
     "ConfigurationError",
     "DataContractError",
+    "ExperimentRegistry",
     "Finding",
     "FindingState",
     "LabelResult",
@@ -62,8 +64,11 @@ __all__ = [
     "configure",
     "cv",
     "default_rules",
+    "experiment",
     "get_config",
     "labels",
+    "regime",
+    "robustness",
     "run_audit",
     "run_benchmarks",
     "signal",

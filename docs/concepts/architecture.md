@@ -137,7 +137,7 @@ Do not create every package as an empty placeholder. Add a package when its firs
 
 ## Current implementation
 
-The repository currently implements the initial v0.1 signal-validation path:
+The repository currently implements the v0.1 signal-validation path and v0.2 robustness milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -148,11 +148,15 @@ The repository currently implements the initial v0.1 signal-validation path:
 - native grouped-rank IC, bootstrap-mean, and interval-purge kernels with reference paths;
 - deterministic audit rules, evidence scoring, JSON/Markdown/basic HTML, and `SignalStudy`;
 - `doctor`, `signal`, and developer `bench` CLI workflows;
-- published result schema, golden fixtures, layered tests, and reproducible benchmark suites.
+- published result schema, golden fixtures, layered tests, and reproducible benchmark suites;
+- canonical experiment fingerprints, append-only attempts/corrections, and selection lineage;
+- Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli corrections;
+- parameter surfaces, seeded perturbations, subperiods, and timestamped universe scenarios;
+- trailing/retrospective regime classification and conditional concentration evidence.
 
-Robustness surfaces, experiment registries, costs/capacity, point-in-time joins, advanced inference,
-backtester integrations, and plugins remain later contracts. The pre-alpha API can change before a
-tagged compatibility commitment.
+Costs/capacity, full point-in-time joins, advanced inference, backtester integrations, and plugins
+remain later contracts. Pre-1.0 minor versions can change through documented migrations; the
+published `0.1.x` and `0.2.x` contracts govern their respective release lines.
 
 ## Detailed guides
 

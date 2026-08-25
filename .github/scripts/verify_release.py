@@ -84,9 +84,12 @@ def verify_source(root: Path, tag: str, *, require_tag: bool) -> str:
     if f"## [{cargo_version}] - " not in changelog:
         fail(f"CHANGELOG.md has no dated release heading for {cargo_version}")
 
-    api_contract = json.loads(
-        (root / "tests/fixtures/public-api-v0.1.json").read_text(encoding="utf-8")
-    )
+    release_numbers = cargo_version.split("-", maxsplit=1)[0].split(".")
+    release_series = ".".join(release_numbers[:2])
+    contract_path = root / f"tests/fixtures/public-api-v{release_series}.json"
+    if not contract_path.is_file():
+        fail(f"public API contract does not exist for release series {release_series}")
+    api_contract = json.loads(contract_path.read_text(encoding="utf-8"))
     if not python_version.startswith(f"{api_contract['package_series']}."):
         fail("public API contract package series does not match the release")
 
@@ -127,7 +130,10 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
             "lacuna/__init__.py",
             "lacuna/_native.pyi",
             "lacuna/_version.py",
+            "lacuna/experiment.py",
             "lacuna/py.typed",
+            "lacuna/regime.py",
+            "lacuna/robustness.py",
             "lacuna/schemas/audit-result-v1.schema.json",
         }
         missing = sorted(required.difference(names))
@@ -152,7 +158,10 @@ def _verify_sdist(path: Path, version: str) -> None:
         f"{prefix}python/lacuna/__init__.py",
         f"{prefix}python/lacuna/_native.pyi",
         f"{prefix}python/lacuna/_version.py",
+        f"{prefix}python/lacuna/experiment.py",
         f"{prefix}python/lacuna/py.typed",
+        f"{prefix}python/lacuna/regime.py",
+        f"{prefix}python/lacuna/robustness.py",
         f"{prefix}rust/lacuna-core/src/lib.rs",
         f"{prefix}rust/lacuna-python/src/lib.rs",
         f"{prefix}schemas/audit-result-v1.schema.json",

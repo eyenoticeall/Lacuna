@@ -85,6 +85,20 @@ Integration tests cover boundaries:
 
 Every fixed correctness bug gets the smallest failing fixture as a regression test. Persisted result schemas keep representative old-version fixtures.
 
+### Robustness and lineage tests
+
+The v0.2 gate additionally requires:
+
+- hand-computed p-value adjustments and ordering invariants;
+- canonical identity invariance plus ambiguous/credential-bearing input rejection;
+- append-only failure, retry, correction, selection, reopen, and concurrent-identity fixtures;
+- planted plateaus, isolated optima, boundaries, and failed neighbors;
+- seeded perturbation reproduction, constraint rejection, and attempt-budget exhaustion;
+- half-open/overlapping subperiod evidence and timestamped universe composition;
+- strictly trailing regime thresholds, future-availability detection, small/unknown regimes, and
+  planted outcome concentration;
+- exact `0.2.x` public exports/signatures and preservation of the `0.1.x` compatibility subset.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

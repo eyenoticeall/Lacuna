@@ -21,9 +21,12 @@ PUBLIC_MODULES = (
     "lacuna.cli",
     "lacuna.config",
     "lacuna.cv",
+    "lacuna.experiment",
     "lacuna.labels",
     "lacuna.native",
+    "lacuna.regime",
     "lacuna.report",
+    "lacuna.robustness",
     "lacuna.signal",
     "lacuna.study",
     "lacuna.validation",
@@ -62,6 +65,20 @@ signal_result = lacuna.signal.ic(
 )
 require(signal_result.metrics["mean_ic"] == 1.0, "public signal API failed")
 
+registry = lacuna.ExperimentRegistry("wheel-smoke")
+registry.record(parameters={"trial": 1}, metric=0.01, metric_name="p_value")
+registry.record(parameters={"trial": 2}, metric=0.20, metric_name="p_value")
+adjusted = lacuna.validation.multiple_testing(registry, method="holm")
+require(adjusted.metrics["trial_count"] == 2, "experiment/multiple-testing API failed")
+
+regimes = lacuna.regime.quantile_regimes(
+    {"time": [0, 1, 2], "value": [1.0, 2.0, 3.0]},
+    method="fixed",
+    lower_threshold=1.5,
+    upper_threshold=2.5,
+)
+require(regimes.metrics["classified_rows"] == 3, "regime API failed")
+
 package = files("lacuna")
 require(package.joinpath("py.typed").is_file(), "wheel is missing py.typed")
 require(package.joinpath("_native.pyi").is_file(), "wheel is missing native type stubs")
@@ -76,6 +93,7 @@ print(
             "public_modules": len(PUBLIC_MODULES),
             "schema": schema["title"],
             "signal_mean_ic": signal_result.metrics["mean_ic"],
+            "trial_count": adjusted.metrics["trial_count"],
         },
         indent=2,
         sort_keys=True,

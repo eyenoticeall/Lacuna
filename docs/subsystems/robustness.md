@@ -1,12 +1,15 @@
 # Parameter, temporal, universe, and regime robustness
 
-**Status:** later than the v0.1 signal path, except that v0.1 results must be designed so these analyses can consume them.
+**Status:** the v0.2 parameter surface, continuous perturbation, subperiod, timestamped universe,
+quantile-regime, and conditional-regime APIs are implemented. Specialized regime primitives,
+distributed execution, and immutable evaluation caching remain later work.
 
 Robustness asks whether evidence survives in a neighborhood of the selected research choice rather than at one optimized point.
 
 ## Ownership
 
-- `lacuna.validation.stability` owns parameter and perturbation analysis.
+- `lacuna.validation` owns parameter surfaces and multiple-testing correction.
+- `lacuna.robustness` owns continuous, subperiod, and universe perturbation.
 - `lacuna.regime` owns regime definitions and conditional evidence.
 - universe/subperiod robustness consumes stable evaluation callbacks or precomputed result tables.
 - audit rules interpret concentration and instability; domain functions compute them.
@@ -32,7 +35,7 @@ Do not cache callback results without a fingerprint covering inputs, code/method
 
 ## Parameter surfaces
 
-Target API:
+Implemented API:
 
 ```python
 surface = lc.validation.parameter_surface(
@@ -42,6 +45,9 @@ surface = lc.validation.parameter_surface(
         "holding": [1, 3, 5, 10],
     },
     objective="sharpe",
+    evaluator_name="strategy.evaluate",
+    sample_id="validation:2020-2024",
+    code_id="git:abc123",
 )
 ```
 
@@ -103,6 +109,9 @@ Random perturbations define distributions, bounds, transformations, and correlat
 - integer rounding after sampling;
 - constrained pairs such as fast window < slow window;
 - correlated cost/volatility scenarios.
+
+The v0.2 sampler draws declared parameter dimensions independently. Correlated scenario generators
+remain a later extension and must record their covariance/correlation parameterization.
 
 Record every attempted sample or a reproducible seed plus generator configuration. Rejection sampling reports rejection rate.
 
@@ -203,3 +212,6 @@ Cache only immutable fingerprinted evaluations. Include evaluator/method version
 - Universe composition and eligibility timestamps preserved.
 - Small/unknown regime evidence remains explicit.
 - Cache fingerprint changes with data, method, or parameter changes.
+
+The v0.2 suite covers all items above except immutable evaluation caching, which remains unshipped;
+its fingerprint requirement continues to constrain that later implementation.

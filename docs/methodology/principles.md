@@ -18,4 +18,10 @@ The implemented v0.1 methods are documented in:
 - [Bootstrap inference](bootstrap.md)
 - [Audit findings and score](audit-scoring.md)
 
+The implemented v0.2 methods are documented in:
+
+- [Experiment lineage and multiple testing](experiments-multiple-testing.md)
+- [Parameter, temporal, and universe robustness](robustness-analysis.md)
+- [Regime classification and conditional evidence](regime-analysis.md)
+
 For implementation-level requirements, see [Contributing a method](../development/contributing-a-method.md), [Testing strategy](../development/testing.md), and the relevant [subsystem guide](../subsystems/financial-validation.md).

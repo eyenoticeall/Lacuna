@@ -24,12 +24,13 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.1** is the initial public release. The signal-validation path is implemented and
-> tested, and the `0.1.x` public API contract is frozen and regression-tested. Lacuna remains
-> pre-1.0 software; later minor versions may evolve through documented migrations.
+> Lacuna **v0.2** adds experiment lineage and robustness analysis to the initial signal-validation
+> path. The additive `0.2.x` public API is frozen and regression-tested while preservation of the
+> `0.1.x` contract remains executable. Lacuna remains pre-1.0 software; later minor versions may
+> evolve through documented migrations.
 
 > [!NOTE]
-> [`v0.1.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.1.0)
+> [`v0.2.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.2.0)
 > as checksummed, provenance-attested wheels and a source distribution. The PyPI distribution name
 > `lacuna` belongs to an unrelated project, so do not install that package expecting this software.
 
@@ -70,7 +71,7 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 
 ## What works now
 
-| v0.1 area | Implemented behavior |
+| Area | Implemented behavior |
 |---|---|
 | Labels | Explicit observation/entry/exit timing, trading-observation horizons, censoring and adjustment evidence |
 | Signal diagnostics | Pearson/Spearman IC, IC time series, balanced quantiles, spreads, monotonicity, turnover, and decay |
@@ -79,6 +80,10 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 | Native core | Rust grouped-rank IC, bootstrap-mean reduction, and half-open interval purging with Python references |
 | Data boundary | Polars eager/lazy, NumPy, optional pandas, and Arrow-compatible inputs |
 | Quality | Published result schema, golden fixtures, property/reference/statistical/differential tests, and Python/Criterion benchmarks |
+| Experiment lineage | Canonical fingerprints, append-only SQLite attempts/corrections, full eligible-set selection records, and structured snapshots |
+| Multiplicity | Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli adjustment over explicit or registered trial families |
+| Robustness | Parameter surfaces, seeded continuous perturbation, declared subperiods, and timestamped universe composition evidence |
+| Regimes | Fixed/trailing/retrospective quantile classifiers, availability checks, conditional evidence, and outcome concentration |
 
 ## Quick start
 
@@ -145,6 +150,23 @@ uncertainty = lc.validation.bootstrap(
 )
 ```
 
+Record every tried variant before selecting a winner, then adjust the complete family:
+
+```python
+registry = lc.ExperimentRegistry("momentum-search", path="experiments.sqlite3")
+for lookback, p_value in [(20, 0.03), (40, 0.01), (60, 0.20)]:
+    registry.record(
+        parameters={"lookback": lookback},
+        metric=p_value,
+        metric_name="p_value",
+        method="strategy.evaluate",
+        data_fingerprint="dataset:2026-08-26",
+        code_fingerprint="git:abc123",
+    )
+
+adjusted = lc.validation.multiple_testing(registry, method="holm")
+```
+
 For local Parquet, CSV, Arrow IPC, or Feather files:
 
 ```bash
@@ -179,12 +201,14 @@ uv run lacuna signal \
 
 ## Roadmap
 
-The initial v0.1 path covers foundations, signal diagnostics, temporal validation, dependent
-bootstrap, audit/reporting, interoperability, and benchmarks. Next milestones add robustness
-surfaces, experiment history, cost/capacity evidence, and point-in-time data checks before advanced
-inference and integrations.
+Versions `0.1` and `0.2` cover foundations, signal diagnostics, temporal validation, dependent
+bootstrap, audit/reporting, experiment lineage, multiple-testing correction, and robustness across
+parameters, time, universes, and regimes. The next milestone is `0.3`: transaction costs, stress
+surfaces, liquidity, and capacity evidence.
 
-See the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for the architecture, statistical scope, and version milestones.
+See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
+and the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for architecture and statistical
+scope.
 
 ## Engineering handbook
 
@@ -197,7 +221,7 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes implemented v0.1 behavior from later contracts. Contributors and
+The documentation distinguishes implemented v0.1/v0.2 behavior from later contracts. Contributors and
 coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 

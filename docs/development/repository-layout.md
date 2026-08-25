@@ -11,6 +11,9 @@
 │   ├── signal.py           IC, quantiles, turnover, and decay
 │   ├── cv.py               walk-forward and purged folds
 │   ├── validation.py       deterministic bootstrap inference
+│   ├── experiment.py       canonical identities and append-only trial lineage
+│   ├── robustness.py       perturbation, subperiod, and universe evidence
+│   ├── regime.py           regime classification and conditional evidence
 │   ├── audit.py            versioned rules and scoring
 │   ├── report.py           JSON/Markdown/HTML presentation
 │   ├── study.py            high-level signal workflow

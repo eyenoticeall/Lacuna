@@ -1,12 +1,15 @@
 # Experiments and reproducibility
 
-**Status:** experiment identity, provenance capture, append-only trial records, and reproducible bundle manifests are v0.1 contracts. Distributed registries and remote artifact stores are later work.
+**Status:** v0.2 implements canonical/versioned identities, append-only local SQLite attempts,
+immutable corrections, complete selection lineage, registry snapshots, and basic multiplicity
+correction. Environment capture, reproducibility bundles, distributed registries, and remote
+artifact stores remain later work.
 
 An experiment registry is the memory of the research process. It records all evaluated variants, not only the winner, so selection bias and multiple testing can be measured instead of guessed.
 
 ## Ownership
 
-The future `lacuna.experiment` package owns:
+The implemented `lacuna.experiment` module owns:
 
 - experiment, family, and trial identity;
 - canonical parameter encoding;

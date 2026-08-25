@@ -2,6 +2,28 @@
 
 The roadmap is dependency-ordered. A later phase does not justify weakening an earlier contract.
 
+## Version progression
+
+Roadmap phases are released as pre-1.0 minor versions because each phase adds public analytical
+capabilities. Patch versions are reserved for compatible corrections and hardening within a shipped
+phase; release candidates use Cargo/SemVer tags such as `v0.2.0-rc.1` and PEP 440 package versions
+such as `0.2.0rc1`.
+
+| Version | Roadmap scope | Release condition |
+| --- | --- | --- |
+| `0.1.x` | Phases 0–3: foundations, signal diagnostics, validation core, audit/reports | Released |
+| `0.2.x` | Phase 4: robustness, regimes, experiment lineage, basic multiple-testing correction | Released |
+| `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Complete Phase 5 contracts and exit criteria |
+| `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Complete Phase 6 contracts and exit criteria |
+| `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Validated reference and simulation suites for every method |
+| `0.6.x` | Phase 8: separately optional adapters and extensions | Core dependency surface remains unchanged |
+| `0.7`–`0.9` | Cross-phase integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
+| `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
+
+This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
+candidates or patch releases, but Lacuna does not claim the next minor version until that phase's
+complete public contract is implemented and verified.
+
 ## Phase 0 — foundations
 
 **Implemented foundation:** packaging, typed configuration, result/finding models, Polars-first normalization, native bridge, baseline tests, CI, docs, and wheel build.
@@ -59,9 +81,28 @@ Exit criteria: absent evidence yields `UNKNOWN`; all rendered values trace to re
 
 ## Phase 4 — robustness and experiments
 
-Parameter surfaces, continuous perturbation, subperiods, regime analysis, universe perturbation, and experiment registry/multiple-testing corrections.
+**v0.2 implemented:** parameter surfaces, continuous perturbation, subperiods, regime analysis,
+universe perturbation, append-only experiment lineage, selection records, canonical fingerprints,
+and multiple-testing corrections.
+
+Deliver for `0.2.0` in this order:
+
+1. Canonical parameter encoding, fingerprints, immutable attempt records, and append-only local
+   registry storage.
+2. Explicit selection lineage over the complete eligible candidate set.
+3. Parameter surfaces with visible failed points, mixed-type adjacency, boundary detection, and
+   isolated-optimum evidence.
+4. Deterministic continuous perturbation with rejection accounting.
+5. Declared subperiod and universe perturbation tables with retained-sample/composition evidence.
+6. Point-in-time or explicitly retrospective regime classification and conditional evidence.
+7. Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli adjustments over registered trial
+   families.
 
 Exit criteria: isolated optima and concentration are quantified; trial history is first-class provenance.
+
+The exit criteria are covered by planted isolated/plateau and regime-concentration fixtures,
+deterministic perturbation tests, point-in-time threshold tests, append-only/concurrent registry
+tests, and the frozen `0.2.x` public API contract.
 
 ## Phase 5 — trading realism
 

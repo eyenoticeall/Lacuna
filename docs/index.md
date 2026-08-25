@@ -4,12 +4,12 @@
 
 Lacuna is an open-source quantitative research validation library for discovering where an apparently promising signal, strategy, or research process is fragile. It is designed to sit between research/backtesting systems and a decision to trust their evidence.
 
-!!! warning "Pre-alpha status"
+!!! warning "Pre-1.0 status"
 
-    The repository now implements the initial v0.1 signal-validation path: explicit forward labels,
-    signal diagnostics, walk-forward and purged validation, dependent bootstrap, structured audit
-    rules, deterministic reports, and a file-based CLI. It remains pre-alpha: APIs and schemas can
-    still change, and later subsystem contracts do not imply those features are released.
+    The repository implements the v0.1 signal-validation path and the v0.2 robustness/experiment
+    milestone: append-only trial lineage, multiplicity correction, parameter/temporal/universe
+    perturbation, and regime evidence. It remains pre-1.0: later minor APIs may change through
+    documented migrations, and target subsystem contracts do not imply release.
 
 ## Choose a path
 

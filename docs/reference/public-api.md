@@ -1,8 +1,9 @@
 # Public API compatibility
 
-Lacuna `0.1` publishes an explicit Python API contract even though the project remains pre-1.0.
-The contract makes release-candidate review concrete: users can distinguish supported entry points
-from implementation details, and CI detects accidental export or signature drift.
+Lacuna `0.2` publishes an additive Python API contract even though the project remains pre-1.0.
+The exact `0.2.x` surface is frozen while the `0.1.x` fixture remains an executable compatibility
+subset. Users can distinguish supported entry points from implementation details, and CI detects
+accidental removal, export, or signature drift.
 
 ## Supported surface
 
@@ -15,26 +16,30 @@ study = lc.SignalStudy(...)
 report = study.audit()
 ```
 
-The following modules are part of the `0.1` contract:
+The following modules are part of the `0.2` contract:
 
 | Module | Supported purpose |
 | --- | --- |
 | `lacuna.labels` | Forward-return labels and `LabelResult` |
 | `lacuna.signal` | IC, quantiles, turnover, and decay |
 | `lacuna.cv` | Walk-forward and purged splitters |
-| `lacuna.validation` | Deterministic bootstrap inference |
+| `lacuna.validation` | Deterministic bootstrap inference, parameter surfaces, and multiplicity correction |
+| `lacuna.experiment` | Canonical fingerprints and append-only experiment/selection lineage |
+| `lacuna.robustness` | Continuous, subperiod, and timestamped-universe perturbation |
+| `lacuna.regime` | Point-in-time-aware classification and conditional regime evidence |
 | `lacuna.audit` | Rule evaluation and audit assembly |
 | `lacuna.report` | JSON, Markdown, and HTML rendering |
 | `lacuna.adapters` | Physical normalization helpers |
 | `lacuna.benchmark` | Reproducible developer benchmark services |
 
 Names declared by each module's `__all__`, the package-root exports, and the primary callable
-signatures are captured in `tests/fixtures/public-api-v0.1.json`. Contract tests compare the running
-package with that reviewed fixture.
+signatures are captured in `tests/fixtures/public-api-v0.2.json`. Contract tests compare the running
+package with that exact reviewed fixture. Separate tests require every `v0.1` root/module export and
+primary signature to remain available.
 
 ## Compatibility promise
 
-Within the `0.1.x` release line:
+Within the `0.2.x` release line:
 
 - exported names are not removed or renamed without a deprecation path;
 - required parameters are not added to an existing call;
@@ -54,7 +59,7 @@ Names beginning with `_`, including `lacuna._native`, are internal implementatio
 native functions are exercised by packaging smoke tests but are not a substitute for the validated
 Python services. Undocumented imports from implementation modules have no compatibility promise.
 
-Because Lacuna is pre-1.0, a future `0.2` may intentionally change the public contract. Such a change
+Because Lacuna is pre-1.0, a future `0.3` may intentionally change the public contract. Such a change
 must update the fixture, changelog, documentation, and migration guidance in the same review.
 
 ## Reviewing an intentional change

@@ -28,7 +28,7 @@ Target wheels:
 
 Normal users should not need a Rust toolchain.
 
-The `0.1` native surface is compatible with PyO3's `abi3-py311` mode: it exchanges owned Python
+The current native surface is compatible with PyO3's `abi3-py311` mode: it exchanges owned Python
 sequences and scalar results rather than borrowing Arrow buffers through version-specific CPython
 APIs. The release therefore builds one CPython 3.11 stable-ABI wheel per platform and smoke-tests it
 under Python 3.13 on the target architecture. The ordinary CI matrix separately verifies the full
@@ -116,7 +116,7 @@ remain read-only. GitHub receives the verified artifacts and checksum manifest; 
 tags are explicitly marked as prereleases, while stable tags create normal releases. GitHub
 provenance attestations are generated from the checksum manifest.
 
-Registry publication is deliberately disabled for `0.1.0`. The PyPI distribution name `lacuna` is
+Registry publication is deliberately disabled for current releases. The PyPI distribution name `lacuna` is
 already owned by an unrelated project, so this repository must not configure a trusted publisher or
 upload credentials for that name. Choose and review a distinct distribution name before adding a
 PyPI job; the Python import package can remain `lacuna`. The initial release is distributed through
@@ -125,12 +125,13 @@ its checksummed, attested GitHub Release artifacts.
 Stable and candidate tags use Cargo/SemVer spelling:
 
 ```text
-v0.1.0
-v0.1.0-rc.1
+v0.2.0
+v0.2.0-rc.1
 ```
 
-Python package metadata normalizes the candidate identity to `0.1.0rc1`; stable package metadata is
-`0.1.0`. The release verifier owns this mapping and prevents the two surfaces from drifting.
+Python package metadata normalizes a candidate such as `0.2.0-rc.1` to `0.2.0rc1`; stable package
+metadata is `0.2.0`. The release verifier owns this mapping and prevents the two surfaces from
+drifting.
 
 ## Initial release decision
 

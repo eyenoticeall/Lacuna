@@ -4,6 +4,43 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.2.0] - 2026-08-26
+
+### Added
+
+- Add versioned canonical JSON and SHA-256 research identities with rejection of ambiguous,
+  non-finite, timezone-naive, callable, unordered, and credential-bearing values.
+- Add an append-only SQLite experiment registry for completed, failed, cancelled, retried, and
+  explicitly superseding attempts, plus full eligible-set selection lineage and structured registry
+  snapshots.
+- Add Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli multiple-testing corrections
+  over explicit trial families or current registry attempts.
+- Add deterministic parameter-surface evaluation with failed-point visibility, local neighborhoods,
+  peak isolation, plateau width, grid-boundary evidence, threshold support, and selection/evaluation
+  sample separation.
+- Add seeded continuous parameter perturbation with normal, lognormal, and uniform distributions,
+  bounds, integer rounding, named constraints, rejection accounting, attempt budgets, and registry
+  integration.
+- Add declared half-open subperiod analysis with sample support, confidence interval passthrough,
+  overlap warnings, sign consistency, dispersion, trend, failures, and outcome concentration.
+- Add timestamped universe perturbation with stable membership identities, complete instrument sets,
+  retained-baseline fractions, composition Jaccard distance, sample support, and explicit
+  retrospective-membership findings.
+- Add fixed, strictly trailing expanding/rolling, and explicitly retrospective quantile regime
+  classifiers with source-availability validation and unknown-history states.
+- Add conditional regime evidence with raw/effective sample size, confidence intervals, Sharpe,
+  hit rate, drawdown, net/absolute contribution, leave-one-regime-out totals, overlap semantics, and
+  concentration findings.
+- Publish and regression-test the additive `0.2.x` public API contract while continuing to test
+  preservation of the `0.1.x` contract.
+
+### Changed
+
+- Advance the implementation roadmap through Phase 4 and designate trading realism as the next
+  milestone for the `0.3.x` series.
+- Make release-contract verification select the public API fixture for the release's major/minor
+  series and require new Phase 4 modules in wheels and source distributions.
+
 ## [0.1.0] - 2026-08-26
 
 ### Changed
