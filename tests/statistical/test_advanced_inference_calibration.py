@@ -96,9 +96,7 @@ def test_spa_is_not_diluted_by_irrelevant_poor_high_variance_models() -> None:
     rng = np.random.default_rng(772)
     base = rng.normal(scale=0.4, size=(120, 2))
     base[:, 0] += 0.25
-    poor = np.column_stack(
-        (base, rng.normal(loc=-5.0, scale=10.0, size=(120, 30)))
-    )
+    poor = np.column_stack((base, rng.normal(loc=-5.0, scale=10.0, size=(120, 30))))
 
     reality = reality_check(poor, expected_block_length=3, resamples=499, seed=9)
     spa = superior_predictive_ability(

@@ -35,10 +35,9 @@ def _direct_hansen_variances(matrix: np.ndarray, block_length: int) -> np.ndarra
         variance = float(np.dot(centered, centered) / size)
         for lag in range(1, size):
             covariance = float(np.dot(centered[:-lag], centered[lag:]) / size)
-            kernel = (
-                (size - lag) / size * (1.0 - 1.0 / block_length) ** lag
-                + lag / size * (1.0 - 1.0 / block_length) ** (size - lag)
-            )
+            kernel = (size - lag) / size * (1.0 - 1.0 / block_length) ** lag + lag / size * (
+                1.0 - 1.0 / block_length
+            ) ** (size - lag)
             variance += 2.0 * kernel * covariance
         result[strategy] = variance
     return result
@@ -64,16 +63,12 @@ def test_reality_check_matches_an_independent_literal_reference() -> None:
     observed = max(0.0, float(np.max(root_n * means)))
     reference = []
     for replicate in range(resamples):
-        indices = _stationary_indices(
-            matrix.shape[0], block_length, seed, 4, replicate
-        )
+        indices = _stationary_indices(matrix.shape[0], block_length, seed, 4, replicate)
         bootstrap_means = matrix[indices].mean(axis=0)
         reference.append(max(0.0, float(np.max(root_n * (bootstrap_means - means)))))
     exceedances = sum(value >= observed for value in reference)
 
-    observed_distribution = [
-        row["statistic"] for row in result.table("bootstrap_distribution")
-    ]
+    observed_distribution = [row["statistic"] for row in result.table("bootstrap_distribution")]
     assert observed_distribution == pytest.approx(reference, abs=1e-14)
     assert result.metrics["statistic"] == pytest.approx(observed)
     assert result.metrics["p_value"] == (exceedances + 1) / (resamples + 1)

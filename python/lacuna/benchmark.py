@@ -393,15 +393,14 @@ def run_benchmarks(
     bootstrap_values = np.sin(np.arange(max(resolved.periods, 20), dtype=np.float64) * 0.17)
     inference_periods = 6 * math.ceil(max(resolved.periods, 24) / 6)
     inference_strategies = max(3, min(resolved.instruments, 12))
-    inference_time: npt.NDArray[np.float64] = np.arange(
-        inference_periods, dtype=np.float64
-    )[:, np.newaxis]
-    inference_identity: npt.NDArray[np.float64] = np.arange(
-        inference_strategies, dtype=np.float64
-    )[np.newaxis, :]
+    inference_time: npt.NDArray[np.float64] = np.arange(inference_periods, dtype=np.float64)[
+        :, np.newaxis
+    ]
+    inference_identity: npt.NDArray[np.float64] = np.arange(inference_strategies, dtype=np.float64)[
+        np.newaxis, :
+    ]
     inference_matrix = (
-        np.sin(inference_time * 0.17 + inference_identity * 0.31)
-        + inference_identity * 0.01
+        np.sin(inference_time * 0.17 + inference_identity * 0.31) + inference_identity * 0.01
     )
 
     cases: list[tuple[str, BenchmarkCallable, int, str]] = [

@@ -15,7 +15,7 @@ such as `0.2.0rc1`.
 | `0.2.x` | Phase 4: robustness, regimes, experiment lineage, basic multiple-testing correction | Released |
 | `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Released |
 | `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Released |
-| `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Validated reference and simulation suites for every method |
+| `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Released |
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Core dependency surface remains unchanged |
 | `0.7`–`0.9` | Cross-phase integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |

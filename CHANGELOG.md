@@ -4,6 +4,51 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.5.0] - 2026-08-26
+
+### Added
+
+- Add combinatorial purged K-fold over every held-out group combination, with half-open interval
+  purging, embargo after every test group, explicit combinatorial safety limits, visible group/fold
+  tables, and deterministic complete-path reconstruction.
+- Add unrestricted, within-date, within-group, block, and sign-flip permutation schemes with
+  explicit null contracts, alternatives, deterministic per-replicate streams, and finite-resample
+  p-value correction.
+- Add non-Normal-return Sharpe uncertainty, two-sided confidence bounds, Probabilistic Sharpe Ratio,
+  minimum track-record length, and Deflated Sharpe Ratio over a visible complete trial family and
+  declared effective independent-trial count.
+- Add symmetric CSCV/PBO over synchronous strategy matrices with complete IS/OOS selection evidence,
+  average OOS ranks, logits, deterministic tie policy, partition sensitivity, and bounded
+  combination enumeration.
+- Add joint stationary bootstrap that shares one index path across strategy columns and reports
+  per-strategy means, standard errors, and long-run covariance evidence.
+- Add White Reality Check with joint stationary resampling and Hansen SPA with studentization,
+  the stationary-bootstrap population long-run variance kernel, and separately exposed lower,
+  consistent, and upper null recenterings.
+- Add literal equation-level White/Hansen references, deterministic stream fixtures, CPCV/PBO
+  properties, adapter equivalence, and fixed-seed permutation, Sharpe, PBO, Reality Check, and SPA
+  simulation suites.
+- Publish a comprehensive advanced-inference methodology and agent review contract, and freeze the
+  additive `0.5.x` public API while preserving executable `0.1.x` through `0.4.x` contracts.
+
+### Changed
+
+- Complete roadmap Phase 7 and designate separately optional adapters and extensions as the next
+  `0.6.x` milestone.
+- Advance the reproducible benchmark artifact to version 4 with public CPCV, PBO, Reality Check,
+  and SPA reference cases, stable checksums, workload-specific throughput, and traced memory.
+- Require the advanced-inference implementation, CV surface, and validation surface in source and
+  wheel distributions, and exercise CPCV/PBO/permutation/Sharpe/Reality Check/SPA in clean-wheel
+  smoke tests.
+
+### Fixed
+
+- Use the declared two-sided confidence level for Sharpe confidence bounds while retaining the
+  one-sided confidence quantile for PSR and minimum track-record decisions.
+- Reject permutation-invariant mean statistics for reorder-only permutation schemes, ambiguous PBO
+  partition types, non-numeric DSR trial families, and invalid CPCV integer configuration early with
+  domain-specific errors.
+
 ## [0.4.0] - 2026-08-26
 
 ### Added
