@@ -83,3 +83,18 @@ the report does not pretend this validates all research choices.
 
 Validation includes deterministic index fixtures, batch-size invariance, native/reference
 differentials, restart-frequency simulation, and a fixed-seed AR(1) coverage guard.
+
+## Joint stationary bootstrap in v0.5
+
+`lacuna.validation.joint_stationary_bootstrap` accepts a synchronous `T x M` strategy matrix and
+uses one stationary-bootstrap index path for every column in a replicate. This preserves
+contemporaneous cross-strategy dependence as well as local serial dependence. It reports the
+bootstrap mean and standard error for each strategy plus the covariance of
+`sqrt(T) * (bootstrap_mean - observed_mean)`.
+
+The joint method uses `SeedSequence([seed, 3, replicate])`. White Reality Check and Hansen SPA use
+the same joint-resampling principle with separate method-version streams `4` and `5`. They never
+resample strategy columns independently.
+
+The full contracts, Hansen long-run variance kernel, null recenterings, and validation evidence are
+documented in [Advanced inference](advanced-inference.md).

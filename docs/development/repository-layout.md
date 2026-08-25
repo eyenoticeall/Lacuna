@@ -9,8 +9,9 @@
 │   ├── config.py           immutable runtime configuration
 │   ├── labels.py           forward-return labels and intervals
 │   ├── signal.py           IC, quantiles, turnover, and decay
-│   ├── cv.py               walk-forward and purged folds
-│   ├── validation.py       deterministic bootstrap inference
+│   ├── cv.py               walk-forward, purged folds, and CPCV paths
+│   ├── validation.py       curated public validation/inference surface
+│   ├── _advanced_inference.py  permutation, Sharpe/PBO, joint bootstrap, RC/SPA
 │   ├── experiment.py       canonical identities and append-only trial lineage
 │   ├── robustness.py       perturbation, subperiod, and universe evidence
 │   ├── regime.py           regime classification and conditional evidence

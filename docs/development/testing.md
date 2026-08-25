@@ -133,6 +133,29 @@ The v0.4 gate additionally requires:
 - exact `0.4.x` public exports/signatures plus preservation of the `0.1.x` through `0.3.x` subsets;
 - a deterministic end-to-end as-of benchmark with output checksum and memory evidence.
 
+### Advanced-inference tests
+
+The v0.5 gate additionally requires:
+
+- exhaustive small CPCV combination fixtures, generated full-path coverage, and no retained label
+  overlap after combinatorial purging;
+- explicit embargo-after-each-test-group cases and combinatorial safety-limit failures;
+- deterministic unrestricted, stratified, block, and sign-flip transformation streams;
+- fixed-seed permutation null-size simulation and exchangeability warnings;
+- direct PSR standard-error and MinTRL equations, zero-variance rejection, and DSR trial-family
+  completeness including the selected Sharpe;
+- CSCV reference combinations with visible selected strategy, OOS rank, relative rank, logit, tie
+  behavior, and partition sensitivity;
+- planted persistent-edge and forced-selection-overfit PBO simulations;
+- one shared stationary-bootstrap index path across every strategy column;
+- an independent literal White Reality Check distribution and finite-corrected p-value;
+- an independent direct-lag Hansen stationary-bootstrap variance plus lower, consistent, and upper
+  SPA recentering distributions;
+- fixed-seed Reality Check/SPA null-size and planted-power simulations, including irrelevant poor
+  high-variance alternatives;
+- exact `0.5.x` public exports/signatures plus preservation of every `0.1.x` through `0.4.x` subset;
+- deterministic benchmark artifact v4 cases and a clean-wheel advanced-inference smoke path.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

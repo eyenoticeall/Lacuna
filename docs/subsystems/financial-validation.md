@@ -1,6 +1,8 @@
 # Financial cross-validation and statistical inference
 
-**Status:** v0.1 walk-forward, simple purging/embargo, and IID, moving, circular, and stationary bootstrap are implemented. Permutation tests, Sharpe inference, CPCV/PBO, and advanced reality checks are later.
+**Status:** v0.5 implements walk-forward, purged K-fold, CPCV with explicit path reconstruction,
+IID/moving/circular/stationary and joint stationary bootstrap, permutation schemes, Sharpe/PSR/DSR,
+CSCV/PBO, White Reality Check, and Hansen SPA.
 
 This subsystem prevents ordinary validation machinery from ignoring time, overlapping labels, dependence, and repeated research trials.
 
@@ -101,17 +103,26 @@ that fixed order.
 
 ## CPCV and PBO
 
-Combinatorial purged cross-validation is later. Its implementation must expose:
+The two implemented methods are deliberately separate:
+
+- `lacuna.cv.CombinatorialPurgedKFold` generates model-fitting splits, interval purging, embargo,
+  and reconstructed test paths;
+- `lacuna.validation.probability_of_backtest_overfitting` runs CSCV selection analysis over a
+  synchronous matrix of already-computed strategy performance.
+
+Together their evidence exposes:
 
 - group partitioning;
 - selected train/test combinations;
 - purge/embargo effects;
 - reconstructed backtest paths;
-- relative out-of-sample ranks;
+- relative out-of-sample ranks after explicit in-sample selection;
 - logit distribution and PBO estimate;
 - sensitivity to partition choice.
 
-Do not introduce a simplified “PBO” that omits path construction or selection logic.
+Do not call CPCV “PBO,” or call an ordinary combinatorial train/test splitter “CSCV.” Full method
+definitions, equations, tie behavior, safety limits, and non-claims are in
+[Advanced inference](../methodology/advanced-inference.md).
 
 ## Bootstrap framework
 
@@ -128,7 +139,9 @@ result = lc.validation.bootstrap(
 )
 ```
 
-All methods return the observed statistic, resample distribution summary, interval, method parameters, seed, raw/effective sample information, and warnings.
+Scalar bootstrap returns the observed statistic, resample distribution summary, interval, method
+parameters, seed, raw/effective sample information, and warnings. Joint bootstrap instead reports
+per-strategy means, standard errors, and the long-run covariance table.
 
 ### IID bootstrap
 
@@ -154,11 +167,13 @@ The implementation validates positive expected length and records the exact para
 
 ## Confidence intervals
 
-Initial intervals may include percentile and basic bootstrap intervals. BCa requires carefully validated acceleration and jackknife behavior and should not be added as a label over an incomplete implementation.
+Implemented intervals are percentile and basic bootstrap intervals. BCa requires carefully
+validated acceleration and jackknife behavior and should not be added as a label over an incomplete
+implementation.
 
 The result states interval level, sidedness, resample count, Monte Carlo resolution, and whether dependence-aware sampling was used.
 
-## Later permutation tests
+## Permutation tests
 
 Permutation schemes represent different null hypotheses:
 
@@ -170,19 +185,20 @@ Permutation schemes represent different null hypotheses:
 
 The p-value calculation defines whether the observed arrangement is included and uses a finite-resample correction such as `(extreme + 1) / (resamples + 1)` when appropriate.
 
-The alternative (`two-sided`, `greater`, `less`) is explicit. A within-date signal test must not accidentally permute labels across dates.
+The alternative (`two_sided`, `greater`, `less`) is explicit. A within-date signal test must not
+accidentally permute labels across dates.
 
-## Later Sharpe inference
+## Sharpe inference
 
 Sharpe calculations declare:
 
-- return frequency and `periods_per_year`;
-- risk-free/excess-return treatment;
+- `annualization` periods per year;
+- that input is already an excess-return series;
 - arithmetic mean and standard-deviation definitions;
-- `ddof`;
+- sample-standard-deviation `ddof=1`;
 - missing values;
-- skewness/kurtosis estimator;
-- autocorrelation treatment.
+- empirical standardized central skewness and Pearson kurtosis;
+- that the moment-based asymptotic equation does not separately correct autocorrelation.
 
 Probabilistic Sharpe Ratio and Deflated Sharpe Ratio include all assumptions and trial inputs. DSR is not computed from a winning Sharpe without a documented estimate of selection multiplicity and expected maximum Sharpe.
 
@@ -234,7 +250,9 @@ method metadata and warnings
 - interval overlap/purge scan is implemented in Rust with a Python reference;
 - deterministic bootstrap indices are generated in bounded Python batches and mean reductions are
   implemented in Rust with a NumPy reference;
-- combinatorial index generation, large permutation reductions, and PBO components are later work.
+- CPCV, permutation, PBO, joint stationary bootstrap, Reality Check, and SPA currently use validated
+  NumPy/Python reference paths; benchmark artifact v4 records their complete public-call cost before
+  any native optimization is considered.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.
 
@@ -251,5 +269,9 @@ SciPy remains the default for mature distribution functions and standard linear 
 - Null false-positive and dependent-coverage simulations.
 - Permutation preserves declared strata.
 - Sharpe/PSR/DSR reference examples.
+- Complete-family and selected-trial DSR validation.
+- CSCV/PBO combination, selection, rank, logit, tie, and partition-sensitivity fixtures.
+- Independent literal White and Hansen implementations, including direct long-run covariance sums.
+- Reality Check/SPA null-size, power, and poor-alternative simulations.
 - Undefined zero-variance and insufficient-sample cases.
 - Native/reference differential tests and bounded-memory benchmarks.

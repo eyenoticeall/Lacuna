@@ -14,7 +14,7 @@ such as `0.2.0rc1`.
 | `0.1.x` | Phases 0–3: foundations, signal diagnostics, validation core, audit/reports | Released |
 | `0.2.x` | Phase 4: robustness, regimes, experiment lineage, basic multiple-testing correction | Released |
 | `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Released |
-| `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Complete Phase 6 contracts and exit criteria |
+| `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Released |
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Validated reference and simulation suites for every method |
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Core dependency surface remains unchanged |
 | `0.7`–`0.9` | Cross-phase integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
@@ -135,7 +135,22 @@ contract; an end-to-end as-of benchmark; and clean-wheel exercise of the bias pa
 
 ## Phase 7 — advanced inference
 
-CPCV/PBO, advanced dependent resampling, White Reality Check, and Hansen SPA only after validated reference implementations and simulation suites exist.
+**v0.5 implemented:** combinatorial purged K-fold with inspectable reconstructed paths; explicit
+permutation nulls; Sharpe uncertainty, PSR, DSR, and minimum track-record length; symmetric
+CSCV/PBO with visible selection/ranks/logits and partition sensitivity; joint stationary bootstrap;
+White Reality Check; and Hansen SPA with lower, consistent, and upper recenterings.
+
+Exit criteria: every method has an independent equation-level reference or deterministic stream
+fixture, a fixed-seed simulation for its statistical behavior, explicit assumptions and failure
+states, bounded combinatorial work, a frozen additive `0.5.x` API, clean-wheel exercise, and a
+versioned public-call benchmark.
+
+The exit criteria are covered by CPCV combination/path and no-overlap invariants; permutation and
+Sharpe null simulations; complete-family DSR checks; planted PBO stable-edge/forced-overfit cases;
+independent literal White and Hansen implementations; Reality Check/SPA size, power, and
+poor-alternative simulations; benchmark artifact v4; and the advanced-inference methodology
+contract. No native advanced-inference path is claimed without a future benchmark-justified,
+differentially tested implementation.
 
 ## Phase 8 — extensions
 

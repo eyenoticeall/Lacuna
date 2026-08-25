@@ -24,14 +24,14 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.4** adds point-in-time joins, revision and future-data checks, survivorship evidence,
-> historical membership selection, universe drift, and declarative dataset contracts. The additive
-> `0.4.x` public API is frozen and regression-tested while preservation of the `0.1.x` through
-> `0.3.x` contracts remains executable. Lacuna remains pre-1.0 software; later minor versions may
+> Lacuna **v0.5** adds CPCV paths, explicit permutation nulls, Sharpe/PSR/DSR inference, CSCV/PBO,
+> joint stationary bootstrap, White Reality Check, and Hansen SPA. The additive `0.5.x` public API
+> is frozen and regression-tested while preservation of the `0.1.x` through `0.4.x` contracts
+> remains executable. Lacuna remains pre-1.0 software; later minor versions may
 > evolve through documented migrations.
 
 > [!NOTE]
-> [`v0.4.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.4.0)
+> [`v0.5.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.5.0)
 > as checksummed, provenance-attested wheels and a source distribution. The PyPI distribution name
 > `lacuna` belongs to an unrelated project, so do not install that package expecting this software.
 
@@ -76,7 +76,7 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 |---|---|
 | Labels | Explicit observation/entry/exit timing, trading-observation horizons, censoring and adjustment evidence |
 | Signal diagnostics | Pearson/Spearman IC, IC time series, balanced quantiles, spreads, monotonicity, turnover, and decay |
-| Financial validation | Expanding/rolling walk-forward folds, purged K-fold, embargo, and IID/moving/circular/stationary bootstrap |
+| Financial validation | Walk-forward, purged K-fold/CPCV paths, dependent and joint bootstrap, permutation, Sharpe/PSR/DSR, CSCV/PBO, Reality Check, and SPA |
 | Audit and reports | Versioned rules, explicit unknown/not-applicable states, evidence coverage, JSON, Markdown, and self-contained HTML |
 | Native core | Rust grouped-rank IC, bootstrap-mean reduction, and half-open interval purging with Python references |
 | Data boundary | Polars eager/lazy, NumPy, optional pandas, and Arrow-compatible inputs |
@@ -148,6 +148,30 @@ uncertainty = lc.validation.bootstrap(
     [row["ic"] for row in ic.table("ic_by_period") if row["ic"] is not None],
     method="stationary",
     expected_block_length=5,
+    resamples=10_000,
+    seed=42,
+)
+```
+
+Keep model-fitting CPCV separate from selection analysis, then test a declared strategy family
+against one common benchmark:
+
+```python
+paths = lc.cv.CombinatorialPurgedKFold(
+    n_groups=6,
+    n_test_groups=2,
+    embargo=2,
+).split(labels.frame)
+
+pbo = lc.validation.probability_of_backtest_overfitting(
+    synchronous_strategy_returns,
+    partitions=8,
+    partition_sensitivity=(4, 6, 10),
+)
+
+spa = lc.validation.superior_predictive_ability(
+    performance_differentials,
+    expected_block_length=20,
     resamples=10_000,
     seed=42,
 )
@@ -246,11 +270,10 @@ uv run lacuna signal \
 
 ## Roadmap
 
-Versions `0.1` through `0.4` cover foundations, signal diagnostics, temporal validation, dependent
+Versions `0.1` through `0.5` cover foundations, signal diagnostics, temporal validation, dependent
 bootstrap, audit/reporting, experiment lineage, multiple-testing correction, robustness,
-trading-realism evidence, and point-in-time data correctness. The next milestone is `0.5`: advanced
-inference, beginning only with independently validated reference implementations and simulation
-suites.
+trading-realism evidence, point-in-time data correctness, and advanced inference. The next
+milestone is `0.6`: optional adapters and extensions that do not expand the core dependency surface.
 
 See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
 and the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for architecture and statistical
@@ -267,7 +290,7 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes implemented v0.1–v0.4 behavior from later contracts. Contributors
+The documentation distinguishes implemented v0.1–v0.5 behavior from later contracts. Contributors
 and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 

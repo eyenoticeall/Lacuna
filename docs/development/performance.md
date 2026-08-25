@@ -1,9 +1,9 @@
 # Performance architecture and benchmarking
 
-**Status:** benchmark artifact version 2 covers public signal/audit workflows, the three native
-kernels, the v0.3 path-independent cost-stress surface, and the v0.4 point-in-time as-of path. The
-measurements establish reproducible
-baselines; no hardware-independent latency promise is claimed.
+**Status:** benchmark artifact version 4 covers public signal/audit workflows, the three native
+kernels, the v0.3 path-independent cost-stress surface, the v0.4 point-in-time as-of path, and v0.5
+CPCV/PBO/Reality Check/SPA reference paths. The measurements establish reproducible baselines; no
+hardware-independent latency promise is claimed.
 
 Performance is a product requirement, but only measured workloads justify optimization decisions.
 
@@ -78,14 +78,20 @@ Measure the public call, including:
 Run equivalent Polars, pandas, NumPy, and Arrow inputs where supported. A fast kernel cannot compensate for an accidental full-data copy at its boundary.
 
 The implemented runner measures forward labels, reference/native IC, quantiles, turnover, decay,
-reference/native bootstrap, reference/native interval purge, the complete `SignalStudy.audit`
-workflow, a nine-point `costs.stress` grid, and the point-in-time `bias.asof_join` reference path. It
-invokes public APIs so validation, data movement, result construction, scenario projection, output
-checksums, and traced Python memory are included.
+reference/native bootstrap, reference/native interval purge, CPCV, PBO, Reality Check, SPA, the
+complete `SignalStudy.audit` workflow, a nine-point `costs.stress` grid, and the point-in-time
+`bias.asof_join` reference path. It invokes public APIs so validation, data movement, result
+construction, combinatorial enumeration, resampling, output checksums, and traced Python memory are
+included.
 
 The cost benchmark currently supports the NumPy/Polars reference implementation. It does not imply
 a native cost path: native/reference differential testing becomes mandatory if measurements later
 justify one.
+
+The v0.5 cases likewise describe reference implementations, not native performance claims. CPCV is
+measured in input intervals, PBO in enumerated symmetric combinations, and Reality Check/SPA in
+joint bootstrap replicates. Any later optimized path must reproduce the same checksums in
+differential tests before it can replace or accompany these baselines.
 
 ```bash
 lacuna bench --tier smoke --out benchmark.json

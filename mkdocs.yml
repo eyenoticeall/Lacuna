@@ -47,6 +47,7 @@ nav:
       - Quantiles, turnover, and decay: methodology/quantiles-turnover-decay.md
       - Temporal validation: methodology/temporal-validation.md
       - Bootstrap inference: methodology/bootstrap.md
+      - Advanced inference: methodology/advanced-inference.md
       - Experiment lineage and multiple testing: methodology/experiments-multiple-testing.md
       - Robustness analysis: methodology/robustness-analysis.md
       - Regime analysis: methodology/regime-analysis.md

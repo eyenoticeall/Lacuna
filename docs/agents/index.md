@@ -16,7 +16,7 @@ When these disagree, do not quietly choose one. Preserve working behavior unless
 
 | Task | First documents | Expected evidence |
 | --- | --- | --- |
-| implement a statistical method | method-contribution guide + subsystem guide | reference, assumptions, fixtures, method version |
+| implement a statistical method | method-contribution guide + subsystem guide; advanced-inference guide for selection/bootstrap work | reference, assumptions, fixtures, method version |
 | optimize in Rust | native-core + performance guides | profile, differential tests, transfer-inclusive benchmark |
 | add a data container/source | data-boundary + adapters guide | semantic mapping, copy plan, eager/lazy tests |
 | fix a temporal bug | data model + bias/CV guide | boundary fixture, leakage analysis, affected outputs |

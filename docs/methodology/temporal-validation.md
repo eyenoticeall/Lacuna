@@ -1,8 +1,8 @@
 # Walk-forward validation, purging, and embargo
 
 `lacuna.cv` returns inspectable source-row indices and structured fold evidence. It never shuffles
-time. v0.1 contains two distinct splitters: chronological `WalkForward` and label-aware
-`PurgedKFold`; it does not yet combine them into purged walk-forward validation.
+time. The package contains chronological `WalkForward`, label-aware `PurgedKFold`, and v0.5
+`CombinatorialPurgedKFold`; it does not conflate any of them with purged walk-forward validation.
 
 ## Walk-forward
 
@@ -61,18 +61,55 @@ The Python reference merges overlapping test intervals and uses ordered endpoint
 implements the same interval rule. Property tests assert that every retained train interval is
 disjoint from every test interval and that native/reference folds agree.
 
+## Combinatorial purged K-fold
+
+`CombinatorialPurgedKFold(n_groups=N, n_test_groups=k)` partitions unique times into `N`
+contiguous, as-even-as-possible groups and holds out all `C(N, k)` combinations. Purging uses the
+union of every test label interval in a combination. Embargo is applied separately after every
+held-out group, then test periods are removed from the embargo set so test and embargo roles never
+overlap.
+
+```python
+combinatorial = lc.cv.CombinatorialPurgedKFold(
+    n_groups=6,
+    n_test_groups=2,
+    embargo=2,
+    max_combinations=10_000,
+).split(labels.frame)
+```
+
+Every group has `C(N - 1, k - 1)` test incidences. Ordered group incidence assigns those results to
+the same number of complete `CPCVPath` objects. Each path exposes one contributing fold per group
+and contains every source row once in chronological group order. This is a reconstruction map for
+out-of-sample predictions: the splitter does not fabricate predictions or performance values.
+
+`CombinatorialSplitResult` provides:
+
+- `folds`: every train/test combination with separate purge and embargo indices;
+- `paths`: every complete reconstructed test path;
+- `groups`: chronological group boundaries and row counts;
+- `combinations`: the test-group tuple for each fold;
+- `path_table`: each `(path, group, contributing fold)` assignment;
+- structured counts for combinations, paths, purged observations, and embargoed observations.
+
+The split count is bounded before enumeration by `max_combinations`. CPCV remains block
+cross-validation: training data can be chronologically later than a held-out group. Use a
+walk-forward design when strict past-only fitting is the required estimand.
+
 ## Embargo
 
-The v0.1 embargo is a non-negative count of unique observation periods immediately after the final
-test period in a fold. It is applied after purging and only to candidates still retained. Purged and
+The implemented embargo is a non-negative count of unique observation periods. `PurgedKFold`
+applies it immediately after the final test period; `CombinatorialPurgedKFold` applies it after
+every held-out group. It is applied after purging and only to candidates still retained. Purged and
 embargoed indices are reported separately. Calendar-duration and percentage embargoes are later
 methods, not alternative interpretations of the integer parameter.
 
 ## Outputs and limitations
 
 Each `Fold` contains `train_indices`, `test_indices`, `purged_indices`, and `embargoed_indices`.
-`SplitResult.fold_table` has one row per fold/role with start, end, and count. Metadata records the
-interval closure, source columns, backend, and materialization evidence.
+`SplitResult.fold_table` has one row per fold/role with start, end, and count. CPCV additionally
+returns explicit group, combination, and path tables. Metadata records the interval closure, source
+columns, backend, and materialization evidence.
 
 The splitters do not fit a model, stratify, randomize, or infer label intervals. They also cannot cure
 look-ahead already embedded in a feature or universe. Purging protects the train/test label boundary;

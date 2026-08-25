@@ -123,8 +123,8 @@ The target Python packages have narrow responsibilities:
 |---|---|
 | `signal` | IC, quantiles, decay, turnover, neutralization |
 | `labels` | forward returns, event intervals, execution timing |
-| `cv` | temporal splits, purging, embargo, later CPCV |
-| `validation` | resampling, Sharpe inference, multiple testing, stability |
+| `cv` | temporal splits, purging, embargo, and CPCV path reconstruction |
+| `validation` | resampling, permutation, Sharpe/PBO, Reality Check/SPA, multiple testing, stability |
 | `regime` | regime definitions and conditional evidence |
 | `costs` | cost models, stress surfaces, impact, capacity |
 | `bias` | point-in-time joins, leakage, survivorship, universe checks |
@@ -138,7 +138,8 @@ Do not create every package as an empty placeholder. Add a package when its firs
 ## Current implementation
 
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
-v0.3 trading-realism milestone, and v0.4 data-correctness milestone:
+v0.3 trading-realism milestone, v0.4 data-correctness milestone, and v0.5 advanced-inference
+milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -159,10 +160,12 @@ v0.3 trading-realism milestone, and v0.4 data-correctness milestone:
   and scenario capacity curves.
 - safe as-of joins, future-data and revision diagnostics, survivorship evidence, half-open
   membership selection, universe drift, and declarative dataset validation.
+- CPCV paths, explicit permutation nulls, Sharpe/PSR/DSR/MinTRL, CSCV/PBO, joint stationary
+  bootstrap, White Reality Check, and Hansen SPA.
 
-Advanced inference, vendor/backtester integrations, and plugins remain later contracts. Pre-1.0
-minor versions can change through documented migrations; the published `0.1.x` through `0.4.x`
-contracts govern their respective release lines.
+Vendor/backtester integrations and plugins remain later contracts. Pre-1.0 minor versions can
+change through documented migrations; the published `0.1.x` through `0.5.x` contracts govern their
+respective release lines.
 
 ## Detailed guides
 

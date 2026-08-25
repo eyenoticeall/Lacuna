@@ -28,6 +28,10 @@ Review Lacuna changes in risk order. A clean style check cannot compensate for t
 - [ ] Small, empty, constant, and degenerate samples have defined outcomes.
 - [ ] Dependence-aware methods are used when observations are not IID.
 - [ ] Multiple testing uses the complete declared candidate family.
+- [ ] CPCV model-fitting paths are not conflated with CSCV/PBO selection analysis.
+- [ ] Strategy-family tests declare one benchmark and whether positive or negative is better.
+- [ ] Dependent matrix resampling shares indices across strategies and records block assumptions.
+- [ ] Selection ties, partition sensitivity, studentization, and null recentering are inspectable.
 - [ ] Randomized methods have deterministic, schedule-independent substreams.
 - [ ] Evidence comes from an independent oracle, analytical fixture, or controlled simulation.
 - [ ] Reported precision and certainty do not exceed supporting evidence.

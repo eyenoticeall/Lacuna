@@ -143,3 +143,13 @@ Define required evidence and applicability before the threshold. Add pass/warn/f
 #### Schema or persistence change
 
 Define compatibility and migration first. Test old reads, new writes, interrupted/concurrent operations, canonical serialization, invalid payload rejection, and explicit version negotiation.
+
+#### Selection-aware or bootstrap inference
+
+Begin with the null, estimand, direction convention, and complete candidate-family boundary. Keep
+model-fitting splitters distinct from post-hoc performance-matrix procedures. Define ties,
+partitions, block length, studentization, recentering, Monte Carlo correction, and degenerate
+variance behavior before code. Resample synchronous strategy columns with one shared index path.
+Validate against a literal equation-level implementation and at least one null-size and planted-power
+simulation. For multiple null distributions, expose each rather than selecting the convenient one.
+Use [Advanced inference](../methodology/advanced-inference.md) as the v0.5 reference contract.

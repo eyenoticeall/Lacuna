@@ -1,7 +1,7 @@
 # Public API compatibility
 
-Lacuna `0.4` publishes an additive Python API contract even though the project remains pre-1.0.
-The exact new `0.4.x` surface is frozen while the `0.1.x` through `0.3.x` fixtures remain executable
+Lacuna `0.5` publishes an additive Python API contract even though the project remains pre-1.0.
+The exact new `0.5.x` surface is frozen while the `0.1.x` through `0.4.x` fixtures remain executable
 compatibility subsets. Users can distinguish supported entry points from implementation details,
 and CI detects accidental removal, export, or signature drift.
 
@@ -16,14 +16,14 @@ study = lc.SignalStudy(...)
 report = study.audit()
 ```
 
-The following modules are part of the supported contract through `0.4`:
+The following modules are part of the supported contract through `0.5`:
 
 | Module | Supported purpose |
 | --- | --- |
 | `lacuna.labels` | Forward-return labels and `LabelResult` |
 | `lacuna.signal` | IC, quantiles, turnover, and decay |
-| `lacuna.cv` | Walk-forward and purged splitters |
-| `lacuna.validation` | Deterministic bootstrap inference, parameter surfaces, and multiplicity correction |
+| `lacuna.cv` | Walk-forward, purged K-fold, and CPCV split/path evidence |
+| `lacuna.validation` | Bootstrap/permutation, Sharpe/PBO, Reality Check/SPA, parameter surfaces, and multiplicity correction |
 | `lacuna.experiment` | Canonical fingerprints and append-only experiment/selection lineage |
 | `lacuna.robustness` | Continuous, subperiod, and timestamped-universe perturbation |
 | `lacuna.regime` | Point-in-time-aware classification and conditional regime evidence |
@@ -36,12 +36,12 @@ The following modules are part of the supported contract through `0.4`:
 
 Names declared by each module's `__all__`, the package-root exports, and the primary callable
 signatures are captured in the versioned files under `tests/fixtures/public-api-v*.json`. Contract
-tests compare the running package with the exact reviewed `0.4` additions. Separate tests require
-every `v0.1` through `v0.3` root/module export and primary signature to remain available.
+tests compare the running package with the exact reviewed `0.5` additions. Separate tests require
+every `v0.1` through `v0.4` root/module export and primary signature to remain available.
 
 ## Compatibility promise
 
-Within the `0.4.x` release line:
+Within the `0.5.x` release line:
 
 - exported names are not removed or renamed without a deprecation path;
 - required parameters are not added to an existing call;
