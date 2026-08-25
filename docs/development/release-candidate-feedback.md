@@ -71,10 +71,12 @@ is preferred for discrepancies.
 ## Evidence register
 
 Feedback is not counted until it links to a reviewable record and satisfies the protocol above.
+The public recruitment and graduation checklist lives in
+[GitHub issue #2](https://github.com/eyenoticeall/Lacuna/issues/2).
 
 | Tester record | Platform | Input boundary | Independent comparison | Disposition |
 | --- | --- | --- | --- | --- |
-| Pending | — | — | — | Awaiting external test |
+| [Tracker #2](https://github.com/eyenoticeall/Lacuna/issues/2) | — | — | — | Awaiting external tests |
 
 The pending row is deliberately explicit. It must not be interpreted as completed independent
 validation.

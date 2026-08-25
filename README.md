@@ -28,6 +28,14 @@ Lacuna is the validation and diagnostics layer between a quantitative research i
 > tested, and the `0.1.x` public API contract is now reviewable and regression-tested. It remains
 > pre-1.0 software; later minor versions may evolve through documented migrations.
 
+> [!NOTE]
+> [`v0.1.0-rc.1` is available for independent testing](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.1.0-rc.1).
+> Lacuna needs results from two non-implementers before the candidate can graduate. Follow the
+> [tester protocol](docs/development/release-candidate-feedback.md), then submit the
+> [structured feedback form](https://github.com/eyenoticeall/Lacuna/issues/new?template=rc-feedback.yml).
+> Progress and qualifying reports are tracked in
+> [GitHub issue #2](https://github.com/eyenoticeall/Lacuna/issues/2).
+
 ## Why Lacuna?
 
 Backtest engines are good at answering _what happened under these assumptions?_ Lacuna is being built to ask the harder follow-up questions:
