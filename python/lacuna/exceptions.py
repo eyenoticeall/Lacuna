@@ -13,5 +13,13 @@ class DataContractError(LacunaError, ValueError):
     """Raised when input data does not satisfy a declared semantic contract."""
 
 
+class MethodContractError(LacunaError, ValueError):
+    """Raised when an analytical method or its configuration is undefined."""
+
+
 class NativeExtensionError(LacunaError, RuntimeError):
     """Raised when a required native capability is unavailable."""
+
+
+class ReportError(LacunaError, RuntimeError):
+    """Raised when a report cannot be rendered or persisted safely."""

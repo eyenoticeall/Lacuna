@@ -13,3 +13,4 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Unit, property, integration, Rust, and CI test foundations.
 - Initial project documentation and branding.
 - Comprehensive developer handbook, subsystem architecture contracts, reference material, and coding-agent playbooks derived from the technical specification.
+- Forward-return labels, Pearson/Spearman IC, quantile diagnostics, turnover, decay, and native grouped-rank, bootstrap-reduction, and interval-purge kernels.

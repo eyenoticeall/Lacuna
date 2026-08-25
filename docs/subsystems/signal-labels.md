@@ -1,6 +1,7 @@
 # Signal analytics and forward labels
 
-**Status:** v0.1 contract. The Phase 0 repository does not yet implement these APIs.
+**Status:** the v0.1 forward-label and signal-diagnostic APIs are implemented. Weighted IC,
+neutralization, specialized half-life models, and additional tie policies remain later work.
 
 This subsystem answers: does a cross-sectional feature contain predictive information under explicit earning and execution assumptions?
 
@@ -30,7 +31,7 @@ structured signal evidence
 
 ## Forward returns
 
-Target functional API:
+Public functional API:
 
 ```python
 labels = lc.labels.forward_returns(
@@ -58,12 +59,13 @@ Log returns may be a later explicit method, never an implicit substitute.
 The label result contains:
 
 - `observation_time` — signal timestamp;
-- `label_start` — actual entry timestamp;
+- `label_start` — conservative sample-interval start at the signal observation;
+- `entry_time` — actual entry observation used to select the entry price;
 - `label_end` — actual exit timestamp;
 - `horizon` — normalized requested horizon;
 - `forward_return`.
 
-A close-observed signal cannot use the same close as entry unless the caller explicitly defines a pre-close availability model. `next_open` resolves per instrument calendar and missing-bar policy.
+A close-observed signal cannot use the same close as entry unless the caller explicitly defines a pre-close availability model. `next_open` resolves per instrument ordering and missing-bar policy. Starting the label interval at the signal observation is conservative for purging and keeps same-session entry/exit labels from collapsing to an empty interval when the source only has session timestamps.
 
 ### Horizon semantics
 
@@ -104,7 +106,7 @@ For lazy frames, projection and alignment should remain lazy until a grouped ker
 
 ## Information coefficient
 
-Target API:
+Public API:
 
 ```python
 result = lc.signal.ic(
@@ -154,7 +156,7 @@ Weights are non-negative finite values aligned row-wise. The result documents wh
 
 ## Quantile analysis
 
-Target API:
+Public API:
 
 ```python
 result = lc.signal.quantiles(
@@ -223,12 +225,11 @@ Neutralization is a transformation result with diagnostics, not a hidden option 
 
 ## Native candidates
 
-First native kernels:
+Native execution:
 
-- grouped average ranks and Spearman IC;
-- deterministic quantile assignment;
-- grouped quantile reductions;
-- turnover and signal autocorrelation.
+- grouped average ranks and Spearman IC are implemented in Rust with a NumPy reference path;
+- quantile assignment, grouped reductions, turnover, and signal autocorrelation currently use
+  Polars/NumPy until benchmarks justify more native kernels.
 
 Polars should own alignment, projection, and ordinary grouping unless benchmarks demonstrate otherwise.
 

@@ -83,12 +83,16 @@ Only columns required by the requested label or cost calculation are mandatory. 
 ```text
 observation_time
 label_start
+entry_time
 label_end
 instrument
 label
 ```
 
-The interval is mandatory for label-aware cross-validation. A scalar label without its earning interval cannot prove that a split is leakage-free.
+`label_start` conservatively begins at the signal observation so purging covers the complete
+sample-information interval. `entry_time` records the actual price-entry observation. The interval
+is mandatory for label-aware cross-validation; a scalar label without its earning interval cannot
+prove that a split is leakage-free.
 
 ### Forward-return frame
 
@@ -97,6 +101,7 @@ Long form is canonical at public boundaries:
 ```text
 observation_time
 label_start
+entry_time
 label_end
 instrument
 horizon
