@@ -5,6 +5,7 @@ from __future__ import annotations
 import gc
 import hashlib
 import json
+import math
 import platform
 import statistics
 import sys
@@ -21,17 +22,27 @@ import polars as pl
 
 from lacuna import bias, costs, signal
 from lacuna.bias import PointInTimeJoinResult
-from lacuna.cv import PurgedKFold, SplitResult
+from lacuna.cv import CombinatorialPurgedKFold, CombinatorialSplitResult, PurgedKFold, SplitResult
 from lacuna.exceptions import MethodContractError
 from lacuna.labels import LabelResult, forward_returns
 from lacuna.native import native_status
 from lacuna.report import AuditReport
 from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult
-from lacuna.validation import bootstrap
+from lacuna.validation import (
+    bootstrap,
+    probability_of_backtest_overfitting,
+    reality_check,
+    superior_predictive_ability,
+)
 
 BenchmarkOutput: TypeAlias = (
-    AnalysisResult | AuditReport | LabelResult | PointInTimeJoinResult | SplitResult
+    AnalysisResult
+    | AuditReport
+    | CombinatorialSplitResult
+    | LabelResult
+    | PointInTimeJoinResult
+    | SplitResult
 )
 BenchmarkCallable: TypeAlias = Callable[[], BenchmarkOutput]
 IntArray: TypeAlias = npt.NDArray[np.int64]
@@ -137,7 +148,7 @@ class BenchmarkSuite:
     generated_at: datetime
     environment: Mapping[str, object]
     schema_version: str = "1"
-    benchmark_version: int = 3
+    benchmark_version: int = 4
 
     def to_dict(self) -> dict[str, object]:
         """Return the complete benchmark artifact."""
@@ -261,7 +272,11 @@ def _output_payload(output: BenchmarkOutput) -> tuple[dict[str, object], str]:
             "evidence": _without_created_at(output.evidence),
             "frame_summary": summary,
         }, "polars"
-    result = output.evidence if isinstance(output, SplitResult | PointInTimeJoinResult) else output
+    result = (
+        output.evidence
+        if isinstance(output, SplitResult | CombinatorialSplitResult | PointInTimeJoinResult)
+        else output
+    )
     parameters = result.metadata.parameters
     backend = parameters.get("backend")
     return _without_created_at(result), str(backend or "polars")
@@ -376,6 +391,18 @@ def run_benchmarks(
         }
     )
     bootstrap_values = np.sin(np.arange(max(resolved.periods, 20), dtype=np.float64) * 0.17)
+    inference_periods = 6 * math.ceil(max(resolved.periods, 24) / 6)
+    inference_strategies = max(3, min(resolved.instruments, 12))
+    inference_time: npt.NDArray[np.float64] = np.arange(
+        inference_periods, dtype=np.float64
+    )[:, np.newaxis]
+    inference_identity: npt.NDArray[np.float64] = np.arange(
+        inference_strategies, dtype=np.float64
+    )[np.newaxis, :]
+    inference_matrix = (
+        np.sin(inference_time * 0.17 + inference_identity * 0.31)
+        + inference_identity * 0.01
+    )
 
     cases: list[tuple[str, BenchmarkCallable, int, str]] = [
         (
@@ -439,6 +466,49 @@ def run_benchmarks(
             lambda: PurgedKFold(n_splits=5, embargo=2, use_native=False).split(interval_frame),
             interval_count,
             "intervals/second",
+        ),
+        (
+            "cv.combinatorial_purged_kfold.reference",
+            lambda: CombinatorialPurgedKFold(
+                n_groups=6,
+                n_test_groups=2,
+                embargo=2,
+                use_native=False,
+            ).split(interval_frame),
+            interval_count,
+            "intervals/second",
+        ),
+        (
+            "validation.pbo.reference",
+            lambda: probability_of_backtest_overfitting(
+                inference_matrix,
+                partitions=6,
+                statistic="mean",
+            ),
+            math.comb(6, 3),
+            "combinations/second",
+        ),
+        (
+            "validation.reality_check.reference",
+            lambda: reality_check(
+                inference_matrix,
+                expected_block_length=3,
+                resamples=resolved.bootstrap_resamples,
+                seed=resolved.seed,
+            ),
+            resolved.bootstrap_resamples,
+            "resamples/second",
+        ),
+        (
+            "validation.spa.reference",
+            lambda: superior_predictive_ability(
+                inference_matrix,
+                expected_block_length=3,
+                resamples=resolved.bootstrap_resamples,
+                seed=resolved.seed,
+            ),
+            resolved.bootstrap_resamples,
+            "resamples/second",
         ),
         (
             "study.audit",

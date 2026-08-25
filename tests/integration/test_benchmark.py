@@ -24,7 +24,7 @@ def test_smoke_benchmark_runs_public_reference_and_native_paths() -> None:
     names = {case["name"] for case in payload["cases"]}
 
     assert payload["schema_version"] == "1"
-    assert payload["benchmark_version"] == 3
+    assert payload["benchmark_version"] == 4
     assert payload["config"]["rows"] == 40
     assert "signal.ic.reference" in names
     assert "signal.ic.native" in names
@@ -32,6 +32,10 @@ def test_smoke_benchmark_runs_public_reference_and_native_paths() -> None:
     assert "validation.bootstrap.native" in names
     assert "cv.purged_kfold.reference" in names
     assert "cv.purged_kfold.native" in names
+    assert "cv.combinatorial_purged_kfold.reference" in names
+    assert "validation.pbo.reference" in names
+    assert "validation.reality_check.reference" in names
+    assert "validation.spa.reference" in names
     assert "study.audit" in names
     assert "costs.stress.reference" in names
     assert "bias.asof_join.reference" in names
