@@ -1,0 +1,73 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "lacuna-options"
+version = "0.1.0"
+description = "Optional empirical options-research contracts for Lacuna."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT OR Apache-2.0"
+keywords = ["options", "quantitative-research", "volatility", "validation"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Financial and Insurance Industry",
+  "License :: OSI Approved :: Apache Software License",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = [
+  "lacuna>=0.5,<0.7",
+  "numpy>=2.0",
+  "polars>=1.30",
+]
+
+[project.urls]
+Changelog = "https://github.com/eyenoticeall/Lacuna/blob/main/extensions/lacuna-options/CHANGELOG.md"
+Documentation = "https://github.com/eyenoticeall/Lacuna/blob/main/docs/subsystems/options-extension.md"
+Repository = "https://github.com/eyenoticeall/Lacuna"
+
+[tool.uv.sources]
+lacuna = { workspace = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/lacuna_options"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "CHANGELOG.md",
+  "README.md",
+  "src/lacuna_options",
+  "tests",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "RUF", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src/lacuna_options"]
+
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]

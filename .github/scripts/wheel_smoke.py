@@ -26,6 +26,7 @@ PUBLIC_MODULES = (
     "lacuna.experiment",
     "lacuna.labels",
     "lacuna.native",
+    "lacuna.plugins",
     "lacuna.regime",
     "lacuna.report",
     "lacuna.robustness",
@@ -170,6 +171,63 @@ spa = lacuna.validation.superior_predictive_ability(
 require(0.0 < reality.metrics["p_value"] <= 1.0, "Reality Check inference failed")
 require(0.0 < spa.metrics["p_value_consistent"] <= 1.0, "SPA inference failed")
 
+vendor = lacuna.adapters.adapt_vendor(
+    {"asset": ["A"], "published": [1], "metric": [2.0]},
+    lacuna.adapters.VendorSchema(
+        "wheel-smoke.vendor.v1",
+        {"instrument": "asset", "available_time": "published", "value": "metric"},
+        required=("instrument", "available_time", "value"),
+        availability="point_in_time",
+    ),
+    collect=True,
+)
+require(vendor.columns == ("instrument", "available_time", "value"), "vendor adapter failed")
+
+backtest = lacuna.adapters.adapt_backtest(
+    {"date": [1], "model": ["alpha"], "pnl_return": [0.01]},
+    lacuna.adapters.BacktestSchema(
+        "wheel-smoke.backtest.v1",
+        "returns",
+        {"time": "date", "strategy": "model", "return": "pnl_return"},
+        lacuna.adapters.BacktestSemantics(
+            returns="net",
+            return_frequency="daily",
+            compounding="simple",
+            position_timing="close-to-close",
+            execution_delay="one session",
+            price_field="close",
+            price_adjustment="total_return_adjusted",
+            costs="included",
+            borrow="included",
+            timezone="UTC",
+            calendar="XNYS",
+            session="regular",
+            missing_instruments="retain as null",
+            delistings="terminal return included",
+        ),
+    ),
+    collect=True,
+)
+require(backtest.columns == ("time", "strategy", "return"), "backtest adapter failed")
+
+sklearn_cv = lacuna.adapters.as_sklearn_cv(
+    lacuna.cv.WalkForward(train=2, test=1, step=1),
+    {"time": [0, 1, 2, 3]},
+)
+require(sklearn_cv.get_n_splits() == 2, "sklearn CV adapter failed")
+
+
+class _DuckDBSmokeSource:
+    def to_arrow_reader(self, batch_size: int) -> object:
+        require(batch_size == 1, "DuckDB adapter batch size changed")
+        return {"value": [1.0]}
+
+
+duckdb_frame = lacuna.adapters.from_duckdb(_DuckDBSmokeSource(), batch_size=1)
+require(duckdb_frame.evidence.metrics["row_count"] == 1, "DuckDB adapter failed")
+plugin_candidates = lacuna.plugins.discover_plugins()
+require(isinstance(plugin_candidates, tuple), "plugin discovery failed")
+
 package = files("lacuna")
 require(package.joinpath("py.typed").is_file(), "wheel is missing py.typed")
 require(package.joinpath("_native.pyi").is_file(), "wheel is missing native type stubs")
@@ -187,6 +245,7 @@ print(
             "trial_count": adjusted.metrics["trial_count"],
             "cost_scenarios": cost_stress.metrics["scenario_count"],
             "point_in_time_matches": point_in_time.evidence.metrics["matched_rows"],
+            "plugin_candidates": len(plugin_candidates),
             "cpcv_combinations": len(combinatorial.folds),
             "pbo_combinations": pbo.metrics["n_combinations"],
             "reality_check_p_value": reality.metrics["p_value"],

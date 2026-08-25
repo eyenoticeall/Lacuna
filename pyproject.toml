@@ -63,6 +63,7 @@ lacuna = "lacuna.cli:main"
 
 [dependency-groups]
 dev = [
+  "hatchling>=1.27",
   "hypothesis>=6.130",
   "jsonschema>=4.23",
   "maturin>=1.9,<2.0",
@@ -94,6 +95,9 @@ cache-keys = [
   { file = "rust/**/*.rs" },
   { file = "python/**/*.py" },
 ]
+
+[tool.uv.workspace]
+members = ["extensions/lacuna-options"]
 
 [tool.ruff]
 target-version = "py311"
