@@ -21,9 +21,12 @@ from lacuna._advanced_inference import (
     PermutationAlternative,
     PermutationScheme,
     PermutationStatistic,
+    joint_stationary_bootstrap,
     permutation_test,
     probability_of_backtest_overfitting,
+    reality_check,
     sharpe_inference,
+    superior_predictive_ability,
 )
 from lacuna._frames import (
     FrameDiagnostics,
@@ -1157,9 +1160,12 @@ __all__ = [
     "Statistic",
     "SurfaceFailurePolicy",
     "bootstrap",
+    "joint_stationary_bootstrap",
     "multiple_testing",
     "parameter_surface",
     "permutation_test",
     "probability_of_backtest_overfitting",
+    "reality_check",
     "sharpe_inference",
+    "superior_predictive_ability",
 ]

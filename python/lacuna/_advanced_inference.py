@@ -821,13 +821,516 @@ def probability_of_backtest_overfitting(
     )
 
 
+def _expected_block_length(size: int, expected_block_length: int | None) -> int:
+    resolved = (
+        max(2, round(size ** (1.0 / 3.0)))
+        if expected_block_length is None
+        else expected_block_length
+    )
+    if isinstance(resolved, bool) or not isinstance(resolved, int):
+        raise MethodContractError("expected_block_length must be an integer")
+    if not 1 <= resolved <= size:
+        raise MethodContractError("expected_block_length must be between 1 and sample size")
+    return resolved
+
+
+def _stationary_bootstrap_indices(
+    *,
+    size: int,
+    expected_block_length: int,
+    seed: int,
+    method_version: int,
+    replicate: int,
+) -> npt.NDArray[np.intp]:
+    rng = _replicate_rng(seed, method_version, replicate)
+    restart_probability = 1.0 / expected_block_length
+    indices: npt.NDArray[np.intp] = np.empty(size, dtype=np.intp)
+    indices[0] = int(rng.integers(0, size))
+    for position in range(1, size):
+        if rng.random() < restart_probability:
+            indices[position] = int(rng.integers(0, size))
+        else:
+            indices[position] = (indices[position - 1] + 1) % size
+    return indices
+
+
+def _joint_bootstrap_means(
+    matrix: FloatArray,
+    *,
+    expected_block_length: int,
+    resamples: int,
+    seed: int,
+    method_version: int,
+) -> FloatArray:
+    means = np.empty((resamples, matrix.shape[1]), dtype=np.float64)
+    for replicate in range(resamples):
+        indices = _stationary_bootstrap_indices(
+            size=matrix.shape[0],
+            expected_block_length=expected_block_length,
+            seed=seed,
+            method_version=method_version,
+            replicate=replicate,
+        )
+        means[replicate] = matrix[indices].mean(axis=0)
+    return means
+
+
+def _resampling_configuration(
+    *,
+    size: int,
+    expected_block_length: int | None,
+    resamples: int,
+    seed: int | None,
+) -> tuple[int, int]:
+    if resamples < 100:
+        raise MethodContractError("resamples must be at least 100 for inferential output")
+    return _expected_block_length(size, expected_block_length), _resolved_seed(seed)
+
+
+def joint_stationary_bootstrap(
+    data: object,
+    *,
+    strategy_columns: Sequence[str] | None = None,
+    expected_block_length: int | None = None,
+    resamples: int = 1_000,
+    seed: int | None = None,
+    store_distribution: bool = False,
+) -> AnalysisResult:
+    """Jointly bootstrap synchronous strategy means with random-length blocks.
+
+    One stationary-bootstrap index path is shared by every strategy in each
+    replicate. This preserves both within-series time dependence and
+    cross-strategy dependence.
+    """
+
+    matrix, names, source = _strategy_matrix(
+        data,
+        strategy_columns=strategy_columns,
+        name="joint stationary bootstrap",
+    )
+    block_length, resolved_seed = _resampling_configuration(
+        size=matrix.shape[0],
+        expected_block_length=expected_block_length,
+        resamples=resamples,
+        seed=seed,
+    )
+    distribution = _joint_bootstrap_means(
+        matrix,
+        expected_block_length=block_length,
+        resamples=resamples,
+        seed=resolved_seed,
+        method_version=3,
+    )
+    observed_means = matrix.mean(axis=0)
+    standard_errors = distribution.std(axis=0, ddof=1)
+    centered = math.sqrt(matrix.shape[0]) * (distribution - observed_means)
+    covariance = np.atleast_2d(np.cov(centered, rowvar=False, ddof=1))
+    strategy_rows: list[dict[str, JsonValue]] = []
+    for index, name in enumerate(names):
+        strategy_rows.append(
+            {
+                "strategy": name,
+                "mean": float(observed_means[index]),
+                "bootstrap_mean": float(distribution[:, index].mean()),
+                "bootstrap_standard_error": float(standard_errors[index]),
+            }
+        )
+    covariance_rows: list[dict[str, JsonValue]] = []
+    for row, first in enumerate(names):
+        for column, second in enumerate(names):
+            covariance_rows.append(
+                {
+                    "strategy": first,
+                    "other_strategy": second,
+                    "long_run_covariance": float(covariance[row, column]),
+                }
+            )
+    tables: dict[str, JsonValue] = {
+        "strategy_statistics": tuple(strategy_rows),
+        "long_run_covariance": tuple(covariance_rows),
+    }
+    if store_distribution:
+        distribution_rows: list[dict[str, JsonValue]] = []
+        for replicate in range(resamples):
+            for strategy, name in enumerate(names):
+                distribution_rows.append(
+                    {
+                        "replicate": replicate,
+                        "strategy": name,
+                        "mean": float(distribution[replicate, strategy]),
+                    }
+                )
+        tables["bootstrap_distribution"] = tuple(distribution_rows)
+    return AnalysisResult(
+        metadata=ResultMetadata(
+            method="validation.joint_stationary_bootstrap",
+            method_version=3,
+            parameters={
+                "strategy_columns": names,
+                "expected_block_length": block_length,
+                "stationary_restart_probability": 1.0 / block_length,
+                "resamples": resamples,
+                "joint_indices": True,
+                "rng": "numpy.PCG64/SeedSequence",
+                "substream_identity": "(seed, method_version=3, replicate)",
+                "input": source,
+            },
+            seed=resolved_seed,
+            input_fingerprint=fingerprint(matrix.tolist(), namespace="joint-bootstrap-input"),
+        ),
+        metrics={
+            "n_observations": int(matrix.shape[0]),
+            "n_strategies": int(matrix.shape[1]),
+            "resamples": resamples,
+            "monte_carlo_resolution": 1.0 / (resamples + 1.0),
+        },
+        tables=tables,
+        warnings=(
+            "Block-length sensitivity is part of the inferential design and should be reported.",
+        ),
+    )
+
+
+def _bootstrap_p_value(distribution: FloatArray, observed: float) -> tuple[float, int]:
+    exceedances = int(np.count_nonzero(distribution >= observed))
+    return (exceedances + 1.0) / (distribution.size + 1.0), exceedances
+
+
+def reality_check(
+    data: object,
+    *,
+    strategy_columns: Sequence[str] | None = None,
+    expected_block_length: int | None = None,
+    resamples: int = 1_000,
+    seed: int | None = None,
+    store_distribution: bool = False,
+) -> AnalysisResult:
+    """Run White's Reality Check over a declared strategy family.
+
+    Input cells are synchronous performance differentials versus one common
+    benchmark, with positive values meaning that a candidate is better. The
+    full matrix is resampled jointly with the stationary bootstrap.
+    """
+
+    matrix, names, source = _strategy_matrix(
+        data,
+        strategy_columns=strategy_columns,
+        name="White Reality Check",
+    )
+    block_length, resolved_seed = _resampling_configuration(
+        size=matrix.shape[0],
+        expected_block_length=expected_block_length,
+        resamples=resamples,
+        seed=seed,
+    )
+    means = matrix.mean(axis=0)
+    root_n = math.sqrt(matrix.shape[0])
+    winner = int(np.argmax(means))
+    observed = max(0.0, root_n * float(means[winner]))
+    bootstrap_means = _joint_bootstrap_means(
+        matrix,
+        expected_block_length=block_length,
+        resamples=resamples,
+        seed=resolved_seed,
+        method_version=4,
+    )
+    bootstrap_statistics = np.maximum(
+        0.0,
+        np.max(root_n * (bootstrap_means - means), axis=1),
+    )
+    p_value, exceedances = _bootstrap_p_value(bootstrap_statistics, observed)
+    strategy_rows: tuple[JsonValue, ...] = tuple(
+        {"strategy": name, "mean_differential": float(means[index])}
+        for index, name in enumerate(names)
+    )
+    tables: dict[str, JsonValue] = {
+        "strategy_statistics": strategy_rows,
+        "distribution_summary": _distribution_summary(bootstrap_statistics),
+    }
+    if store_distribution:
+        tables["bootstrap_distribution"] = frame_records(
+            pl.DataFrame(
+                {
+                    "replicate": np.arange(resamples, dtype=np.int64),
+                    "statistic": bootstrap_statistics,
+                }
+            )
+        )
+    significant = p_value <= 0.05 and observed > 0.0
+    return AnalysisResult(
+        metadata=ResultMetadata(
+            method="validation.white_reality_check",
+            method_version=4,
+            parameters={
+                "strategy_columns": names,
+                "direction": "positive differential means candidate outperforms benchmark",
+                "expected_block_length": block_length,
+                "stationary_restart_probability": 1.0 / block_length,
+                "resamples": resamples,
+                "null": "no candidate has positive expected performance differential",
+                "joint_indices": True,
+                "finite_sample_p_value_correction": "(exceedances + 1) / (resamples + 1)",
+                "rng": "numpy.PCG64/SeedSequence",
+                "substream_identity": "(seed, method_version=4, replicate)",
+                "input": source,
+            },
+            seed=resolved_seed,
+            input_fingerprint=fingerprint(matrix.tolist(), namespace="reality-check-input"),
+        ),
+        metrics={
+            "statistic": observed,
+            "p_value": p_value,
+            "exceedances": exceedances,
+            "best_strategy": names[winner],
+            "best_mean_differential": float(means[winner]),
+            "n_observations": int(matrix.shape[0]),
+            "n_strategies": int(matrix.shape[1]),
+            "monte_carlo_resolution": 1.0 / (resamples + 1.0),
+        },
+        findings=(
+            Finding(
+                code=(
+                    "REALITY_CHECK_SUPERIOR_CANDIDATE"
+                    if significant
+                    else "REALITY_CHECK_NO_SUPERIOR_CANDIDATE"
+                ),
+                title=(
+                    "A candidate survives the Reality Check"
+                    if significant
+                    else "No candidate survives the Reality Check"
+                ),
+                message=(
+                    "The best candidate rejects the family-wise no-superiority null."
+                    if significant
+                    else "The declared family does not reject the no-superiority null at 5%."
+                ),
+                state=FindingState.PASS if significant else FindingState.WARN,
+                severity=Severity.INFO if significant else Severity.MEDIUM,
+                category="data_snooping",
+                evidence={"p_value": p_value, "best_strategy": names[winner]},
+            ),
+        ),
+        tables=tables,
+        warnings=(
+            "White's least-favorable null can be conservative when many poor alternatives "
+            "are included.",
+            "Block-length sensitivity should be checked before treating the p-value as stable.",
+        ),
+    )
+
+
+def _stationary_long_run_variances(
+    matrix: FloatArray,
+    *,
+    expected_block_length: int,
+) -> FloatArray:
+    size = matrix.shape[0]
+    centered = matrix - matrix.mean(axis=0)
+    transform_size = 2 * size
+    transformed = np.fft.rfft(centered, n=transform_size, axis=0)
+    autocovariances = np.fft.irfft(
+        np.conjugate(transformed) * transformed,
+        n=transform_size,
+        axis=0,
+    )[:size]
+    autocovariances /= size
+    restart_probability = 1.0 / expected_block_length
+    lags = np.arange(1, size, dtype=np.float64)
+    kernel = ((size - lags) / size) * (1.0 - restart_probability) ** lags + (lags / size) * (
+        1.0 - restart_probability
+    ) ** (size - lags)
+    variances = autocovariances[0] + 2.0 * np.sum(
+        kernel[:, np.newaxis] * autocovariances[1:],
+        axis=0,
+    )
+    return np.asarray(variances, dtype=np.float64)
+
+
+def superior_predictive_ability(
+    data: object,
+    *,
+    strategy_columns: Sequence[str] | None = None,
+    expected_block_length: int | None = None,
+    resamples: int = 1_000,
+    seed: int | None = None,
+    store_distribution: bool = False,
+) -> AnalysisResult:
+    """Run Hansen's studentized Superior Predictive Ability test.
+
+    Returns the lower, consistent, and upper bootstrap p-values. Input cells
+    are synchronous performance differentials versus one common benchmark;
+    positive values mean that a candidate is better.
+    """
+
+    matrix, names, source = _strategy_matrix(
+        data,
+        strategy_columns=strategy_columns,
+        name="Hansen SPA",
+    )
+    block_length, resolved_seed = _resampling_configuration(
+        size=matrix.shape[0],
+        expected_block_length=expected_block_length,
+        resamples=resamples,
+        seed=seed,
+    )
+    variances = _stationary_long_run_variances(
+        matrix,
+        expected_block_length=block_length,
+    )
+    invalid = np.flatnonzero(~np.isfinite(variances) | (variances <= 0.0))
+    if invalid.size:
+        invalid_names = ", ".join(names[int(index)] for index in invalid)
+        raise DataContractError(
+            "SPA requires positive finite stationary-bootstrap long-run variance for every "
+            f"strategy; invalid: {invalid_names}"
+        )
+    scales = np.sqrt(variances)
+    means = matrix.mean(axis=0)
+    root_n = math.sqrt(matrix.shape[0])
+    standardized = root_n * means / scales
+    observed = max(0.0, float(standardized.max()))
+    winner = int(np.argmax(standardized))
+    log_log = math.log(math.log(matrix.shape[0]))
+    if log_log <= 0.0:
+        raise DataContractError("SPA requires enough observations for log(log(n)) to be positive")
+    consistent_thresholds = -scales * math.sqrt(2.0 * log_log / matrix.shape[0])
+    recenterings = {
+        "lower": np.maximum(0.0, means),
+        "consistent": means * (means >= consistent_thresholds),
+        "upper": means,
+    }
+    bootstrap_means = _joint_bootstrap_means(
+        matrix,
+        expected_block_length=block_length,
+        resamples=resamples,
+        seed=resolved_seed,
+        method_version=5,
+    )
+    distributions: dict[str, FloatArray] = {}
+    p_values: dict[str, float] = {}
+    exceedance_counts: dict[str, int] = {}
+    for recentering, location in recenterings.items():
+        distribution = np.maximum(
+            0.0,
+            np.max(root_n * (bootstrap_means - location) / scales, axis=1),
+        )
+        distributions[recentering] = distribution
+        p_value, exceedances = _bootstrap_p_value(distribution, observed)
+        p_values[recentering] = p_value
+        exceedance_counts[recentering] = exceedances
+
+    strategy_rows: list[dict[str, JsonValue]] = []
+    for index, name in enumerate(names):
+        strategy_rows.append(
+            {
+                "strategy": name,
+                "mean_differential": float(means[index]),
+                "long_run_variance": float(variances[index]),
+                "long_run_standard_deviation": float(scales[index]),
+                "standardized_mean": float(standardized[index]),
+                "consistent_threshold": float(consistent_thresholds[index]),
+                "lower_recentering": float(recenterings["lower"][index]),
+                "consistent_recentering": float(recenterings["consistent"][index]),
+                "upper_recentering": float(recenterings["upper"][index]),
+            }
+        )
+    p_value_rows = tuple(
+        {
+            "recentering": recentering,
+            "p_value": p_values[recentering],
+            "exceedances": exceedance_counts[recentering],
+        }
+        for recentering in ("lower", "consistent", "upper")
+    )
+    tables: dict[str, JsonValue] = {
+        "strategy_statistics": tuple(strategy_rows),
+        "p_values": p_value_rows,
+        "consistent_distribution_summary": _distribution_summary(distributions["consistent"]),
+    }
+    if store_distribution:
+        tables["bootstrap_distribution"] = tuple(
+            {
+                "replicate": replicate,
+                "lower": float(distributions["lower"][replicate]),
+                "consistent": float(distributions["consistent"][replicate]),
+                "upper": float(distributions["upper"][replicate]),
+            }
+            for replicate in range(resamples)
+        )
+    significant = p_values["consistent"] <= 0.05 and observed > 0.0
+    return AnalysisResult(
+        metadata=ResultMetadata(
+            method="validation.hansen_spa",
+            method_version=5,
+            parameters={
+                "strategy_columns": names,
+                "direction": "positive differential means candidate outperforms benchmark",
+                "expected_block_length": block_length,
+                "stationary_restart_probability": 1.0 / block_length,
+                "long_run_variance": "Hansen stationary-bootstrap population kernel",
+                "resamples": resamples,
+                "null": "no candidate has positive expected performance differential",
+                "recentering": ("lower", "consistent", "upper"),
+                "joint_indices": True,
+                "finite_sample_p_value_correction": "(exceedances + 1) / (resamples + 1)",
+                "rng": "numpy.PCG64/SeedSequence",
+                "substream_identity": "(seed, method_version=5, replicate)",
+                "input": source,
+            },
+            seed=resolved_seed,
+            input_fingerprint=fingerprint(matrix.tolist(), namespace="spa-input"),
+        ),
+        metrics={
+            "statistic": observed,
+            "p_value_lower": p_values["lower"],
+            "p_value_consistent": p_values["consistent"],
+            "p_value_upper": p_values["upper"],
+            "best_strategy": names[winner],
+            "best_standardized_mean": float(standardized[winner]),
+            "n_observations": int(matrix.shape[0]),
+            "n_strategies": int(matrix.shape[1]),
+            "monte_carlo_resolution": 1.0 / (resamples + 1.0),
+        },
+        findings=(
+            Finding(
+                code=("SPA_SUPERIOR_CANDIDATE" if significant else "SPA_NO_SUPERIOR_CANDIDATE"),
+                title=(
+                    "A candidate survives Hansen SPA"
+                    if significant
+                    else "No candidate survives Hansen SPA"
+                ),
+                message=(
+                    "The studentized family rejects the no-superiority null."
+                    if significant
+                    else "The declared family does not reject the no-superiority null at 5%."
+                ),
+                state=FindingState.PASS if significant else FindingState.WARN,
+                severity=Severity.INFO if significant else Severity.MEDIUM,
+                category="data_snooping",
+                evidence={
+                    "consistent_p_value": p_values["consistent"],
+                    "best_strategy": names[winner],
+                },
+            ),
+        ),
+        tables=tables,
+        warnings=(
+            "SPA asymptotics require a stationary weakly dependent differential process.",
+            "Block-length sensitivity should be checked before treating the p-values as stable.",
+        ),
+    )
+
+
 __all__ = [
     "PBOStatistic",
     "PBOTieBreak",
     "PermutationAlternative",
     "PermutationScheme",
     "PermutationStatistic",
+    "joint_stationary_bootstrap",
     "permutation_test",
     "probability_of_backtest_overfitting",
+    "reality_check",
     "sharpe_inference",
+    "superior_predictive_ability",
 ]

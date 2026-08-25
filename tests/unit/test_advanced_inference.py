@@ -9,9 +9,12 @@ import pytest
 
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.validation import (
+    joint_stationary_bootstrap,
     permutation_test,
     probability_of_backtest_overfitting,
+    reality_check,
     sharpe_inference,
+    superior_predictive_ability,
 )
 
 
@@ -170,3 +173,75 @@ def test_pbo_refuses_ambiguous_selection_and_unequal_partitions() -> None:
         probability_of_backtest_overfitting(matrix, partitions=4, statistic="mean")
     with pytest.raises(DataContractError, match="row count must divide"):
         probability_of_backtest_overfitting(np.arange(30, dtype=float).reshape(10, 3), partitions=4)
+
+
+def test_joint_stationary_bootstrap_preserves_cross_strategy_structure() -> None:
+    first = np.sin(np.arange(30, dtype=np.float64))
+    matrix = np.column_stack((first, 2.0 * first + 3.0))
+    result = joint_stationary_bootstrap(
+        matrix,
+        expected_block_length=4,
+        resamples=100,
+        seed=19,
+        store_distribution=True,
+    )
+    rows = result.table("bootstrap_distribution")
+    for replicate in range(100):
+        first_mean = rows[replicate * 2]["mean"]
+        second_mean = rows[replicate * 2 + 1]["mean"]
+        assert second_mean == pytest.approx(2.0 * first_mean + 3.0)
+    assert result.metadata.parameters["joint_indices"] is True
+
+
+def test_reality_check_handles_no_edge_and_detects_a_clear_edge() -> None:
+    rng = np.random.default_rng(22)
+    no_edge = -1.0 + rng.normal(scale=0.1, size=(80, 3))
+    negative = reality_check(
+        no_edge,
+        expected_block_length=5,
+        resamples=199,
+        seed=2,
+    )
+    assert negative.metrics["statistic"] == 0.0
+    assert negative.metrics["p_value"] == 1.0
+
+    edge = rng.normal(scale=0.2, size=(80, 3))
+    edge[:, 0] += 0.8
+    positive = reality_check(
+        edge,
+        expected_block_length=5,
+        resamples=499,
+        seed=2,
+    )
+    assert positive.metrics["best_strategy"] == "strategy_0"
+    assert positive.metrics["p_value"] <= 0.01
+
+
+def test_spa_exposes_ordered_recenterings_and_detects_a_clear_edge() -> None:
+    rng = np.random.default_rng(71)
+    matrix = rng.normal(scale=0.2, size=(100, 5))
+    matrix[:, 0] += 0.7
+    matrix[:, 3:] -= 0.5
+    result = superior_predictive_ability(
+        matrix,
+        expected_block_length=6,
+        resamples=499,
+        seed=5,
+        store_distribution=True,
+    )
+
+    assert result.metrics["best_strategy"] == "strategy_0"
+    assert result.metrics["p_value_lower"] <= result.metrics["p_value_consistent"]
+    assert result.metrics["p_value_consistent"] <= result.metrics["p_value_upper"]
+    assert result.metrics["p_value_consistent"] <= 0.01
+    assert [row["recentering"] for row in result.table("p_values")] == [
+        "lower",
+        "consistent",
+        "upper",
+    ]
+
+
+def test_spa_rejects_a_strategy_without_studentization_variance() -> None:
+    matrix = np.column_stack((np.ones(20), np.arange(20, dtype=np.float64)))
+    with pytest.raises(DataContractError, match="long-run variance"):
+        superior_predictive_ability(matrix, resamples=100, seed=1)
