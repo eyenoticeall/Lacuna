@@ -62,3 +62,41 @@ jobs:
         run: uv sync --group dev --extra pandas --extra statistics
       - name: Test adapter and reference suites
         run: uv run --extra pandas --extra statistics pytest tests/integration/test_adapter_matrix.py tests/reference
+
+  documentation:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Sync documentation environment
+        run: uv sync --group docs
+      - name: Build documentation with strict link validation
+        run: uv run mkdocs build --strict
+
+  package:
+    name: Source distribution and wheel smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+          enable-cache: true
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Sync build environment
+        run: uv sync --group dev
+      - name: Build the source distribution and wheel from it
+        run: uv run maturin build --release --sdist --out dist
+      - name: Install the wheel into a clean environment
+        run: |
+          uv venv .wheel-smoke --python 3.13
+          uv pip install --python .wheel-smoke/bin/python dist/*.whl
+      - name: Verify native, typing, and schema resources
+        run: |
+          .wheel-smoke/bin/python -c "import json, lacuna; from importlib.resources import files; from lacuna import _native; from lacuna.schemas import audit_result_v1_text; package = files('lacuna'); assert lacuna.__version__ == _native.version(); assert _native.checked_mean([1.0, 2.0, 3.0]) == 2.0; assert package.joinpath('py.typed').is_file(); assert package.joinpath('_native.pyi').is_file(); assert json.loads(audit_result_v1_text())['title'] == 'Lacuna audit result v1'"
+          .wheel-smoke/bin/lacuna doctor --json

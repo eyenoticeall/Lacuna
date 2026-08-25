@@ -42,3 +42,15 @@ def test_missing_required_columns_are_reported() -> None:
     frame = pl.DataFrame({"signal": [0.2]})
     with pytest.raises(DataContractError, match="instrument, time"):
         require_columns(frame, ["time", "instrument", "signal"])
+
+
+def test_optional_arrow_failure_is_wrapped_as_a_data_contract_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def missing_arrow(_: object) -> pl.DataFrame:
+        raise ModuleNotFoundError("pyarrow is not installed")
+
+    monkeypatch.setattr(pl, "from_arrow", missing_arrow)
+
+    with pytest.raises(DataContractError, match=r"unsupported dataframe input: builtins\.list"):
+        to_polars([1.0, 2.0])

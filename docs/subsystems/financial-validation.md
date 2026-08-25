@@ -86,15 +86,18 @@ Embargo excludes observations in an additional region after the test boundary wh
 
 An embargo can be expressed as:
 
-- clock/calendar duration;
-- trading sessions;
-- fraction of available observations, only when explicitly requested.
+- a count of sorted unique observation periods in v0.1;
+- clock/calendar duration in a later method;
+- a fraction of available observations only in a later, explicitly named method.
 
 The output separates purged and embargoed samples so users can understand why data was excluded.
 
 ## Purged walk-forward
 
-A combined splitter first establishes chronological train/test windows, then purges overlapping training labels, then applies embargo. The ordering is fixed and documented.
+A combined splitter is later work. v0.1 exposes `WalkForward` and `PurgedKFold` separately so it does
+not falsely describe block K-fold as strictly past-only validation. A future combined method will
+establish chronological train/test windows, purge overlapping training labels, then apply embargo in
+that fixed order.
 
 ## CPCV and PBO
 
@@ -133,7 +136,8 @@ Draw `n` observation indices independently with replacement. It is a reference a
 
 ### Moving block bootstrap
 
-Draw contiguous blocks of fixed length until at least `n` observations are produced, then truncate. The contract states whether blocks can start only where a full block fits.
+Draw contiguous blocks of fixed length until at least `n` observations are produced, then truncate.
+v0.1 starts blocks only where the complete block fits.
 
 ### Circular block bootstrap
 
@@ -141,7 +145,10 @@ As moving block bootstrap, but block indices wrap around the sample boundary.
 
 ### Stationary bootstrap
 
-At each step, continue the current block with probability `1 - p` or start at a uniformly drawn index with probability `p`, where expected block length is `1 / p`.
+Draw geometric block lengths with restart probability `p`, choose each block start uniformly, wrap at
+the sample boundary, and truncate to `n`. This is distributionally equivalent to continuing the
+current block with probability `1 - p` or restarting uniformly with probability `p`, where expected
+block length is `1 / p`.
 
 The implementation validates positive expected length and records the exact parameterization.
 
@@ -225,11 +232,9 @@ method metadata and warnings
 ## Native execution
 
 - interval overlap/purge scan is implemented in Rust with a Python reference;
-- combinatorial index generation;
 - deterministic bootstrap indices are generated in bounded Python batches and mean reductions are
   implemented in Rust with a NumPy reference;
-- large permutation reductions;
-- later PBO components.
+- combinatorial index generation, large permutation reductions, and PBO components are later work.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.
 

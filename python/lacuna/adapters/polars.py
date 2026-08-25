@@ -72,7 +72,7 @@ def to_polars(
     else:
         try:
             frame = _as_dataframe(pl.from_arrow(data))
-        except (TypeError, ValueError) as error:
+        except (ModuleNotFoundError, TypeError, ValueError) as error:
             message = f"unsupported dataframe input: {type(data).__module__}.{type(data).__name__}"
             raise DataContractError(message) from error
 

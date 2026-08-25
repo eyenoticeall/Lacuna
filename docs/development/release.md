@@ -43,6 +43,11 @@ Normal users should not need a Rust toolchain.
 11. Changelog is complete and target APIs are not presented as shipped.
 12. Security advisories and dependency changes are reviewed.
 
+CI rebuilds the wheel through the source distribution (`maturin build --sdist`) so omitted Rust,
+Python, typing, license, or schema files fail before release. The package job then installs that
+wheel into a separate environment and checks version agreement, the native module, packaged JSON
+Schema, and CLI diagnostics.
+
 ## Wheel smoke test
 
 A clean wheel environment should verify:
@@ -55,6 +60,11 @@ assert lacuna.__version__ == _native.version()
 ```
 
 It then runs a minimal native kernel, imports every public package, checks `py.typed` and stubs, and exercises the CLI `doctor` command.
+
+The canonical audit schema is available both as the repository publication artifact at
+`schemas/audit-result-v1.schema.json` and as the installed
+`lacuna.schemas/audit-result-v1.schema.json` resource. Schema tests require these copies to be
+byte-for-byte identical.
 
 ## Release flow
 

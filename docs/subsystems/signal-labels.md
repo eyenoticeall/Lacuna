@@ -192,12 +192,13 @@ No single component is labeled universal “signal quality.”
 
 ## Turnover
 
-Support distinct concepts:
+v0.1 exposes distinct concepts:
 
 - rank turnover between consecutive observations;
 - top/bottom membership turnover;
-- portfolio-weight turnover;
 - signal autocorrelation.
+
+Portfolio-weight turnover is later because a signal study does not contain portfolio weights.
 
 Membership turnover must define entry, exit, and denominator conventions. Portfolio turnover distinguishes one-way from two-way turnover. Gaps in an instrument's observations are not automatically consecutive.
 

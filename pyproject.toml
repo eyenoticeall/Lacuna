@@ -73,6 +73,7 @@ python-source = "python"
 module-name = "lacuna._native"
 bindings = "pyo3"
 strip = true
+include = [{ path = "schemas/**/*", format = "sdist" }]
 
 [tool.uv]
 cache-keys = [

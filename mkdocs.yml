@@ -41,6 +41,12 @@ nav:
       - Adapters, execution, and plugins: subsystems/adapters-execution-plugins.md
   - Methodology:
       - Principles: methodology/principles.md
+      - Forward-return labels: methodology/forward-returns.md
+      - Information coefficient: methodology/information-coefficient.md
+      - Quantiles, turnover, and decay: methodology/quantiles-turnover-decay.md
+      - Temporal validation: methodology/temporal-validation.md
+      - Bootstrap inference: methodology/bootstrap.md
+      - Audit score: methodology/audit-scoring.md
   - Agent handbook:
       - Overview: agents/index.md
       - Implementation playbook: agents/implementation-playbook.md

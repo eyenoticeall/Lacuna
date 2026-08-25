@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
+from lacuna.schemas import audit_result_v1_text
+
 ROOT = Path(__file__).parents[2]
 SCHEMA_PATH = ROOT / "schemas" / "audit-result-v1.schema.json"
 FIXTURE_PATH = ROOT / "tests" / "fixtures" / "audit-result-v1.json"
@@ -20,6 +22,10 @@ def _validator() -> Draft202012Validator:
 def test_persisted_v1_audit_fixture_satisfies_published_schema() -> None:
     payload = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     _validator().validate(payload)
+
+
+def test_packaged_schema_matches_the_language_independent_source() -> None:
+    assert audit_result_v1_text() == SCHEMA_PATH.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize(

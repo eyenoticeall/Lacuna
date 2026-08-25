@@ -3,6 +3,9 @@
 Lacuna's canonical interchange format is the JSON representation of `AnalysisResult`. The v0.1
 contract is schema version `1`, published in the repository as
 `schemas/audit-result-v1.schema.json` using JSON Schema Draft 2020-12.
+The identical wheel resource is available through
+`lacuna.schemas.audit_result_v1_text()`; a test prevents the packaged and language-independent copies
+from drifting.
 
 ## Envelope
 

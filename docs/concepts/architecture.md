@@ -137,17 +137,22 @@ Do not create every package as an empty placeholder. Add a package when its firs
 
 ## Current implementation
 
-The repository currently implements the Phase 0 foundation:
+The repository currently implements the initial v0.1 signal-validation path:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
 - immutable result, finding, and provenance models;
-- Polars-first normalization for supported dataframe-like inputs;
-- a checked native numerical kernel proving the language boundary;
-- Python, property, integration, and Rust test foundations;
-- CI, documentation, and packaging configuration.
+- Polars-first normalization for Polars, pandas, Arrow-compatible, mapping, and NumPy inputs;
+- explicit forward-return labels and Pearson/Spearman IC, quantile, turnover, and decay diagnostics;
+- walk-forward folds, half-open interval purging, observation embargo, and four bootstrap schemes;
+- native grouped-rank IC, bootstrap-mean, and interval-purge kernels with reference paths;
+- deterministic audit rules, evidence scoring, JSON/Markdown/basic HTML, and `SignalStudy`;
+- `doctor`, `signal`, and developer `bench` CLI workflows;
+- published result schema, golden fixtures, layered tests, and reproducible benchmark suites.
 
-Signal analytics, validation methods, and audit orchestration remain target contracts.
+Robustness surfaces, experiment registries, costs/capacity, point-in-time joins, advanced inference,
+backtester integrations, and plugins remain later contracts. The pre-alpha API can change before a
+tagged compatibility commitment.
 
 ## Detailed guides
 

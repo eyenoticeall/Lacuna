@@ -23,7 +23,9 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna is at the **foundation / pre-alpha** stage. The package, native bridge, data boundary, result contracts, tests, CI, and documentation skeleton are in place. Signal analytics and audit workflows shown as “target API” below are the intended v0.1 experience, not released functionality yet.
+> Lacuna is **pre-alpha**. The initial v0.1 signal-validation path is implemented and tested, but no
+> stable release or compatibility promise has been made. Treat APIs, thresholds, and schemas as
+> reviewable pre-release contracts.
 
 ## Why Lacuna?
 
@@ -60,16 +62,17 @@ pandas · Polars · NumPy · Arrow · any backtester
 
 The design keeps **Python outside, Rust inside**: Python supplies research ergonomics, Rust owns benchmark-justified hot paths, and Arrow-compatible columnar memory is the interoperability contract.
 
-## What is in the scaffold?
+## What works now
 
-| Foundation | Included now |
+| v0.1 area | Implemented behavior |
 |---|---|
-| Python package | Typed public API, scoped configuration, CLI diagnostics |
-| Native core | Cargo workspace, PyO3/maturin bridge, checked numerical smoke kernel |
-| Data boundary | Polars-first normalization for lazy/eager, NumPy, pandas, and Arrow-compatible inputs |
-| Result contract | Immutable metadata, findings, metrics, tables, and safe JSON serialization |
-| Quality | Python, property, integration, and Rust tests; Ruff, mypy, and CI configuration |
-| Project docs | Architecture, subsystem contracts, developer handbook, agent playbooks, methodology, and roadmap |
+| Labels | Explicit observation/entry/exit timing, trading-observation horizons, censoring and adjustment evidence |
+| Signal diagnostics | Pearson/Spearman IC, IC time series, balanced quantiles, spreads, monotonicity, turnover, and decay |
+| Financial validation | Expanding/rolling walk-forward folds, purged K-fold, embargo, and IID/moving/circular/stationary bootstrap |
+| Audit and reports | Versioned rules, explicit unknown/not-applicable states, evidence coverage, JSON, Markdown, and self-contained HTML |
+| Native core | Rust grouped-rank IC, bootstrap-mean reduction, and half-open interval purging with Python references |
+| Data boundary | Polars eager/lazy, NumPy, optional pandas, and Arrow-compatible inputs |
+| Quality | Published result schema, golden fixtures, property/reference/statistical/differential tests, and Python/Criterion benchmarks |
 
 ## Quick start
 
@@ -79,7 +82,7 @@ Lacuna uses [uv](https://docs.astral.sh/uv/) for Python environments and Cargo f
 git clone <your-fork-or-repository-url>
 cd Lacuna
 
-uv sync --group dev
+uv sync --group dev --group docs --extra pandas --extra statistics
 uv run lacuna doctor
 uv run pytest
 cargo test --workspace
@@ -91,36 +94,7 @@ Inspect the runtime in machine-readable form:
 uv run lacuna doctor --json
 ```
 
-The initial public contracts are usable today:
-
-```python
-import lacuna as lc
-
-with lc.config(threads=8, seed=42) as active:
-    result = lc.AnalysisResult(
-        metadata=lc.ResultMetadata(
-            method="research.example",
-            parameters={"threads": active.threads},
-            seed=active.seed,
-        ),
-        metrics={"observations": 1_000_000},
-        findings=(
-            lc.Finding(
-                code="TRIAL_HISTORY_MISSING",
-                title="Trial history unavailable",
-                message="Multiple-testing risk cannot be estimated.",
-                state=lc.FindingState.UNKNOWN,
-                severity=lc.Severity.HIGH,
-            ),
-        ),
-    )
-
-print(result.to_json())
-```
-
-### Target v0.1 API
-
-The first product milestone is intentionally narrow: turn a cross-sectional signal into rigorous diagnostics.
+Turn a cross-sectional signal and price panel into structured evidence:
 
 ```python
 import lacuna as lc
@@ -128,17 +102,54 @@ import lacuna as lc
 study = lc.SignalStudy(
     signal=signal,
     prices=prices,
-    horizons=["1D", "5D", "20D"],
+    horizons=("1D", "5D", "20D"),
+    signal_observed_at="open",
+    entry="current_close",
+    price_adjustment="total_return_adjusted",
+    quantiles=5,
 )
 
-report = study.audit()
+labels = study.labels()
+split = lc.cv.PurgedKFold(n_splits=5, embargo=1).split(labels.frame)
+report = study.audit(bootstrap_resamples=10_000, seed=42, split=split)
 report.show()
+report.to_json("lacuna-audit.json")
+report.to_html("lacuna-audit.html")
 ```
 
-The same evidence should remain composable through a functional API:
+Missing price-adjustment, delisting, survivorship, trial-history, or validation evidence stays visible
+as `UNKNOWN`; it is never silently promoted to a pass.
+
+The same methods are composable through the functional API:
 
 ```python
-ic = lc.signal.ic(signal, forward_returns, method="spearman", by="date")
+labels = lc.labels.forward_returns(
+    prices,
+    horizons=("1D", "5D", "20D"),
+    price_adjustment="total_return_adjusted",
+)
+ic = lc.signal.ic(signal, labels, method="spearman")
+quantiles = lc.signal.quantiles(signal, labels, quantiles=5)
+uncertainty = lc.validation.bootstrap(
+    [row["ic"] for row in ic.table("ic_by_period") if row["ic"] is not None],
+    method="stationary",
+    expected_block_length=5,
+    resamples=10_000,
+    seed=42,
+)
+```
+
+For local Parquet, CSV, Arrow IPC, or Feather files:
+
+```bash
+uv run lacuna signal \
+  --signal factor.parquet \
+  --prices prices.parquet \
+  --horizon 1D --horizon 5D --horizon 20D \
+  --price-adjustment total_return_adjusted \
+  --bootstrap-resamples 10000 \
+  --seed 42 \
+  --out lacuna-audit.html
 ```
 
 ## Repository map
@@ -149,8 +160,9 @@ ic = lc.signal.ic(signal, forward_returns, method="spearman", by="date")
 ├── rust/
 │   ├── lacuna-core/        # language-independent kernels
 │   └── lacuna-python/      # PyO3 extension
-├── tests/                  # unit, property, and integration tests
-├── benches/                # benchmark entry points
+├── tests/                  # unit, property, reference, schema, golden, and integration tests
+├── benches/                # Python and Criterion benchmark entry points
+├── schemas/                # published result compatibility schemas
 ├── docs/                   # engineering handbook and subsystem contracts
 ├── examples/               # executable examples
 ├── logos/                  # Lacuna brand assets
@@ -161,11 +173,10 @@ ic = lc.signal.ic(signal, forward_returns, method="spearman", by="date")
 
 ## Roadmap
 
-1. **Foundations** — build, data boundary, result model, tests, benchmarks, docs.
-2. **Signal diagnostics** — forward returns, Pearson/Spearman IC, quantiles, decay, turnover.
-3. **Validation** — block bootstrap, walk-forward analysis, purging, and embargo.
-4. **Audit** — explicit `PASS`, `WARN`, `FAIL`, `UNKNOWN`, and `NOT_APPLICABLE` findings.
-5. **Robustness and realism** — parameter stability, regimes, cost stress, capacity, and point-in-time correctness.
+The initial v0.1 path covers foundations, signal diagnostics, temporal validation, dependent
+bootstrap, audit/reporting, interoperability, and benchmarks. Next milestones add robustness
+surfaces, experiment history, cost/capacity evidence, and point-in-time data checks before advanced
+inference and integrations.
 
 See the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for the architecture, statistical scope, and version milestones.
 
@@ -180,7 +191,9 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes the implemented Phase 0 foundation, the v0.1 contract, and later work. Contributors and coding agents should begin with [AGENTS.md](AGENTS.md) before implementing target APIs.
+The documentation distinguishes implemented v0.1 behavior from later contracts. Contributors and
+coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
+subsystem pages before changing a method.
 
 ## Principles
 
@@ -206,7 +219,11 @@ uv run pytest
 cargo test --workspace
 
 # Build a local wheel
-uv build --wheel
+uv run maturin build --release
+
+# Run reproducible benchmarks
+uv run lacuna bench --tier smoke
+cargo bench --bench kernels
 ```
 
 Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete local documentation site can be built with `uv run mkdocs serve`. Security concerns should follow [SECURITY.md](SECURITY.md).

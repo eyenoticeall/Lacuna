@@ -7,8 +7,16 @@
 ├── python/lacuna/          Python package
 │   ├── adapters/           edge-format normalization
 │   ├── config.py           immutable runtime configuration
+│   ├── labels.py           forward-return labels and intervals
+│   ├── signal.py           IC, quantiles, turnover, and decay
+│   ├── cv.py               walk-forward and purged folds
+│   ├── validation.py       deterministic bootstrap inference
+│   ├── audit.py            versioned rules and scoring
+│   ├── report.py           JSON/Markdown/HTML presentation
+│   ├── study.py            high-level signal workflow
+│   ├── benchmark.py        reproducible public-path benchmarks
 │   ├── types.py            result and finding foundation
-│   └── native.py           safe native-extension inspection
+│   └── native.py           native-extension inspection
 ├── rust/
 │   ├── lacuna-core/        language-independent kernels
 │   └── lacuna-python/      thin PyO3 bridge

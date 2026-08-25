@@ -12,6 +12,7 @@ metadata
 metrics
 findings
 tables
+warnings
 ```
 
 Domain-specific result types may add typed convenience properties, but they must preserve the same concepts and serialize predictably.
@@ -74,6 +75,10 @@ Core serialization is versioned JSON. It must be valid interoperable JSON, not P
 - unknown fields can be preserved or ignored according to the schema compatibility policy.
 
 Markdown is a renderer over the structured result. HTML is optional and must escape user-provided labels and metadata.
+
+The published v0.1 envelope is documented in
+[Result schema compatibility](../reference/result-schema.md) and validated against a committed
+representative fixture.
 
 ## Findings lifecycle
 
