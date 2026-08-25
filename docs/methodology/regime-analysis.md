@@ -117,4 +117,3 @@ Regime evidence can be statistically correct but causally weak, retrospectively 
 or dominated by one condition. Lacuna keeps these as separate findings. A point-in-time pass means
 the supplied thresholds and availability timestamps do not show future use; it does not certify an
 upstream feature whose own construction leaked future data.
-
