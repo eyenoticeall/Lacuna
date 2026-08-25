@@ -11,6 +11,7 @@ This handbook translates Lacuna's product specification into engineering rules. 
 | Rust or performance work | [Native core](native-core.md), [Performance](performance.md) |
 | New statistical method | [Contributing a method](contributing-a-method.md), [Testing](testing.md) |
 | Package or dependency change | [Repository layout](repository-layout.md), [Architecture](../concepts/architecture.md) |
+| CI or required checks | [Continuous integration](continuous-integration.md), [Testing](testing.md) |
 | Release or persisted schema | [Release engineering](release.md), [Results and evidence](../concepts/evidence-model.md) |
 | Roadmap work | [Implementation roadmap](roadmap.md), relevant [subsystem guide](../subsystems/signal-labels.md) |
 

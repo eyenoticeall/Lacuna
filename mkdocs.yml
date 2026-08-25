@@ -26,6 +26,7 @@ nav:
       - Native Rust core: development/native-core.md
       - Data boundary: development/data-boundary.md
       - Testing strategy: development/testing.md
+      - Continuous integration: development/continuous-integration.md
       - Performance: development/performance.md
       - Contributing a method: development/contributing-a-method.md
       - Release engineering: development/release.md

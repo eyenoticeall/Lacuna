@@ -11,6 +11,7 @@
   <p><em>Stress-test your alpha before the market does.</em></p>
 
   <p>
+    <a href="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml"><img src="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>&nbsp;&nbsp;
     <code>Python 3.11+</code>&nbsp;&nbsp;
     <code>Rust 2024</code>&nbsp;&nbsp;
     <code>Arrow-native</code>&nbsp;&nbsp;
@@ -225,6 +226,12 @@ uv run maturin build --release
 uv run lacuna bench --tier smoke
 cargo bench --bench kernels
 ```
+
+Pull requests pass through formatting, lint, strict typing, Python 3.11–3.14 on Linux, Python 3.13
+on macOS and Windows, Rust, optional dataframe/reference integrations, strict documentation, and a
+minimum-Rust check, plus a clean source-distribution-to-wheel smoke test. See the
+[CI architecture](docs/development/continuous-integration.md) for the job graph and branch-protection
+contract.
 
 Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete local documentation site can be built with `uv run mkdocs serve`. Security concerns should follow [SECURITY.md](SECURITY.md).
 

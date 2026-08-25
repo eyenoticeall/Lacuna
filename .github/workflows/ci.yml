@@ -4,99 +4,299 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+  UV_NO_PROGRESS: "1"
+
 jobs:
-  python:
-    name: Python ${{ matrix.python-version }}
+  quality:
+    name: Quality
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
+          python-version: "3.13"
+          enable-cache: true
+      - name: Install quality dependencies from the lockfile
+        run: uv sync --frozen --group dev --no-install-project
+      - name: Check Python formatting
+        run: uv run --no-sync ruff format --check .
+      - name: Lint Python
+        run: uv run --no-sync ruff check .
+      - name: Type-check the public package
+        run: uv run --no-sync mypy
+      - name: Check repository whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [[ -n "$BASE_SHA" && "$BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            git diff --check "$BASE_SHA" "$GITHUB_SHA"
+          else
+            git show --check --format= "$GITHUB_SHA"
+          fi
+
+  python:
+    name: Python / ${{ matrix.platform }} / ${{ matrix.python-version }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - runner: ubuntu-latest
+            platform: Linux
+            python-version: "3.11"
+            pytest-args: --junitxml=junit.xml
+          - runner: ubuntu-latest
+            platform: Linux
+            python-version: "3.12"
+            pytest-args: --junitxml=junit.xml
+          - runner: ubuntu-latest
+            platform: Linux
+            python-version: "3.13"
+            pytest-args: >-
+              --junitxml=junit.xml
+              --cov=lacuna
+              --cov-branch
+              --cov-report=term-missing:skip-covered
+              --cov-report=xml:coverage.xml
+              --cov-fail-under=80
+          - runner: ubuntu-latest
+            platform: Linux
+            python-version: "3.14"
+            pytest-args: --junitxml=junit.xml
+          - runner: macos-latest
+            platform: macOS
+            python-version: "3.13"
+            pytest-args: --junitxml=junit.xml
+          - runner: windows-latest
+            platform: Windows
+            python-version: "3.13"
+            pytest-args: --junitxml=junit.xml
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
+        with:
+          toolchain: stable
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
           python-version: ${{ matrix.python-version }}
           enable-cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Sync environment
-        run: uv sync --group dev
-      - name: Test
-        run: uv run pytest
+      - name: Install test environment from the lockfile
+        run: uv sync --frozen --group dev
+      - name: Run the complete Python suite
+        env:
+          PYTEST_ARGS: ${{ matrix.pytest-args }}
+        run: uv run --no-sync pytest ${PYTEST_ARGS}
+      - name: Retain test evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tests-${{ matrix.platform }}-py${{ matrix.python-version }}
+          path: |
+            junit.xml
+            coverage.xml
+          if-no-files-found: warn
+          retention-days: 7
 
-  quality:
-    name: Lint and type-check
+  rust:
+    name: Rust
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: "3.12"
-          enable-cache: true
-      - uses: dtolnay/rust-toolchain@stable
+          persist-credentials: false
+      - name: Install Rust with quality components
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
         with:
+          toolchain: stable
           components: clippy,rustfmt
-      - run: uv sync --group dev
-      - run: uv run ruff format --check .
-      - run: uv run ruff check .
-      - run: uv run mypy
-      - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
-      - run: cargo test --workspace
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+      - name: Lint every Rust target
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Test the Rust workspace
+        run: cargo test --locked --workspace
+      - name: Compile Criterion benchmarks
+        run: cargo bench --locked --bench kernels --no-run
 
-  optional-adapters:
-    name: Optional adapters and references
+  rust-msrv:
+    name: Rust / MSRV 1.85
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Install the minimum supported Rust toolchain
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
+        with:
+          toolchain: 1.85.0
+      - name: Compile every target at the MSRV
+        run: cargo check --locked --workspace --all-targets
+      - name: Test the workspace at the MSRV
+        run: cargo test --locked --workspace
+
+  interoperability:
+    name: Interoperability
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
+        with:
+          toolchain: stable
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Sync optional test environment
-        run: uv sync --group dev --extra pandas --extra statistics
-      - name: Test adapter and reference suites
-        run: uv run --extra pandas --extra statistics pytest tests/integration/test_adapter_matrix.py tests/reference
+      - name: Install optional adapters and statistical references
+        run: uv sync --frozen --group dev --extra pandas --extra statistics
+      - name: Compare dataframe adapters and independent references
+        run: >-
+          uv run --no-sync pytest
+          tests/integration/test_adapter_matrix.py
+          tests/reference
+          --junitxml=junit.xml
+      - name: Retain interoperability evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: interoperability-py3.13
+          path: junit.xml
+          if-no-files-found: warn
+          retention-days: 7
 
   documentation:
     name: Documentation
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Sync documentation environment
-        run: uv sync --group docs
-      - name: Build documentation with strict link validation
-        run: uv run mkdocs build --strict
+      - name: Install documentation dependencies from the lockfile
+        run: uv sync --frozen --group docs --no-install-project
+      - name: Build documentation in strict mode
+        run: uv run --no-sync mkdocs build --strict
+      - name: Retain the rendered handbook
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lacuna-handbook
+          path: site/
+          if-no-files-found: error
+          retention-days: 7
 
   package:
-    name: Source distribution and wheel smoke
+    name: Package
+    needs: [quality, python, rust, rust-msrv, interoperability, documentation]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v7
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
+        with:
+          toolchain: stable
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Sync build environment
-        run: uv sync --group dev
-      - name: Build the source distribution and wheel from it
-        run: uv run maturin build --release --sdist --out dist
+      - name: Install build dependencies from the lockfile
+        run: uv sync --frozen --group dev
+      - name: Build a source distribution and rebuild its wheel
+        run: uv run --no-sync maturin build --release --locked --sdist --out dist
       - name: Install the wheel into a clean environment
         run: |
           uv venv .wheel-smoke --python 3.13
           uv pip install --python .wheel-smoke/bin/python dist/*.whl
-      - name: Verify native, typing, and schema resources
+      - name: Exercise the installed wheel
         run: |
-          .wheel-smoke/bin/python -c "import json, lacuna; from importlib.resources import files; from lacuna import _native; from lacuna.schemas import audit_result_v1_text; package = files('lacuna'); assert lacuna.__version__ == _native.version(); assert _native.checked_mean([1.0, 2.0, 3.0]) == 2.0; assert package.joinpath('py.typed').is_file(); assert package.joinpath('_native.pyi').is_file(); assert json.loads(audit_result_v1_text())['title'] == 'Lacuna audit result v1'"
+          .wheel-smoke/bin/python .github/scripts/wheel_smoke.py
           .wheel-smoke/bin/lacuna doctor --json
+      - name: Retain distributable artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: lacuna-linux-dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  gate:
+    name: CI gate
+    if: ${{ !cancelled() }}
+    needs: [quality, python, rust, rust-msrv, interoperability, documentation, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Require every CI layer
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          PYTHON: ${{ needs.python.result }}
+          RUST: ${{ needs.rust.result }}
+          RUST_MSRV: ${{ needs.rust-msrv.result }}
+          INTEROPERABILITY: ${{ needs.interoperability.result }}
+          DOCUMENTATION: ${{ needs.documentation.result }}
+          PACKAGE: ${{ needs.package.result }}
+        run: |
+          for result in "$QUALITY" "$PYTHON" "$RUST" "$RUST_MSRV" "$INTEROPERABILITY" "$DOCUMENTATION" "$PACKAGE"; do
+            if [[ "$result" != "success" ]]; then
+              printf 'A required CI layer finished with status: %s\n' "$result"
+              exit 1
+            fi
+          done
+          {
+            echo "### Lacuna CI passed"
+            echo
+            echo "All quality, compatibility, native, documentation, interoperability, and package gates succeeded."
+          } >> "$GITHUB_STEP_SUMMARY"
