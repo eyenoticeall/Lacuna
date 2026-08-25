@@ -1,6 +1,6 @@
 """Public API for quantitative signal diagnostics and validation."""
 
-from lacuna import costs, cv, experiment, labels, regime, robustness, signal, validation
+from lacuna import bias, costs, cv, experiment, labels, regime, robustness, signal, validation
 from lacuna._version import __version__
 from lacuna.audit import (
     Applicability,
@@ -60,6 +60,7 @@ __all__ = [
     "__version__",
     "audit",
     "benchmark_config_for_tier",
+    "bias",
     "config",
     "configure",
     "costs",
