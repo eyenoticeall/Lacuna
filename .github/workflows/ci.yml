@@ -39,6 +39,7 @@ jobs:
           version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
+          cache-suffix: quality
       - name: Install quality dependencies from the lockfile
         run: uv sync --frozen --group dev --no-install-project
       - name: Check Python formatting
@@ -110,6 +111,7 @@ jobs:
           version: "0.12.5"
           python-version: ${{ matrix.python-version }}
           enable-cache: true
+          cache-suffix: tests-${{ matrix.python-version }}
       - name: Install test environment from the lockfile
         run: uv sync --frozen --group dev
       - name: Run the complete Python suite
@@ -187,6 +189,7 @@ jobs:
           version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
+          cache-suffix: interoperability
       - name: Install optional adapters and statistical references
         run: uv sync --frozen --group dev --extra pandas --extra statistics
       - name: Compare dataframe adapters and independent references
@@ -219,6 +222,7 @@ jobs:
           version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
+          cache-suffix: documentation
       - name: Install documentation dependencies from the lockfile
         run: uv sync --frozen --group docs --no-install-project
       - name: Build documentation in strict mode
@@ -251,6 +255,7 @@ jobs:
           version: "0.12.5"
           python-version: "3.13"
           enable-cache: true
+          cache-suffix: package
       - name: Install build dependencies from the lockfile
         run: uv sync --frozen --group dev
       - name: Build a source distribution and rebuild its wheel

@@ -50,6 +50,8 @@ failure does not hide results from the other supported runtimes or platforms.
 - Python dependencies come from `uv.lock` via `uv sync --frozen`.
 - Cargo commands use `--locked` where dependency resolution applies.
 - CI installs an explicit uv release rather than an implicit latest version.
+- Concurrent dependency profiles use distinct uv cache suffixes, avoiding cache-save races while
+  preserving reuse within each job type.
 - Every external action is pinned to a full commit SHA and annotated with its reviewed release.
 - Dependabot groups GitHub Actions updates into a weekly pull request so immutable pins remain
   maintainable and changes still pass the complete gate.
