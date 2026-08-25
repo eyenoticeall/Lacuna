@@ -1,0 +1,21 @@
+site_name: Lacuna
+site_description: Quantitative research validation for finding where alpha breaks.
+docs_dir: docs
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: black
+    accent: teal
+nav:
+  - Home: index.md
+  - Getting started: getting-started/index.md
+  - Concepts:
+      - Architecture: concepts/architecture.md
+  - Methodology:
+      - Principles: methodology/principles.md
+markdown_extensions:
+  - admonition
+  - attr_list
+  - pymdownx.highlight
+  - pymdownx.superfences
