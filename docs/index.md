@@ -6,7 +6,10 @@ Lacuna is an open-source quantitative research validation library for discoverin
 
 !!! warning "Pre-alpha status"
 
-    The repository currently implements the Phase 0 foundation: package/build infrastructure, configuration, structured results and findings, a Polars-first data boundary, and a small native bridge. The analytical subsystem pages define implementation contracts for v0.1 and later work; they do not imply those APIs are released.
+    The repository now implements the initial v0.1 signal-validation path: explicit forward labels,
+    signal diagnostics, walk-forward and purged validation, dependent bootstrap, structured audit
+    rules, deterministic reports, and a file-based CLI. It remains pre-alpha: APIs and schemas can
+    still change, and later subsystem contracts do not imply those features are released.
 
 ## Choose a path
 

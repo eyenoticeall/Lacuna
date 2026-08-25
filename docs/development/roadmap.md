@@ -10,6 +10,10 @@ Remaining foundation hardening before v0.1 includes richer copy diagnostics, dom
 
 ## Phase 1 — signal diagnostics
 
+**v0.1 implemented:** explicit forward labels, Pearson/Spearman IC, grouped IC time series,
+quantile returns and spread, monotonicity, rank turnover/autocorrelation, multi-horizon decay, and
+native grouped rank IC.
+
 Deliver in this order:
 
 1. Forward-return labels with explicit observation/entry/exit timing.
@@ -37,6 +41,10 @@ embargo, and deterministic IID/moving/circular/stationary bootstrap confidence i
 Exit criteria: no post-purge overlap in property tests; bootstrap calibration simulations pass; seeds reproduce across thread counts.
 
 ## Phase 3 — audit and reports
+
+**v0.1 implemented:** immutable audit contexts, independently executable versioned rules, explicit
+applicability, a 100-weight score with visible evidence coverage, deterministic JSON/Markdown/basic
+HTML, the `SignalStudy` facade, and the `lacuna signal` file workflow.
 
 1. Rule protocol and applicability model.
 2. Versioned finding codes and thresholds.

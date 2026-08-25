@@ -8,6 +8,15 @@ except PackageNotFoundError:
     __version__ = "0.0.1"
 
 from lacuna import cv, labels, signal, validation
+from lacuna.audit import (
+    Applicability,
+    ApplicabilityState,
+    AuditContext,
+    AuditRule,
+    audit,
+    default_rules,
+    run_audit,
+)
 from lacuna.config import Config, config, configure, get_config
 from lacuna.exceptions import (
     ConfigurationError,
@@ -18,10 +27,17 @@ from lacuna.exceptions import (
     ReportError,
 )
 from lacuna.labels import LabelResult
+from lacuna.report import AuditReport
+from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
 
 __all__ = [
     "AnalysisResult",
+    "Applicability",
+    "ApplicabilityState",
+    "AuditContext",
+    "AuditReport",
+    "AuditRule",
     "Config",
     "ConfigurationError",
     "DataContractError",
@@ -34,12 +50,16 @@ __all__ = [
     "ReportError",
     "ResultMetadata",
     "Severity",
+    "SignalStudy",
     "__version__",
+    "audit",
     "config",
     "configure",
     "cv",
+    "default_rules",
     "get_config",
     "labels",
+    "run_audit",
     "signal",
     "validation",
 ]

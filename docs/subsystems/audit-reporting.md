@@ -1,6 +1,8 @@
 # Audit engine and reporting
 
-**Status:** the rule protocol, explicit unknown states, versioned scoring, and deterministic JSON/Markdown output are v0.1 contracts. Rich HTML, plotting, and interactive exploration arrive later.
+**Status:** the v0.1 rule protocol, explicit applicability states, versioned scoring,
+`SignalStudy` orchestration, and deterministic JSON/Markdown/basic HTML renderers are implemented.
+Plotting, interactive exploration, and third-party rules arrive later.
 
 The audit engine turns analytical evidence into reviewable findings. Reporting renders that evidence. Keeping the two separate prevents presentation choices from changing audit conclusions.
 
@@ -21,6 +23,40 @@ analysis results + provenance + optional context
 
 `lacuna.audit` owns rule execution, applicability, findings, and scoring. `lacuna.report` owns serialization and presentation. Renderers consume an immutable audit result; they do not execute analyses or reinterpret severity.
 
+## Public v0.1 workflow
+
+The high-level study delegates to the functional label, signal, validation, and audit APIs:
+
+```python
+import lacuna as lc
+
+study = lc.SignalStudy(
+    signal=signal,
+    prices=prices,
+    horizons=("1D", "5D", "20D"),
+    price_adjustment="total_return_adjusted",
+    quantiles=5,
+)
+report = study.audit(
+    bootstrap_resamples=10_000,
+    seed=42,
+    policies={
+        "survivorship_safe": True,
+        "trial_history_available": True,
+    },
+)
+
+print(report.summary())
+report.to_markdown("lacuna-audit.md")
+report.to_html("lacuna-audit.html")
+report.to_json("lacuna-audit.json")
+```
+
+Lower-level callers can assemble evidence explicitly with `AuditContext` and `run_audit`, or
+call `lacuna.audit(results=..., policies=...)`. This is useful when the analysis was computed by
+separate jobs. Result names are part of the v0.1 audit contract: `labels`, `ic`, `quantiles`,
+`turnover`, `decay`, `bootstrap`, and `split`.
+
 ## Audit context
 
 Rules receive an `AuditContext`, not an unrestricted study object. The context may contain:
@@ -40,7 +76,7 @@ Conceptually, a rule exposes:
 ```python
 class AuditRule(Protocol):
     rule_id: str
-    rule_version: str
+    rule_version: int
 
     def applicable(self, context: AuditContext) -> Applicability: ...
     def evaluate(self, context: AuditContext) -> Finding: ...
@@ -76,6 +112,10 @@ Severity expresses potential consequence; state expresses observed evidence. A h
 
 Findings must not contain arbitrary exception strings, secrets, raw proprietary datasets, or user-controlled HTML.
 
+In v0.1, `Finding.code` is the stable rule identifier because every built-in rule produces one
+aggregate finding. Separate finding-instance IDs and scoped recommendations are reserved for rules
+that can produce multiple findings later.
+
 ## Categories
 
 Initial categories should remain stable:
@@ -105,6 +145,42 @@ Score computation should use unrounded internal values and round only for displa
 
 The default report should show state counts and missing-evidence coverage next to the score.
 
+### v0.1 score policy
+
+The default score is version 1. Rule weights total 100 after the signal-only transaction-cost rule
+is excluded. State credit is `PASS = 1`, `WARN = 0.5`, and `FAIL = UNKNOWN = 0`.
+`NOT_APPLICABLE` is removed from both numerator and denominator. The computation is:
+
+```text
+score = 100 × Σ(rule_weight × state_credit) / Σ(applicable_rule_weight)
+evidence_coverage = assessed_weight / applicable_weight
+```
+
+`UNKNOWN` remains in the score denominator but not the coverage numerator. A missing high-weight
+check therefore lowers both the score and visible evidence coverage; it cannot disappear as an
+implicit pass.
+
+The implemented rule set is:
+
+| Rule | Weight | Evidence or policy | Main v0.1 decision |
+| --- | ---: | --- | --- |
+| `IC_DEFINED` | 12 | `ic` | aggregate IC exists |
+| `IC_PERIOD_SUPPORT` | 12 | `ic` | pass at 60 periods, warn at 20 |
+| `QUANTILE_MONOTONICITY` | 10 | `quantiles` | pass at 0.7, warn at 0.4 |
+| `BOOTSTRAP_INTERVAL` | 12 | `bootstrap` | pass if interval is positive |
+| `HORIZON_DECAY_COVERAGE` | 10 | `decay` | pass at three horizons, warn at two |
+| `LABEL_INTERVALS_PRESENT` | 10 | `labels` | explicit forward-label timing evidence |
+| `PURGED_VALIDATION_SUPPLIED` | 10 | `split` | evidence must come from `cv.purged_kfold` |
+| `PRICE_ADJUSTMENT_DECLARED` | 8 | `labels` | adjustment semantics are not unknown |
+| `DELISTING_HANDLING_DECLARED` | 8 | `labels` | a delisting-return field was supplied |
+| `TURNOVER_MEASURED` | 4 | `turnover` | rank turnover is defined |
+| `SURVIVORSHIP_HANDLING_DECLARED` | 2 | policy | historical-universe safety is declared |
+| `TRIAL_HISTORY_AVAILABLE` | 2 | policy | full research trial history is declared |
+| `TRANSACTION_COST_EVIDENCE` | 4 | policy | not applicable to a signal-only study |
+
+Threshold or weight changes require a rule or score version change. A score is an audit summary,
+not a probability of future profitability.
+
 ## Deterministic output
 
 Repeated rendering of the same audit result must produce semantically identical output. Define ordering for:
@@ -132,6 +208,11 @@ JSON is the canonical machine-readable report. It should have a published schema
 
 Large tables should be referenced as typed artifacts rather than embedded without bound. Consumers must reject unsupported major schema versions.
 
+The v0.1 JSON is `AnalysisResult` schema version `1`. It contains canonical finite values, audit
+method and score versions, rule versions, summary metrics, findings, compact score tables, warnings,
+and result-method provenance. Artifact manifests and large external evidence tables are later bundle
+features.
+
 ## Markdown and terminal output
 
 Markdown should optimize for code review and issue attachment:
@@ -144,6 +225,10 @@ Markdown should optimize for code review and issue attachment:
 6. methodology and provenance appendix.
 
 Terminal output is a compact view of the same data and uses text labels in addition to color. `--no-color` must be supported. Exit-code behavior belongs to the CLI contract and should distinguish execution failure from an audit containing failed findings.
+
+`AuditReport` provides in-memory `to_json()`, `to_markdown()`, and `to_html()` calls. Passing a path
+persists the corresponding format with exclusive creation by default; pass `overwrite=True`
+explicitly to replace a file. `write(path, format=...)` is the format-selecting equivalent.
 
 ## HTML and plots
 

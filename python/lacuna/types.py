@@ -52,6 +52,13 @@ def _thaw(value: JsonValue) -> object:
     return value
 
 
+def _freeze_mapping(value: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
+    frozen = _freeze(value)
+    if not isinstance(frozen, Mapping):  # pragma: no cover - guaranteed by the input type
+        raise TypeError("expected a JSON-compatible mapping")
+    return frozen
+
+
 class FindingState(StrEnum):
     """Outcome of an audit check."""
 

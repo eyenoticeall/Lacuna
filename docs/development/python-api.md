@@ -25,8 +25,11 @@ Study objects coordinate shared normalized inputs and repeated analyses:
 study = lc.SignalStudy(
     signal=signal,
     prices=prices,
-    time="date",
+    signal_time="date",
+    price_time="date",
     instrument="instrument",
+    horizons=("1D", "5D", "20D"),
+    price_adjustment="total_return_adjusted",
 )
 ```
 
@@ -68,13 +71,13 @@ Avoid functions that accept arbitrary `**kwargs`. Configuration objects or expli
 Simple valid calls should be short, while risky assumptions remain inspectable:
 
 ```python
-lc.audit(returns)
+lc.audit(results={"ic": ic_result, "bootstrap": bootstrap_result})
 ```
 
 An advanced method exposes its model explicitly:
 
 ```python
-lc.validation.block_bootstrap(
+lc.validation.bootstrap(
     returns,
     method="stationary",
     expected_block_length=20,

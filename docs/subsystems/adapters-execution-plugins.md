@@ -137,6 +137,32 @@ CLI behavior should define:
 - dry-run/explain-plan support before expensive work;
 - safe overwrite behavior for artifacts.
 
+The implemented v0.1 command is a thin file adapter around `SignalStudy`:
+
+```bash
+lacuna signal \
+  --signal factor.parquet \
+  --prices prices.parquet \
+  --horizon 5D \
+  --price-adjustment total_return_adjusted \
+  --quantiles 5 \
+  --bootstrap-resamples 10000 \
+  --seed 42 \
+  --format html \
+  --out factor-audit.html
+```
+
+Parquet, CSV, Arrow IPC, and Feather inputs are scanned lazily before the public services apply
+their explicit materialization boundary. Requested results go to stdout; file-write diagnostics and
+errors go to stderr. Existing artifacts are not replaced without `--overwrite`. Exit code `0` means
+execution completed under the requested finding policy, `1` means execution failed, and `3` means
+`--fail-on fail` or `--fail-on warn` matched an audit finding. `--format json` emits JSON without
+progress or color sequences. `--no-color` is accepted and terminal output is currently plain text.
+
+`lacuna doctor [--json]` remains available for build and native-extension diagnostics. Audit of
+standalone return/trade artifacts, dataset checks, dry-run planning, and developer benchmarks are
+separate later CLI stages.
+
 ## Observability
 
 Structured execution events may report phases, row counts, durations, allocations, and selected backend. They must not log sample data, credentials, or proprietary query text by default. Progress callbacks are optional and cannot affect calculation results.
