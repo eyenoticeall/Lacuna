@@ -127,12 +127,12 @@ its checksummed, attested GitHub Release artifacts.
 Stable and candidate tags use Cargo/SemVer spelling:
 
 ```text
-v0.2.0
-v0.2.0-rc.1
+v0.3.0
+v0.3.0-rc.1
 ```
 
-Python package metadata normalizes a candidate such as `0.2.0-rc.1` to `0.2.0rc1`; stable package
-metadata is `0.2.0`. The release verifier owns this mapping and prevents the two surfaces from
+Python package metadata normalizes a candidate such as `0.3.0-rc.1` to `0.3.0rc1`; stable package
+metadata is `0.3.0`. The release verifier owns this mapping and prevents the two surfaces from
 drifting.
 
 ## Initial release decision
