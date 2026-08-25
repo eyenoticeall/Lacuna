@@ -11,6 +11,7 @@ from lacuna.bias import asof_join
 from lacuna.costs import CommissionModel, stress
 from lacuna.labels import forward_returns
 from lacuna.signal import ic, quantiles, turnover
+from lacuna.validation import probability_of_backtest_overfitting, superior_predictive_ability
 
 
 def _records() -> tuple[dict[str, list[object]], dict[str, list[object]]]:
@@ -206,3 +207,48 @@ def test_point_in_time_join_matches_eager_lazy_pandas_and_arrow_inputs() -> None
         assert result.frame.equals(expected.frame)
         assert result.evidence.metrics == expected.evidence.metrics
         assert result.evidence.tables == expected.evidence.tables
+
+
+def test_advanced_inference_matches_eager_lazy_pandas_and_arrow_inputs() -> None:
+    pd = pytest.importorskip("pandas")
+    pa = pytest.importorskip("pyarrow")
+    values = np.arange(24, dtype=np.float64)
+    records = {
+        "first": (np.sin(values) + 0.5).tolist(),
+        "second": np.cos(values).tolist(),
+        "third": (np.sin(values * 0.5) - 0.5).tolist(),
+    }
+    frame = pl.DataFrame(records)
+    variants = (
+        frame.lazy(),
+        pd.DataFrame(records),
+        pa.table(records),
+    )
+    expected_pbo = probability_of_backtest_overfitting(
+        frame,
+        partitions=4,
+        statistic="mean",
+    )
+    expected_spa = superior_predictive_ability(
+        frame,
+        expected_block_length=3,
+        resamples=100,
+        seed=8,
+    )
+
+    for variant in variants:
+        pbo = probability_of_backtest_overfitting(
+            variant,
+            partitions=4,
+            statistic="mean",
+        )
+        spa = superior_predictive_ability(
+            variant,
+            expected_block_length=3,
+            resamples=100,
+            seed=8,
+        )
+        assert pbo.metrics == expected_pbo.metrics
+        assert pbo.tables == expected_pbo.tables
+        assert spa.metrics == expected_spa.metrics
+        assert spa.tables == expected_spa.tables

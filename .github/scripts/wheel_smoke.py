@@ -119,6 +119,57 @@ require(
     "point-in-time join selected future data",
 )
 
+intervals = {
+    "observation_time": list(range(6)),
+    "label_start": list(range(6)),
+    "label_end": [value + 1 for value in range(6)],
+}
+combinatorial = lacuna.cv.CombinatorialPurgedKFold(
+    n_groups=3,
+    n_test_groups=1,
+).split(intervals)
+require(len(combinatorial.folds) == 3, "CPCV combination generation failed")
+require(len(combinatorial.paths) == 1, "CPCV path reconstruction failed")
+
+inference_matrix = np.column_stack(
+    (
+        np.sin(np.arange(12, dtype=np.float64)) + 1.0,
+        np.cos(np.arange(12, dtype=np.float64)),
+        np.sin(np.arange(12, dtype=np.float64) * 0.5) - 1.0,
+    )
+)
+pbo = lacuna.validation.probability_of_backtest_overfitting(
+    inference_matrix,
+    partitions=4,
+    statistic="mean",
+)
+require(pbo.metrics["n_combinations"] == 6, "CSCV/PBO inference failed")
+permutation = lacuna.validation.permutation_test(
+    inference_matrix[:, 0],
+    permutations=100,
+    seed=7,
+)
+require(0.0 < permutation.metrics["p_value"] <= 1.0, "permutation inference failed")
+sharpe = lacuna.validation.sharpe_inference(inference_matrix[:, 0])
+require(
+    sharpe.metrics["probabilistic_sharpe_ratio"] > 0.5,
+    "Sharpe inference failed",
+)
+reality = lacuna.validation.reality_check(
+    inference_matrix,
+    expected_block_length=1,
+    resamples=100,
+    seed=7,
+)
+spa = lacuna.validation.superior_predictive_ability(
+    inference_matrix,
+    expected_block_length=1,
+    resamples=100,
+    seed=7,
+)
+require(0.0 < reality.metrics["p_value"] <= 1.0, "Reality Check inference failed")
+require(0.0 < spa.metrics["p_value_consistent"] <= 1.0, "SPA inference failed")
+
 package = files("lacuna")
 require(package.joinpath("py.typed").is_file(), "wheel is missing py.typed")
 require(package.joinpath("_native.pyi").is_file(), "wheel is missing native type stubs")
@@ -136,6 +187,10 @@ print(
             "trial_count": adjusted.metrics["trial_count"],
             "cost_scenarios": cost_stress.metrics["scenario_count"],
             "point_in_time_matches": point_in_time.evidence.metrics["matched_rows"],
+            "cpcv_combinations": len(combinatorial.folds),
+            "pbo_combinations": pbo.metrics["n_combinations"],
+            "reality_check_p_value": reality.metrics["p_value"],
+            "spa_p_value": spa.metrics["p_value_consistent"],
         },
         indent=2,
         sort_keys=True,

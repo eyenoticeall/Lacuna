@@ -401,6 +401,7 @@ def sharpe_inference(
     z_score = (periodic_sharpe - benchmark_periodic) / periodic_standard_error
     psr = NormalDist().cdf(z_score)
     critical_z = NormalDist().inv_cdf(confidence_level)
+    interval_z = NormalDist().inv_cdf(0.5 + confidence_level / 2.0)
     minimum_track_record: float | None = None
     if periodic_sharpe > benchmark_periodic:
         minimum_track_record = (
@@ -465,8 +466,8 @@ def sharpe_inference(
     elif independent_trials is not None:
         raise MethodContractError("independent_trials requires the complete trial_sharpes family")
 
-    lower = observed_sharpe - critical_z * standard_error
-    upper = observed_sharpe + critical_z * standard_error
+    lower = observed_sharpe - interval_z * standard_error
+    upper = observed_sharpe + interval_z * standard_error
     findings = (
         Finding(
             code="SHARPE_EXCEEDS_BENCHMARK" if psr >= confidence_level else "SHARPE_UNCERTAIN",
@@ -494,6 +495,8 @@ def sharpe_inference(
                 "value_column": value,
                 "benchmark": benchmark,
                 "confidence_level": confidence_level,
+                "confidence_interval": "two-sided asymptotic normal",
+                "minimum_track_record_confidence": "one-sided",
                 "annualization": annualization,
                 "kurtosis_convention": "Pearson (normal=3)",
                 "moment_estimator": "empirical standardized central moments",

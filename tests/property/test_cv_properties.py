@@ -61,3 +61,38 @@ def test_every_cpcv_path_covers_every_observation_once(
         for group, fold_number in enumerate(path.fold_by_group):
             test_groups = result.evidence.table("combinations")[fold_number]["test_groups"]
             assert group in test_groups
+
+
+@given(
+    st.lists(st.integers(min_value=1, max_value=5), min_size=6, max_size=14),
+    st.integers(min_value=3, max_value=5),
+    st.integers(min_value=1, max_value=2),
+)
+def test_cpcv_purging_never_retains_an_overlapping_interval(
+    lengths: list[int],
+    requested_groups: int,
+    requested_test_groups: int,
+) -> None:
+    periods = list(range(len(lengths)))
+    frame = pl.DataFrame(
+        {
+            "observation_time": periods,
+            "label_start": periods,
+            "label_end": [start + length for start, length in zip(periods, lengths, strict=True)],
+        }
+    )
+    n_groups = min(requested_groups, len(periods))
+    n_test_groups = min(requested_test_groups, n_groups - 1)
+    result = CombinatorialPurgedKFold(
+        n_groups=n_groups,
+        n_test_groups=n_test_groups,
+        use_native=False,
+    ).split(frame)
+    for fold in result.folds:
+        for train_index in fold.train_indices:
+            train_start = periods[train_index]
+            train_end = periods[train_index] + lengths[train_index]
+            for test_index in fold.test_indices:
+                test_start = periods[test_index]
+                test_end = periods[test_index] + lengths[test_index]
+                assert not (train_start < test_end and train_end > test_start)

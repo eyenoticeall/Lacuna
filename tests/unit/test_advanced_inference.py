@@ -120,6 +120,13 @@ def test_sharpe_inference_matches_the_published_moment_equations() -> None:
     )
     assert result.metrics["standard_error"] == pytest.approx(periodic_se * math.sqrt(12.0))
     assert result.metrics["probabilistic_sharpe_ratio"] == pytest.approx(expected_psr)
+    interval_z = NormalDist().inv_cdf(0.975)
+    assert result.metrics["confidence_lower"] == pytest.approx(
+        result.metrics["observed_sharpe"] - interval_z * result.metrics["standard_error"]
+    )
+    assert result.metrics["confidence_upper"] == pytest.approx(
+        result.metrics["observed_sharpe"] + interval_z * result.metrics["standard_error"]
+    )
 
 
 def test_deflated_sharpe_uses_and_exposes_the_complete_trial_family() -> None:
@@ -146,6 +153,11 @@ def test_sharpe_inference_rejects_undefined_or_incomplete_inputs() -> None:
         sharpe_inference([1.0, 1.0, 1.0])
     with pytest.raises(MethodContractError, match="complete trial_sharpes"):
         sharpe_inference([1.0, 2.0, 3.0], independent_trials=2.0)
+    with pytest.raises(DataContractError, match="selected strategy"):
+        sharpe_inference(
+            [-1.0, 0.0, 2.0, 3.0],
+            trial_sharpes=[0.1, 0.2],
+        )
 
 
 def test_pbo_exposes_selection_rank_logit_and_partition_sensitivity() -> None:
