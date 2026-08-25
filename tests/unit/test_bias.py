@@ -5,7 +5,17 @@ from datetime import datetime
 import polars as pl
 import pytest
 
-from lacuna.bias import asof_join, future_data_check
+from lacuna.bias import (
+    DatasetSpec,
+    SurvivorshipStatus,
+    asof_join,
+    future_data_check,
+    membership_at,
+    revision_diagnostics,
+    survivorship_diagnostics,
+    universe_drift,
+    validate_dataset,
+)
 from lacuna.exceptions import DataContractError, MethodContractError
 
 
@@ -250,3 +260,276 @@ def test_future_data_check_passes_only_complete_nonfuture_evidence() -> None:
         )
     )
     assert {finding.code for finding in result.findings} == {"BIAS_FUTURE_DATA_CLEAR"}
+
+
+def test_revision_diagnostics_groups_versions_and_validates_publication_order() -> None:
+    frame = pl.DataFrame(
+        {
+            "instrument": ["A", "A", "B"],
+            "effective_time": [1, 1, 1],
+            "available_time": [2, 4, 3],
+            "revision_id": [0, 1, 0],
+            "value": [10.0, 11.0, 20.0],
+        }
+    )
+    result = revision_diagnostics(
+        frame,
+        value="value",
+        source_mode="point_in_time",
+    )
+
+    assert result.metrics["fact_count"] == 2
+    assert result.metrics["revised_facts"] == 1
+    assert result.metrics["maximum_versions_per_fact"] == 2
+    assert {finding.code for finding in result.findings} == {"BIAS_REVISION_HISTORY_VALID"}
+    assert result.table("facts")[0]["distinct_value_count"] == 2  # type: ignore[index]
+
+
+def test_revision_diagnostics_exposes_latest_only_and_invalid_order() -> None:
+    frame = pl.DataFrame(
+        {
+            "instrument": ["A", "A"],
+            "effective_time": [1, 1],
+            "available_time": [4, 2],
+            "revision_id": [0, 1],
+        }
+    )
+    result = revision_diagnostics(frame, source_mode="latest_only")
+
+    assert result.metrics["order_violations"] == 1
+    assert {finding.code for finding in result.findings} == {
+        "BIAS_REVISION_ORDER_INVALID",
+        "BIAS_REVISION_LATEST_ONLY",
+    }
+
+
+def test_revision_diagnostics_rejects_duplicate_version_identity() -> None:
+    frame = pl.DataFrame(
+        {
+            "instrument": ["A", "A"],
+            "effective_time": [1, 1],
+            "available_time": [2, 2],
+            "revision_id": [0, 0],
+        }
+    )
+    with pytest.raises(DataContractError, match="duplicate version identities"):
+        revision_diagnostics(frame, source_mode="point_in_time")
+
+    republished = frame.with_columns(pl.Series("available_time", [2, 3]))
+    with pytest.raises(DataContractError, match="duplicate version identities"):
+        revision_diagnostics(republished, source_mode="point_in_time")
+
+
+def test_survivorship_diagnostics_requires_and_preserves_delisted_history() -> None:
+    frame = pl.DataFrame(
+        {
+            "index": ["LAC", "LAC", "LAC"],
+            "instrument": ["A", "A", "B"],
+            "valid_from": [1, 3, 1],
+            "valid_to": pl.Series([3, None, None], dtype=pl.Int64),
+            "available_time": [1, 3, 1],
+            "delisted": [True, False, False],
+        }
+    )
+    result = survivorship_diagnostics(
+        frame,
+        delisted="delisted",
+        source_status=SurvivorshipStatus.CONFIRMED_SAFE,
+        includes_delisted=True,
+    )
+
+    assert result.metrics["delisted_rows"] == 1
+    assert result.metrics["overlapping_intervals"] == 0
+    assert {finding.code for finding in result.findings} == {"BIAS_SURVIVORSHIP_SAFE"}
+
+
+def test_survivorship_diagnostics_never_converts_unknown_to_pass() -> None:
+    frame = pl.DataFrame(
+        {
+            "index": ["LAC"],
+            "instrument": ["A"],
+            "valid_from": [1],
+            "valid_to": pl.Series([None], dtype=pl.Int64),
+            "available_time": [1],
+        }
+    )
+    unknown = survivorship_diagnostics(frame)
+    biased = survivorship_diagnostics(frame, source_status="confirmed_biased")
+
+    assert [finding.state.value for finding in unknown.findings] == ["UNKNOWN"]
+    assert [finding.state.value for finding in biased.findings] == ["FAIL"]
+    with pytest.raises(MethodContractError, match="includes_delisted=True"):
+        survivorship_diagnostics(frame, source_status="confirmed_safe")
+
+
+def test_survivorship_diagnostics_preserves_all_null_availability_as_unknown() -> None:
+    frame = pl.DataFrame(
+        {
+            "index": ["LAC"],
+            "instrument": ["A"],
+            "valid_from": [1],
+            "valid_to": [None],
+            "available_time": [None],
+        }
+    )
+    result = survivorship_diagnostics(frame)
+
+    assert result.metrics["missing_availability_rows"] == 1
+    assert {finding.code for finding in result.findings} == {
+        "BIAS_MEMBERSHIP_AVAILABILITY_UNKNOWN",
+        "BIAS_SURVIVORSHIP_UNKNOWN",
+    }
+
+
+def test_survivorship_diagnostics_detects_overlap_and_late_availability() -> None:
+    frame = pl.DataFrame(
+        {
+            "index": ["LAC", "LAC"],
+            "instrument": ["A", "A"],
+            "valid_from": [1, 2],
+            "valid_to": [3, 4],
+            "available_time": [1, 3],
+        }
+    )
+    result = survivorship_diagnostics(frame)
+
+    assert result.metrics["overlapping_intervals"] == 1
+    assert result.metrics["late_availability_rows"] == 1
+    assert {finding.code for finding in result.findings} == {
+        "BIAS_MEMBERSHIP_INTERVAL_OVERLAP",
+        "BIAS_MEMBERSHIP_LATE_AVAILABILITY",
+        "BIAS_SURVIVORSHIP_UNKNOWN",
+    }
+
+
+def test_membership_at_uses_half_open_boundaries_and_availability_firewall() -> None:
+    frame = pl.DataFrame(
+        {
+            "index": ["LAC", "LAC", "LAC"],
+            "instrument": ["A", "A", "B"],
+            "valid_from": [1, 3, 1],
+            "valid_to": pl.Series([3, None, None], dtype=pl.Int64),
+            "available_time": [1, 3, 4],
+            "generation": ["old", "new", "future-known"],
+        }
+    )
+    result = membership_at(
+        frame,
+        as_of=3,
+        source_status="confirmed_safe",
+    )
+
+    assert result.frame.get_column("instrument").to_list() == ["A"]
+    assert result.frame.item(0, "generation") == "new"
+    assert result.evidence.metrics["active_candidate_rows"] == 2
+    assert result.evidence.metrics["not_yet_available_rows"] == 1
+    assert {finding.code for finding in result.evidence.findings} == {
+        "BIAS_MEMBERSHIP_NOT_YET_AVAILABLE"
+    }
+
+
+def test_membership_at_rejects_structurally_ambiguous_intervals() -> None:
+    frame = pl.DataFrame(
+        {
+            "index": ["LAC", "LAC"],
+            "instrument": ["A", "A"],
+            "valid_from": [1, 2],
+            "valid_to": [4, 3],
+            "available_time": [1, 2],
+        }
+    )
+    with pytest.raises(DataContractError, match="non-overlapping"):
+        membership_at(frame, as_of=2)
+
+
+def test_universe_drift_reports_additions_removals_and_unknown_source() -> None:
+    frame = pl.DataFrame(
+        {
+            "snapshot_time": [1, 1, 2, 2, 3, 3, 3],
+            "instrument": ["A", "B", "B", "C", "B", "C", "D"],
+        }
+    )
+    result = universe_drift(frame, warning_threshold=0.5)
+    transitions = result.table("transitions")
+
+    assert result.metrics["snapshots"] == 3
+    assert result.metrics["transitions"] == 2
+    assert transitions[0]["additions"] == 1  # type: ignore[index]
+    assert transitions[0]["removals"] == 1  # type: ignore[index]
+    assert transitions[0]["jaccard"] == pytest.approx(1 / 3)  # type: ignore[index]
+    assert transitions[1]["drift"] == pytest.approx(1 / 3)  # type: ignore[index]
+    assert {finding.code for finding in result.findings} == {
+        "BIAS_UNIVERSE_DRIFT_HIGH",
+        "BIAS_SURVIVORSHIP_UNKNOWN",
+    }
+
+
+def test_universe_drift_rejects_duplicate_snapshot_membership() -> None:
+    frame = pl.DataFrame(
+        {
+            "snapshot_time": [1, 1],
+            "instrument": ["A", "A"],
+        }
+    )
+    with pytest.raises(DataContractError, match="duplicate membership"):
+        universe_drift(frame)
+
+
+def test_validate_dataset_reports_structural_and_temporal_defects() -> None:
+    spec = DatasetSpec(
+        name="fundamentals",
+        required=("instrument", "effective_time", "available_time", "value"),
+        keys=("instrument", "effective_time"),
+        non_null=("instrument", "value"),
+        numeric=("value",),
+        temporal=("effective_time", "available_time"),
+        temporal_order=(("effective_time", "available_time"),),
+    )
+    clean = validate_dataset(
+        pl.DataFrame(
+            {
+                "instrument": ["A", "B"],
+                "effective_time": [1, 2],
+                "available_time": [2, 2],
+                "value": [1.0, 2.0],
+            }
+        ),
+        spec=spec,
+    )
+    broken = validate_dataset(
+        pl.DataFrame(
+            {
+                "instrument": ["A", "A", None],
+                "effective_time": [2, 2, 3],
+                "available_time": [1, 1, 4],
+                "value": [float("inf"), float("inf"), None],
+            }
+        ),
+        spec=spec,
+    )
+
+    assert {finding.code for finding in clean.findings} == {"DATASET_CONTRACT_VALID"}
+    assert {finding.code for finding in broken.findings} == {
+        "DATASET_NULL_CONSTRAINT_FAILED",
+        "DATASET_KEY_NOT_UNIQUE",
+        "DATASET_NONFINITE_VALUES",
+        "DATASET_TEMPORAL_ORDER_INVALID",
+    }
+    assert broken.metrics["duplicate_key_rows"] == 2
+    assert broken.metrics["nonfinite_values"] == 2
+
+
+def test_validate_dataset_returns_missing_column_findings_and_validates_spec() -> None:
+    spec = DatasetSpec(name="prices", required=("time", "close"), numeric=("close",))
+    result = validate_dataset(pl.DataFrame({"time": [1]}), spec=spec)
+
+    assert result.metrics["missing_required_columns"] == 1
+    assert {finding.code for finding in result.findings} == {"DATASET_REQUIRED_COLUMNS_MISSING"}
+    with pytest.raises(MethodContractError, match="declared in required"):
+        DatasetSpec(name="invalid", required=("time",), numeric=("close",))
+    with pytest.raises(MethodContractError, match="declared in temporal"):
+        DatasetSpec(
+            name="invalid-order",
+            required=("effective", "available"),
+            temporal_order=(("effective", "available"),),
+        )
