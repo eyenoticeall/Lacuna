@@ -7,8 +7,12 @@ mod _native {
 
     /// Return the version of the compiled extension.
     #[pyfunction]
-    fn version() -> &'static str {
-        env!("CARGO_PKG_VERSION")
+    fn version() -> String {
+        let cargo_version = env!("CARGO_PKG_VERSION");
+        if let Some((release, candidate)) = cargo_version.split_once("-rc.") {
+            return format!("{release}rc{candidate}");
+        }
+        cargo_version.to_owned()
     }
 
     /// Compute a checked mean while releasing the Python interpreter lock.

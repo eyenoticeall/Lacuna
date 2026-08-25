@@ -2,6 +2,9 @@
 
 Python is Lacuna's public language. It owns usability, semantic validation, explicit configuration, backend dispatch, error translation, and structured result construction.
 
+The reviewed `0.1` export and signature surface, compatibility promise, and intentional-change
+procedure are published in [Public API compatibility](../reference/public-api.md).
+
 ## Functional API first
 
 Every analytical capability starts with a composable function:

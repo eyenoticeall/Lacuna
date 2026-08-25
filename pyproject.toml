@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "lacuna"
-version = "0.0.1"
+version = "0.1.0rc1"
 description = "Open-source quantitative research validation for finding where alpha breaks."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,6 +35,12 @@ dependencies = [
   "numpy>=2.0",
   "polars>=1.30",
 ]
+
+[project.urls]
+Changelog = "https://github.com/eyenoticeall/Lacuna/blob/main/CHANGELOG.md"
+Documentation = "https://github.com/eyenoticeall/Lacuna/tree/main/docs"
+Issues = "https://github.com/eyenoticeall/Lacuna/issues"
+Repository = "https://github.com/eyenoticeall/Lacuna"
 
 [project.optional-dependencies]
 statistics = ["scipy>=1.15"]

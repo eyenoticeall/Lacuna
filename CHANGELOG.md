@@ -26,6 +26,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   analytical input evidence.
 - Validate signal, label, and price time/identity schemas, external label intervals, delisting-return
   dtypes, key compatibility, and runtime policy values before analytical execution.
+- Freeze the `0.1.x` root/module export surface and primary call signatures in an executable public
+  API contract with documented compatibility and migration rules.
 
 ### Fixed
 

@@ -54,6 +54,7 @@ nav:
       - Review checklist: agents/review-checklist.md
   - Reference:
       - Glossary: reference/glossary.md
+      - Public API compatibility: reference/public-api.md
       - Result schema: reference/result-schema.md
       - Architecture decisions: reference/architecture-decisions.md
 markdown_extensions:

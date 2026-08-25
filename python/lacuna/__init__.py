@@ -1,13 +1,7 @@
 """Public API for quantitative signal diagnostics and validation."""
 
-from importlib.metadata import PackageNotFoundError, version
-
-try:
-    __version__ = version("lacuna")
-except PackageNotFoundError:
-    __version__ = "0.0.1"
-
 from lacuna import cv, labels, signal, validation
+from lacuna._version import __version__
 from lacuna.audit import (
     Applicability,
     ApplicabilityState,

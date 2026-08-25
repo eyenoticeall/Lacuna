@@ -24,9 +24,9 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna is **pre-alpha**. The initial v0.1 signal-validation path is implemented and tested, but no
-> stable release or compatibility promise has been made. Treat APIs, thresholds, and schemas as
-> reviewable pre-release contracts.
+> Lacuna is a **v0.1 release candidate**. The initial signal-validation path is implemented and
+> tested, and the `0.1.x` public API contract is now reviewable and regression-tested. It remains
+> pre-1.0 software; later minor versions may evolve through documented migrations.
 
 ## Why Lacuna?
 

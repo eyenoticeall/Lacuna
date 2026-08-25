@@ -5,6 +5,7 @@ import math
 import numpy as np
 import pytest
 
+import lacuna
 from lacuna import _native
 from lacuna.native import native_status
 from lacuna.signal import ic
@@ -14,6 +15,7 @@ def test_native_extension_is_available() -> None:
     status = native_status()
     assert status.available is True
     assert status.version == _native.version()
+    assert lacuna.__version__ == _native.version()
 
 
 def test_checked_mean_crosses_the_native_boundary() -> None:
