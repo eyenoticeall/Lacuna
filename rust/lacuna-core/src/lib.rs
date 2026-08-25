@@ -42,7 +42,7 @@ impl Display for NumericError {
                 write!(formatter, "bootstrap index {index} is out of bounds")
             }
             Self::InvalidInterval { index } => {
-                write!(formatter, "interval {index} ends before it starts")
+                write!(formatter, "interval {index} must end after it starts")
             }
         }
     }
@@ -212,14 +212,23 @@ pub fn bootstrap_means(
             if window[0] == window[1] {
                 return Err(NumericError::EmptyInput);
             }
-            let mut sampled = Vec::with_capacity(window[1] - window[0]);
+            let mut sum = 0.0;
+            let mut correction = 0.0;
             for index in &indices[window[0]..window[1]] {
                 let value = values
                     .get(*index)
                     .ok_or(NumericError::IndexOutOfBounds { index: *index })?;
-                sampled.push(*value);
+                let candidate = sum + value;
+                if sum.abs() >= value.abs() {
+                    correction += (sum - candidate) + value;
+                } else {
+                    correction += (value - candidate) + sum;
+                }
+                sum = candidate;
             }
-            checked_mean(&sampled)
+            #[allow(clippy::cast_precision_loss)]
+            let count = (window[1] - window[0]) as f64;
+            Ok((sum + correction) / count)
         })
         .collect()
 }
@@ -241,24 +250,39 @@ pub fn interval_purge(
         return Err(NumericError::LengthMismatch);
     }
     for (index, (start, end)) in train_starts.iter().zip(train_ends).enumerate() {
-        if end < start {
+        if end <= start {
             return Err(NumericError::InvalidInterval { index });
         }
     }
     for (index, (start, end)) in test_starts.iter().zip(test_ends).enumerate() {
-        if end < start {
+        if end <= start {
             return Err(NumericError::InvalidInterval { index });
         }
+    }
+
+    let mut test_intervals: Vec<(i64, i64)> = test_starts
+        .iter()
+        .zip(test_ends)
+        .map(|(start, end)| (*start, *end))
+        .collect();
+    test_intervals.sort_unstable();
+    let mut merged: Vec<(i64, i64)> = Vec::with_capacity(test_intervals.len());
+    for (start, end) in test_intervals {
+        if let Some(last) = merged.last_mut() {
+            if start <= last.1 {
+                last.1 = last.1.max(end);
+                continue;
+            }
+        }
+        merged.push((start, end));
     }
 
     Ok(train_starts
         .iter()
         .zip(train_ends)
         .map(|(train_start, train_end)| {
-            test_starts
-                .iter()
-                .zip(test_ends)
-                .any(|(test_start, test_end)| train_start < test_end && train_end > test_start)
+            let candidate = merged.partition_point(|(_, end)| *end <= *train_start);
+            candidate < merged.len() && merged[candidate].0 < *train_end
         })
         .collect())
 }
@@ -344,6 +368,14 @@ mod tests {
     fn interval_purge_rejects_reversed_intervals() {
         assert_eq!(
             interval_purge(&[2], &[1], &[0], &[1]),
+            Err(NumericError::InvalidInterval { index: 0 })
+        );
+    }
+
+    #[test]
+    fn interval_purge_rejects_empty_intervals() {
+        assert_eq!(
+            interval_purge(&[1], &[1], &[2], &[3]),
             Err(NumericError::InvalidInterval { index: 0 })
         );
     }

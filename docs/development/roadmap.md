@@ -24,12 +24,15 @@ Exit criteria: Polars, NumPy, and optional pandas inputs agree; methodology is c
 
 ## Phase 2 — validation
 
+**v0.1 implemented:** expanding/rolling walk-forward folds, interval-aware purging, observation-count
+embargo, and deterministic IID/moving/circular/stationary bootstrap confidence intervals.
+
 1. Walk-forward split definitions and visualizable fold table.
 2. Interval-aware purging and embargo.
 3. IID reference bootstrap.
 4. Moving block and stationary bootstrap with deterministic streams.
-5. Permutation schemes.
-6. Sharpe uncertainty, then PSR and DSR with assumptions.
+5. **Later:** permutation schemes.
+6. **Later:** Sharpe uncertainty, then PSR and DSR with assumptions.
 
 Exit criteria: no post-purge overlap in property tests; bootstrap calibration simulations pass; seeds reproduce across thread counts.
 

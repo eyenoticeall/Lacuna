@@ -7,7 +7,7 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.1"
 
-from lacuna import labels, signal
+from lacuna import cv, labels, signal, validation
 from lacuna.config import Config, config, configure, get_config
 from lacuna.exceptions import (
     ConfigurationError,
@@ -37,7 +37,9 @@ __all__ = [
     "__version__",
     "config",
     "configure",
+    "cv",
     "get_config",
     "labels",
     "signal",
+    "validation",
 ]

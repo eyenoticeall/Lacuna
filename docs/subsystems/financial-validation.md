@@ -1,6 +1,6 @@
 # Financial cross-validation and statistical inference
 
-**Status:** v0.1 contract for walk-forward, simple purging, and basic block bootstrap. CPCV/PBO and advanced reality checks are later.
+**Status:** v0.1 walk-forward, simple purging/embargo, and IID, moving, circular, and stationary bootstrap are implemented. Permutation tests, Sharpe inference, CPCV/PBO, and advanced reality checks are later.
 
 This subsystem prevents ordinary validation machinery from ignoring time, overlapping labels, dependence, and repeated research trials.
 
@@ -45,7 +45,7 @@ This table is the source for visualization and audit evidence. Generated indices
 
 ## Walk-forward validation
 
-Target API:
+Public API:
 
 ```python
 cv = lc.cv.WalkForward(
@@ -60,8 +60,8 @@ Modes:
 
 - **expanding** — fixed train start, advancing train end;
 - **rolling** — fixed-width train window;
-- **anchored** — explicit anchor with configured advance behavior;
-- **fixed** — caller-supplied calendar boundaries.
+- **anchored** — later explicit anchor with configured advance behavior;
+- **fixed** — later caller-supplied calendar boundaries.
 
 The splitter defines incomplete final-window behavior, timezone/calendar handling, minimum observations, and whether test windows overlap.
 
@@ -112,7 +112,7 @@ Do not introduce a simplified “PBO” that omits path construction or selectio
 
 ## Bootstrap framework
 
-Target API:
+Public API:
 
 ```python
 result = lc.validation.bootstrap(
@@ -151,7 +151,7 @@ Initial intervals may include percentile and basic bootstrap intervals. BCa requ
 
 The result states interval level, sidedness, resample count, Monte Carlo resolution, and whether dependence-aware sampling was used.
 
-## Permutation tests
+## Later permutation tests
 
 Permutation schemes represent different null hypotheses:
 
@@ -165,7 +165,7 @@ The p-value calculation defines whether the observed arrangement is included and
 
 The alternative (`two-sided`, `greater`, `less`) is explicit. A within-date signal test must not accidentally permute labels across dates.
 
-## Sharpe inference
+## Later Sharpe inference
 
 Sharpe calculations declare:
 
@@ -179,7 +179,7 @@ Sharpe calculations declare:
 
 Probabilistic Sharpe Ratio and Deflated Sharpe Ratio include all assumptions and trial inputs. DSR is not computed from a winning Sharpe without a documented estimate of selection multiplicity and expected maximum Sharpe.
 
-## Effective sample size
+## Later effective sample size
 
 When defensible, expose both:
 
@@ -222,11 +222,12 @@ resample summary/table
 method metadata and warnings
 ```
 
-## Native candidates
+## Native execution
 
-- interval overlap/purge scan;
+- interval overlap/purge scan is implemented in Rust with a Python reference;
 - combinatorial index generation;
-- moving/circular/stationary bootstrap indices and reductions;
+- deterministic bootstrap indices are generated in bounded Python batches and mean reductions are
+  implemented in Rust with a NumPy reference;
 - large permutation reductions;
 - later PBO components.
 
