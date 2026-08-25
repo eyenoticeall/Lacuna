@@ -11,7 +11,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from lacuna._frames import eager_frame, frame_records, paired_numeric_policy
+from lacuna._frames import FrameDiagnostics, eager_frame, frame_records, paired_numeric_policy
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, Finding, FindingState, JsonValue, ResultMetadata, Severity
@@ -28,18 +28,34 @@ def _values_array(
     value: str,
     null_policy: Literal["drop", "raise"],
 ) -> tuple[FloatArray, dict[str, JsonValue], int]:
-    source: dict[str, JsonValue]
     if isinstance(data, np.ndarray):
         if data.ndim != 1:
             raise DataContractError("bootstrap NumPy input must be one-dimensional")
         frame = pl.DataFrame({value: data})
-        source = {"source_type": "numpy.ndarray", "rows": int(data.shape[0])}
+        diagnostics = FrameDiagnostics(
+            source_type="numpy.ndarray",
+            rows=int(data.shape[0]),
+            columns=(value,),
+            lazy_input=False,
+            materialized=False,
+            adapter_copy="potentially_zero_copy",
+            adapter_operations=("numpy_to_polars",),
+        )
     elif isinstance(data, Sequence) and not isinstance(data, str | bytes):
         frame = pl.DataFrame({value: data})
-        source = {"source_type": type(data).__name__, "rows": len(data)}
+        diagnostics = FrameDiagnostics(
+            source_type=f"{type(data).__module__}.{type(data).__name__}",
+            rows=len(data),
+            columns=(value,),
+            lazy_input=False,
+            materialized=False,
+            adapter_copy="one_copy",
+            adapter_operations=("sequence_to_polars",),
+        )
     else:
         frame, diagnostics = eager_frame(data, required=[value])
-        source = diagnostics.to_parameters()
+    diagnostics = diagnostics.with_execution("project_and_cast_float64")
+    source: dict[str, JsonValue] = diagnostics.to_parameters()
     frame = frame.select(pl.col(value).cast(pl.Float64).alias("value"))
     frame, excluded = paired_numeric_policy(frame, ["value"], null_policy=null_policy)
     if frame.height < 2:

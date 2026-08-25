@@ -20,11 +20,17 @@ rate, compound across rows, or infer a total-return series from a raw close.
 The price table needs unique `(time, instrument)` rows and numeric entry/exit price columns. Eager and
 lazy Polars, optional pandas/Arrow, and two-dimensional NumPy with an explicit `schema` are accepted at
 the boundary. The method materializes, sorts by `(instrument, time)`, and records the source type, shape,
-and materialization decision.
+adapter copy classification, materialization reason, and subsequent execution operations.
+
+`time` must be a Date, Datetime, Duration, integer observation index, or a whole-valued floating index
+from a homogeneous NumPy matrix. `instrument` must be a non-null string, categorical, integer, or
+whole-valued numeric identifier. Fractional identifiers, null semantic keys, and unsupported time
+dtypes fail before sorting. The optional delisting-return column must be numeric.
 
 Prices must be finite and strictly positive when present. Duplicate bars and infinite values are errors.
 `missing="drop"` censors individual labels that lack a usable entry or exit; `missing="raise"` rejects
-missing source prices or any horizon censoring.
+missing source prices or any horizon censoring. Other policy values are rejected rather than treated
+as an implicit drop policy.
 
 ## Horizon clock
 

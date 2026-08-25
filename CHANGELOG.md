@@ -22,6 +22,10 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Add strict documentation and clean source-distribution/wheel smoke jobs to CI.
 - Redesign CI as a staged, cross-platform gate with frozen installs, immutable action pins, coverage,
   retained evidence, Dependabot maintenance, and a stable branch-protection result.
+- Add conservative adapter-copy/materialization provenance and execution-operation diagnostics to
+  analytical input evidence.
+- Validate signal, label, and price time/identity schemas, external label intervals, delisting-return
+  dtypes, key compatibility, and runtime policy values before analytical execution.
 
 ### Fixed
 

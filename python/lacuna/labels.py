@@ -9,7 +9,7 @@ from typing import Literal, TypeAlias
 
 import polars as pl
 
-from lacuna._frames import eager_frame, frame_records, require_numeric, require_unique
+from lacuna._frames import eager_frame, frame_records, validate_panel_schema
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
 
@@ -127,6 +127,8 @@ def forward_returns(
     """
 
     normalized_horizons = _normalize_horizons(horizons, horizon)
+    if missing not in {"drop", "raise"}:
+        raise MethodContractError("missing must be 'drop' or 'raise'")
     if price_adjustment not in {
         "raw",
         "split_adjusted",
@@ -146,13 +148,28 @@ def forward_returns(
     if delisting_return is not None:
         required.append(delisting_return)
     frame, diagnostics = eager_frame(prices, schema=schema, required=required)
-    if frame.is_empty():
-        raise DataContractError("prices must contain at least one row")
-    require_unique(frame, [time, instrument], name="prices")
-    require_numeric(frame, [entry_column, exit_column])
-    infinite = pl.any_horizontal(
-        [pl.col(entry_column).is_infinite(), pl.col(exit_column).is_infinite()]
+    numeric_columns = list(dict.fromkeys([entry_column, exit_column]))
+    if delisting_return is not None:
+        numeric_columns.append(delisting_return)
+    validate_panel_schema(
+        frame,
+        time=time,
+        instrument=instrument,
+        numeric=numeric_columns,
+        name="prices",
     )
+    diagnostics = diagnostics.with_execution(
+        "validate_price_frame",
+        f"sort({instrument},{time})",
+        "derive_forward_return_columns",
+    )
+    infinite_expressions = [
+        pl.col(entry_column).is_infinite(),
+        pl.col(exit_column).is_infinite(),
+    ]
+    if delisting_return is not None:
+        infinite_expressions.append(pl.col(delisting_return).is_infinite())
+    infinite = pl.any_horizontal(infinite_expressions)
     infinite_count = int(frame.select(infinite.sum()).item())
     if infinite_count:
         raise DataContractError(

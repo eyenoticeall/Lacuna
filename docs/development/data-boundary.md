@@ -48,6 +48,21 @@ Every adapter path should eventually report one of:
 
 Claims are path-specific. “Arrow compatible” does not guarantee zero-copy.
 
+The implemented v0.1 evidence records adapter behavior under each result's input parameters:
+
+- `adapter_copy` classifies the boundary as `zero_copy`, `potentially_zero_copy`, `one_copy`, or
+  `materializing`;
+- `adapter_operations` names the physical conversion path;
+- `lazy_input`, `materialized`, and `materialization_reason` distinguish a lazy source from an
+  actual collection boundary;
+- `execution_operations` lists projections, casts, joins, sorts, or derived-column work performed
+  after normalization.
+
+These are conservative path classifications, not byte counters. In particular, a
+`potentially_zero_copy` Arrow or NumPy path depends on producer layout, chunking, dtype, and Polars.
+`materializing` means a lazy source was deliberately collected because the current domain algorithm
+requires eager data.
+
 Common copy causes include:
 
 - dtype coercion;

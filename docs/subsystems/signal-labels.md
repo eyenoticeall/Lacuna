@@ -102,6 +102,11 @@ Signal and labels align on stable instrument identity and observation time, neve
 - instruments and periods retained;
 - duplicates or many-to-many joins prevented.
 
+The v0.1 boundary rejects null semantic keys, non-numeric analytical values, incompatible signal and
+label key dtypes, duplicate logical keys, incomplete interval metadata, non-positive intervals, and
+entry times outside the supplied label interval. Optional external interval columns must use the same
+physical time dtype as `observation_time`.
+
 For lazy frames, projection and alignment should remain lazy until a grouped kernel requires materialization.
 
 ## Information coefficient

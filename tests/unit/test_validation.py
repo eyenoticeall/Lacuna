@@ -147,3 +147,14 @@ def test_invalid_bootstrap_configuration_is_rejected(
 ) -> None:
     with pytest.raises(MethodContractError, match=message):
         bootstrap([1.0, 2.0, 3.0], seed=1, **kwargs)  # type: ignore[arg-type]
+
+
+def test_bootstrap_sequence_records_copy_diagnostics() -> None:
+    result = bootstrap([1.0, 2.0, 3.0], resamples=100, seed=3)
+    diagnostics = result.metadata.parameters["input"]
+
+    assert diagnostics["source_type"] == "builtins.list"  # type: ignore[index]
+    assert diagnostics["adapter_copy"] == "one_copy"  # type: ignore[index]
+    assert diagnostics["execution_operations"] == (  # type: ignore[index]
+        "project_and_cast_float64",
+    )

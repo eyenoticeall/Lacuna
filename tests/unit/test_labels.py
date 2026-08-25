@@ -140,3 +140,44 @@ def test_non_positive_and_infinite_prices_are_rejected() -> None:
         )
         with pytest.raises(DataContractError):
             forward_returns(prices, horizon="1D")
+
+
+def test_price_frame_rejects_invalid_time_and_identity_contracts() -> None:
+    string_time = _prices().with_columns(pl.col("time").cast(pl.String))
+    with pytest.raises(DataContractError, match="time column 'time'"):
+        forward_returns(string_time, horizon="1D")
+
+    null_instrument = _prices().with_columns(
+        pl.when(pl.col("time") == 0).then(None).otherwise(pl.col("instrument")).alias("instrument")
+    )
+    with pytest.raises(DataContractError, match="null semantic keys: instrument=2"):
+        forward_returns(null_instrument, horizon="1D")
+
+    fractional_identifier = _prices().with_columns(pl.lit(1.5).alias("instrument"))
+    with pytest.raises(DataContractError, match="integer identifiers"):
+        forward_returns(fractional_identifier, horizon="1D")
+
+
+def test_delisting_and_missing_policies_are_validated_before_execution() -> None:
+    invalid_delisting = _prices().with_columns(pl.lit("unknown").alias("delisting_return"))
+    with pytest.raises(DataContractError, match="delisting_return=String"):
+        forward_returns(
+            invalid_delisting,
+            horizon="1D",
+            delisting_return="delisting_return",
+        )
+
+    with pytest.raises(MethodContractError, match="missing must be"):
+        forward_returns(_prices(), horizon="1D", missing="ignore")  # type: ignore[arg-type]
+
+
+def test_label_evidence_exposes_copy_and_execution_diagnostics() -> None:
+    result = forward_returns(_prices().lazy(), horizon="1D", price_adjustment="raw")
+    diagnostics = result.metadata.parameters["input"]
+
+    assert diagnostics["lazy_input"] is True  # type: ignore[index]
+    assert diagnostics["adapter_copy"] == "materializing"  # type: ignore[index]
+    assert diagnostics["materialization_reason"] == (  # type: ignore[index]
+        "domain method requires an eager frame"
+    )
+    assert "derive_forward_return_columns" in diagnostics["execution_operations"]  # type: ignore[operator,index]

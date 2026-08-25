@@ -6,7 +6,7 @@ import numpy as np
 import polars as pl
 import pytest
 
-from lacuna.exceptions import DataContractError
+from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.labels import forward_returns
 from lacuna.signal import decay, ic, quantiles, turnover
 
@@ -155,3 +155,31 @@ def test_nulls_drop_pairwise_and_infinity_is_rejected() -> None:
     )
     with pytest.raises(DataContractError, match="infinity"):
         ic(signal, labels_with_infinity, use_native=False)
+
+
+def test_signal_and_label_semantic_keys_must_have_matching_dtypes() -> None:
+    signal, labels = _panel()
+    incompatible = labels.with_columns(pl.col("observation_time").cast(pl.Int32))
+
+    with pytest.raises(DataContractError, match="aligned semantic keys must use matching dtypes"):
+        ic(signal, incompatible)
+
+
+def test_external_label_interval_metadata_is_validated() -> None:
+    signal, labels = _panel()
+    incomplete = labels.with_columns(pl.col("observation_time").alias("label_start"))
+    with pytest.raises(DataContractError, match="interval metadata is incomplete"):
+        ic(signal, incomplete)
+
+    invalid = labels.with_columns(
+        pl.col("observation_time").alias("label_start"),
+        pl.col("observation_time").alias("label_end"),
+    )
+    with pytest.raises(DataContractError, match="label_start < label_end"):
+        ic(signal, invalid)
+
+
+def test_signal_null_policy_is_a_method_contract() -> None:
+    signal, labels = _panel()
+    with pytest.raises(MethodContractError, match="null_policy"):
+        ic(signal, labels, null_policy="ignore")  # type: ignore[arg-type]

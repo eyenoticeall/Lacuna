@@ -16,7 +16,10 @@ from lacuna._frames import (
     eager_frame,
     frame_records,
     paired_numeric_policy,
+    require_compatible_keys,
     require_unique,
+    validate_label_intervals,
+    validate_panel_schema,
 )
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.labels import Horizon, LabelResult, forward_returns
@@ -96,13 +99,21 @@ def _array_panel(
         source_type="numpy.ndarray",
         rows=signal_values.shape[0],
         columns=("signal",),
+        lazy_input=False,
         materialized=False,
+        adapter_copy="potentially_zero_copy",
+        adapter_operations=("numpy_to_polars",),
+        execution_operations=("construct_aligned_array_panel",),
     )
     label_diagnostics = FrameDiagnostics(
         source_type="numpy.ndarray",
         rows=label_values.shape[0],
         columns=("forward_return",),
+        lazy_input=False,
         materialized=False,
+        adapter_copy="potentially_zero_copy",
+        adapter_operations=("numpy_to_polars",),
+        execution_operations=("construct_aligned_array_panel",),
     )
     return frame, signal_diagnostics, label_diagnostics
 
@@ -141,14 +152,41 @@ def _aligned_panel(
         label_source,
         required=[label_time, instrument, label_value],
     )
-    if signal_frame.is_empty() or label_frame.is_empty():
-        raise DataContractError("signal and labels must each contain at least one row")
-
-    require_unique(signal_frame, [signal_time, instrument], name="signal")
+    validate_panel_schema(
+        signal_frame,
+        time=signal_time,
+        instrument=instrument,
+        numeric=[signal_value],
+        name="signal",
+    )
     label_key = [label_time, instrument]
     if "horizon" in label_frame.columns:
         label_key.append("horizon")
+    validate_panel_schema(
+        label_frame,
+        time=label_time,
+        instrument=instrument,
+        numeric=[label_value],
+        name="labels",
+        unique=False,
+    )
     require_unique(label_frame, label_key, name="labels")
+    validate_label_intervals(label_frame, observation_time=label_time)
+    require_compatible_keys(
+        signal_frame,
+        label_frame,
+        pairs=((signal_time, label_time), (instrument, instrument)),
+    )
+    signal_diagnostics = signal_diagnostics.with_execution(
+        "validate_signal_frame",
+        "project_and_cast_float64",
+        "inner_join_signal_labels",
+    )
+    label_diagnostics = label_diagnostics.with_execution(
+        "validate_label_frame",
+        "project_and_cast_float64",
+        "inner_join_signal_labels",
+    )
 
     signal_projection = signal_frame.select(
         pl.col(signal_time).alias("observation_time"),
@@ -644,7 +682,18 @@ def _signal_frame(
     null_policy: Literal["drop", "raise"],
 ) -> tuple[pl.DataFrame, FrameDiagnostics, int]:
     frame, diagnostics = eager_frame(signal, required=[time, instrument, value])
-    require_unique(frame, [time, instrument], name="signal")
+    validate_panel_schema(
+        frame,
+        time=time,
+        instrument=instrument,
+        numeric=[value],
+        name="signal",
+    )
+    diagnostics = diagnostics.with_execution(
+        "validate_signal_frame",
+        "project_and_cast_float64",
+        "sort_and_group_signal_panel",
+    )
     frame = frame.select(
         pl.col(time).alias("observation_time"),
         pl.col(instrument).alias("instrument"),
