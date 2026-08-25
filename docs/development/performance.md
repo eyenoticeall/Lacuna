@@ -78,8 +78,9 @@ Run equivalent Polars, pandas, NumPy, and Arrow inputs where supported. A fast k
 
 The implemented runner measures forward labels, reference/native IC, quantiles, turnover, decay,
 reference/native bootstrap, reference/native interval purge, the complete `SignalStudy.audit`
-workflow, and a nine-point `costs.stress` grid. It invokes public APIs so validation, data movement,
-result construction, scenario projection, output checksums, and traced Python memory are included.
+workflow, a nine-point `costs.stress` grid, and the point-in-time `bias.asof_join` reference path. It
+invokes public APIs so validation, data movement, result construction, scenario projection, output
+checksums, and traced Python memory are included.
 
 The cost benchmark currently supports the NumPy/Polars reference implementation. It does not imply
 a native cost path: native/reference differential testing becomes mandatory if measurements later

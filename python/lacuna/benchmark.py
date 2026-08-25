@@ -19,7 +19,8 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from lacuna import costs, signal
+from lacuna import bias, costs, signal
+from lacuna.bias import PointInTimeJoinResult
 from lacuna.cv import PurgedKFold, SplitResult
 from lacuna.exceptions import MethodContractError
 from lacuna.labels import LabelResult, forward_returns
@@ -29,7 +30,9 @@ from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult
 from lacuna.validation import bootstrap
 
-BenchmarkOutput: TypeAlias = AnalysisResult | AuditReport | LabelResult | SplitResult
+BenchmarkOutput: TypeAlias = (
+    AnalysisResult | AuditReport | LabelResult | PointInTimeJoinResult | SplitResult
+)
 BenchmarkCallable: TypeAlias = Callable[[], BenchmarkOutput]
 IntArray: TypeAlias = npt.NDArray[np.int64]
 
@@ -134,7 +137,7 @@ class BenchmarkSuite:
     generated_at: datetime
     environment: Mapping[str, object]
     schema_version: str = "1"
-    benchmark_version: int = 2
+    benchmark_version: int = 3
 
     def to_dict(self) -> dict[str, object]:
         """Return the complete benchmark artifact."""
@@ -258,7 +261,7 @@ def _output_payload(output: BenchmarkOutput) -> tuple[dict[str, object], str]:
             "evidence": _without_created_at(output.evidence),
             "frame_summary": summary,
         }, "polars"
-    result = output.evidence if isinstance(output, SplitResult) else output
+    result = output.evidence if isinstance(output, SplitResult | PointInTimeJoinResult) else output
     parameters = result.metadata.parameters
     backend = parameters.get("backend")
     return _without_created_at(result), str(backend or "polars")
@@ -349,6 +352,15 @@ def run_benchmarks(
     resolved = config or BenchmarkConfig()
     observations, prices = _panels(resolved)
     trades = _trades(resolved)
+    decisions = observations.select(
+        pl.col("time").alias("decision_time"),
+        "instrument",
+    )
+    available_records = prices.filter(pl.col("time") % 2 == 0).select(
+        pl.col("time").alias("available_time"),
+        "instrument",
+        pl.col("close").alias("value"),
+    )
     labels = forward_returns(
         prices,
         horizons=resolved.horizon_names,
@@ -453,6 +465,16 @@ def run_benchmarks(
             ),
             resolved.rows * 9,
             "scenario_rows/second",
+        ),
+        (
+            "bias.asof_join.reference",
+            lambda: bias.asof_join(
+                decisions,
+                available_records,
+                revision_mode="not_applicable",
+            ),
+            resolved.rows,
+            "left_rows/second",
         ),
     ]
     native = native_status()
