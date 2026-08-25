@@ -15,6 +15,16 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from lacuna._advanced_inference import (
+    PBOStatistic,
+    PBOTieBreak,
+    PermutationAlternative,
+    PermutationScheme,
+    PermutationStatistic,
+    permutation_test,
+    probability_of_backtest_overfitting,
+    sharpe_inference,
+)
 from lacuna._frames import (
     FrameDiagnostics,
     eager_frame,
@@ -1139,9 +1149,17 @@ __all__ = [
     "IntervalMethod",
     "MultipleTestingMethod",
     "ObjectiveDirection",
+    "PBOStatistic",
+    "PBOTieBreak",
+    "PermutationAlternative",
+    "PermutationScheme",
+    "PermutationStatistic",
     "Statistic",
     "SurfaceFailurePolicy",
     "bootstrap",
     "multiple_testing",
     "parameter_surface",
+    "permutation_test",
+    "probability_of_backtest_overfitting",
+    "sharpe_inference",
 ]
