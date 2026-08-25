@@ -126,6 +126,8 @@ variable hosted-runner timings as exact measurements.
 The separate `Release` workflow consumes a version-matching tag only after the tagged commit's
 `CI gate` succeeded. It builds and target-smoke-tests the complete stable-ABI wheel matrix, validates
 the source distribution and packaged resources as one set, generates checksums and provenance, and
-creates a GitHub prerelease. Any future PyPI trusted-publishing job must be isolated in its own
+creates a GitHub prerelease for SemVer candidate tags or a normal release for stable tags. Any future
+PyPI trusted-publishing job must be isolated in its own
 environment and permission boundary after a non-conflicting distribution name is selected. RC1 does
-not publish to PyPI. See [Release engineering](release.md) for the tag and artifact contract.
+not publish to PyPI, and neither does `0.1.0`. See [Release engineering](release.md) for the tag and
+artifact contract.

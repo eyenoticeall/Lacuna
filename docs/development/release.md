@@ -35,7 +35,7 @@ under Python 3.13 on the target architecture. The ordinary CI matrix separately 
 Python 3.11–3.14 range. Revisit `abi3` before introducing native Arrow capsules, buffer borrowing, or
 another CPython API that the stable ABI cannot represent safely.
 
-## Pre-release gate
+## Release gate
 
 1. Working tree and lockfiles are clean.
 2. Ruff formatting/lint and strict mypy pass.
@@ -90,7 +90,7 @@ version/tag from the exact tested commit
     ↓
 signed/attested artifacts
     ↓
-PyPI and GitHub release
+GitHub Release and optional registry publication
 ```
 
 Do not rebuild release artifacts from a different source state after approval.
@@ -112,30 +112,33 @@ missing or unexpected filenames and tags, inspects wheel and source contents, an
 `SHA256SUMS`.
 
 Only the final publication job has `contents: write`, attestation, and OIDC permissions. Build jobs
-remain read-only. GitHub receives an explicitly marked prerelease with the verified artifacts and
-checksum manifest; GitHub provenance attestations are generated from that manifest.
+remain read-only. GitHub receives the verified artifacts and checksum manifest; SemVer prerelease
+tags are explicitly marked as prereleases, while stable tags create normal releases. GitHub
+provenance attestations are generated from the checksum manifest.
 
-Registry publication is deliberately disabled for RC1. The PyPI distribution name `lacuna` is
+Registry publication is deliberately disabled for `0.1.0`. The PyPI distribution name `lacuna` is
 already owned by an unrelated project, so this repository must not configure a trusted publisher or
 upload credentials for that name. Choose and review a distinct distribution name before adding a
-PyPI job; the Python import package can remain `lacuna`. RC1 is distributed through its checksummed,
-attested GitHub release artifacts.
+PyPI job; the Python import package can remain `lacuna`. The initial release is distributed through
+its checksummed, attested GitHub Release artifacts.
 
-For a candidate tag, use the Cargo/SemVer spelling:
+Stable and candidate tags use Cargo/SemVer spelling:
 
 ```text
+v0.1.0
 v0.1.0-rc.1
 ```
 
-Python package metadata normalizes that identity to `0.1.0rc1`. The release verifier owns this
-mapping and prevents the two surfaces from drifting.
+Python package metadata normalizes the candidate identity to `0.1.0rc1`; stable package metadata is
+`0.1.0`. The release verifier owns this mapping and prevents the two surfaces from drifting.
 
-## Candidate feedback gate
+## Initial release decision
 
-Artifact publication begins the release-candidate evaluation; it does not complete it. The
-[release-candidate feedback protocol](release-candidate-feedback.md) requires independent users,
-multiple platforms/input boundaries, an external numerical comparison, and disposition of all
-release blockers before the candidate can graduate.
+Independent-user validation was planned as an acceptance gate for `0.1.0`, but no external testers
+were available. The maintainer explicitly waived that gate on 2026-08-26 after the tagged candidate
+passed the complete CI, target-native wheel, source-distribution, checksum, and provenance workflow.
+This decision permits publication; it does not convert maintainer and CI evidence into a claim of
+independent validation. Future feedback remains welcome through ordinary GitHub issues.
 
 ## Pre-1.0 policy
 
