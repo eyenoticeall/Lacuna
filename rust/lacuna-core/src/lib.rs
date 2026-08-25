@@ -100,6 +100,8 @@ fn validate_offsets(offsets: &[usize], length: usize) -> Result<(), NumericError
     Ok(())
 }
 
+// Exact numeric equality defines a rank tie; this intentionally makes -0.0 and +0.0 equal.
+#[allow(clippy::float_cmp)]
 fn average_ranks(values: &[f64]) -> Vec<f64> {
     let mut order: Vec<usize> = (0..values.len()).collect();
     order.sort_by(|left, right| values[*left].total_cmp(&values[*right]));
@@ -108,7 +110,7 @@ fn average_ranks(values: &[f64]) -> Vec<f64> {
     let mut start = 0;
     while start < order.len() {
         let mut end = start + 1;
-        while end < order.len() && values[order[end]].total_cmp(&values[order[start]]).is_eq() {
+        while end < order.len() && values[order[end]] == values[order[start]] {
             end += 1;
         }
         #[allow(clippy::cast_precision_loss)]
@@ -332,6 +334,17 @@ mod tests {
     fn grouped_rank_ic_marks_constant_groups_undefined() {
         let result = grouped_rank_ic(&[1.0, 1.0], &[1.0, 2.0], &[0, 2]).expect("valid group");
         assert_eq!(result, vec![None]);
+    }
+
+    #[test]
+    fn grouped_rank_ic_treats_signed_zero_as_a_tie() {
+        let result =
+            grouped_rank_ic(&[1.0, 2.0, 3.0], &[0.0, -0.0, 1.0], &[0, 3]).expect("valid group");
+        assert!((result[0].expect("defined group") - 0.866_025_403_784_438_7).abs() < 1e-14);
+
+        let constant =
+            grouped_rank_ic(&[1.0, 2.0], &[0.0, -0.0], &[0, 2]).expect("valid constant group");
+        assert_eq!(constant, vec![None]);
     }
 
     #[test]

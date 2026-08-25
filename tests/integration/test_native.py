@@ -35,6 +35,16 @@ def test_native_grouped_rank_ic_uses_average_ties() -> None:
     assert result[1] == -1.0
 
 
+def test_native_grouped_rank_ic_treats_signed_zero_as_a_tie() -> None:
+    result = _native.grouped_rank_ic(
+        [1.0, 2.0, 3.0, 1.0, 2.0],
+        [0.0, -0.0, 1.0, 0.0, -0.0],
+        [0, 3, 5],
+    )
+    assert result[0] == pytest.approx(0.8660254037844387)
+    assert result[1] is None
+
+
 def test_native_bootstrap_mean_reduction() -> None:
     assert _native.bootstrap_means(
         [1.0, 2.0, 5.0],
