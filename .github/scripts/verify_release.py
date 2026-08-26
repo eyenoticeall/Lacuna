@@ -64,7 +64,14 @@ def _tag_target(root: Path, tag: str) -> str:
     return process.stdout.strip()
 
 
-def options_version(root: Path) -> str:
+def _release_tuple(version: str) -> tuple[int, int, int]:
+    match = re.match(r"(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)", version)
+    if match is None:
+        fail(f"cannot compare release version: {version!r}")
+    return tuple(int(match.group(name)) for name in ("major", "minor", "patch"))
+
+
+def options_version(root: Path, *, core_version: str) -> str:
     """Verify and return the independent lacuna-options release identity."""
 
     options_root = root / OPTIONS_ROOT
@@ -78,6 +85,28 @@ def options_version(root: Path) -> str:
         )
     if re.fullmatch(r"\d+\.\d+\.\d+", project_version) is None:
         fail(f"unsupported lacuna-options release version: {project_version!r}")
+    core_requirements = [
+        requirement
+        for requirement in pyproject["project"]["dependencies"]
+        if requirement.startswith("lacuna")
+    ]
+    if len(core_requirements) != 1:
+        fail("lacuna-options must declare exactly one Lacuna core requirement")
+    requirement_match = re.fullmatch(
+        r"lacuna>=(\d+\.\d+(?:\.\d+)?),<(\d+\.\d+(?:\.\d+)?)",
+        core_requirements[0],
+    )
+    if requirement_match is None:
+        fail("lacuna-options core requirement must use the reviewed >=lower,<upper form")
+
+    def bound(value: str) -> tuple[int, int, int]:
+        parts = [int(part) for part in value.split(".")]
+        parts.extend([0] * (3 - len(parts)))
+        return parts[0], parts[1], parts[2]
+
+    core_release = _release_tuple(core_version)
+    if not bound(requirement_match[1]) <= core_release < bound(requirement_match[2]):
+        fail(f"lacuna-options requirement {core_requirements[0]!r} excludes core {core_version}")
     changelog = (options_root / "CHANGELOG.md").read_text(encoding="utf-8")
     if f"## [{project_version}] - " not in changelog:
         fail(f"lacuna-options CHANGELOG has no dated release heading for {project_version}")
@@ -112,7 +141,7 @@ def verify_source(root: Path, tag: str, *, require_tag: bool) -> str:
     changelog = (root / "CHANGELOG.md").read_text(encoding="utf-8")
     if f"## [{cargo_version}] - " not in changelog:
         fail(f"CHANGELOG.md has no dated release heading for {cargo_version}")
-    options_version(root)
+    options_version(root, core_version=python_version)
 
     release_numbers = cargo_version.split("-", maxsplit=1)[0].split(".")
     release_series = ".".join(release_numbers[:2])
@@ -280,7 +309,7 @@ def _write_checksums(paths: list[Path], destination: Path) -> None:
 
 def verify_artifacts(root: Path, dist: Path, tag: str) -> str:
     version = verify_source(root, tag, require_tag=False)
-    extension_version = options_version(root)
+    extension_version = options_version(root, core_version=version)
     wheels = sorted(dist.glob("*.whl"))
     sdists = sorted(dist.glob("*.tar.gz"))
     expected_wheel_count = len(EXPECTED_WHEEL_PLATFORMS) + 1

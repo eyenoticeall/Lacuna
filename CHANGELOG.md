@@ -4,6 +4,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.7.0] - 2026-08-26
+
 ### Added
 
 - Add deterministic `.lacuna` reproducibility bundles containing the canonical audit,

@@ -15,7 +15,7 @@ The initial `0.1.x` contract provides:
 Install the matching Lacuna core wheel and the extension wheel from the same GitHub Release:
 
 ```bash
-python -m pip install ./lacuna-0.6.0-*.whl ./lacuna_options-0.1.0-py3-none-any.whl
+python -m pip install ./lacuna-0.7.0-*.whl ./lacuna_options-0.1.1-py3-none-any.whl
 ```
 
 ```python
@@ -29,3 +29,6 @@ residuals = lo.empirical_residual(chain, expected="fair_iv")
 The package does not claim a universal implied-volatility solver, Greeks model, surface fit, or
 arbitrage-free calibration. Those depend on explicit model, day-count, exercise, settlement,
 dividend, and numerical policies and belong in later separately versioned capabilities.
+
+Version `0.1.1` preserves the exact `0.1.x` Python surface while expanding its compatible core range
+to include additive Lacuna `0.7.x` releases.

@@ -17,7 +17,7 @@ such as `0.2.0rc1`.
 | `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Released |
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Released |
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Released |
-| `0.7.x` | Portable, deterministic, independently verifiable evidence bundles | Released bundle/schema/API contract and hostile-input gate |
+| `0.7.x` | Portable, deterministic, independently verifiable evidence bundles | Released |
 | `0.8`–`0.9` | Cross-phase audit integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 

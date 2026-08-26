@@ -1,7 +1,8 @@
 # Options-research extension
 
 **Status:** implemented as the separately versioned `lacuna-options` 0.1 package for the Lacuna
-0.6 milestone. It is released beside core but is not a core dependency.
+0.6 milestone. Patch `0.1.1` expands compatibility through additive Lacuna core `0.7.x`; it is
+released beside core but is not a core dependency.
 
 The extension provides empirical option-chain normalization and transparent derived coordinates.
 It deliberately begins below the level of a pricing library: callers provide market/model fields,
@@ -14,7 +15,7 @@ The distribution and import names are distinct:
 ```text
 distribution: lacuna-options
 import:       lacuna_options
-version:      0.1.x (independent of Lacuna core 0.6.x)
+version:      0.1.x (independent of Lacuna core 0.7.x)
 ```
 
 Install both artifacts from the same GitHub Release because the core distribution name on PyPI is
@@ -22,14 +23,18 @@ unrelated to this project:
 
 ```bash
 python -m pip install \
-  ./lacuna-0.6.0-cp311-abi3-<platform>.whl \
-  ./lacuna_options-0.1.0-py3-none-any.whl
+  ./lacuna-0.7.0-cp311-abi3-<platform>.whl \
+  ./lacuna_options-0.1.1-py3-none-any.whl
 ```
 
-The initial extension supports `lacuna>=0.5,<0.7`. Its `0.1.x` exports and signatures are frozen in
+The extension supports `lacuna>=0.5,<0.8`. Its `0.1.x` exports and signatures are frozen in
 `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`. Core and extension versions do not
 advance in lockstep: a later extension patch can improve its own compatible contract without a core
 release, while a future core incompatibility must update the dependency range and migration notes.
+
+`0.1.1` changes only dependency metadata: core `0.7` is additive and the extension's source/API
+contract is unchanged. The patch release is still required because an installed distribution's
+dependency range is part of its compatibility contract.
 
 Core remains importable without this package. Conversely, `lacuna_options` depends on the core data
 boundary, exceptions, and evidence types instead of duplicating them.
