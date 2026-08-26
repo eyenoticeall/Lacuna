@@ -19,6 +19,7 @@ from lacuna.schemas import audit_result_v1_text, bundle_manifest_v1_text
 PUBLIC_MODULES = (
     "lacuna.adapters",
     "lacuna.audit",
+    "lacuna.audit_profiles",
     "lacuna.benchmark",
     "lacuna.bias",
     "lacuna.bundle",
@@ -230,6 +231,29 @@ duckdb_frame = lacuna.adapters.from_duckdb(_DuckDBSmokeSource(), batch_size=1)
 require(duckdb_frame.evidence.metrics["row_count"] == 1, "DuckDB adapter failed")
 plugin_candidates = lacuna.plugins.discover_plugins()
 require(isinstance(plugin_candidates, tuple), "plugin discovery failed")
+
+standard_report = lacuna.standard_audit(
+    results={
+        "vendor": vendor.evidence,
+        "backtest": backtest.evidence,
+        "costs": cost_stress,
+        "point_in_time": point_in_time.evidence,
+    },
+    scope="strategy",
+)
+require(
+    standard_report.metrics["recognized_result_count"] == 4,
+    "standardized audit did not recognize installed-wheel evidence",
+)
+require(
+    "robustness_score" not in standard_report.metrics,
+    "standardized audit must not emit one universal score",
+)
+round_tripped = lacuna.AnalysisResult.from_json(standard_report.to_json())
+require(
+    round_tripped.to_dict() == standard_report.result.to_dict(),
+    "strict result JSON reader did not round-trip the standardized audit",
+)
 
 bundle_report = lacuna.audit(policies={"study_type": "signal"})
 with tempfile.TemporaryDirectory() as temporary_directory:

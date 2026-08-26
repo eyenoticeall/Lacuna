@@ -6,6 +6,7 @@ import numpy as np
 import polars as pl
 
 from lacuna.cli import main
+from lacuna.types import AnalysisResult, ResultMetadata
 
 
 def test_doctor_has_machine_readable_output(capsys: object) -> None:
@@ -167,6 +168,133 @@ def test_signal_command_rejects_unsupported_input_format(tmp_path: object, capsy
     captured = capsys.readouterr()  # type: ignore[attr-defined]
     assert exit_code == 1
     assert "unsupported input format" in captured.err
+
+
+def test_standard_audit_command_loads_named_result_json(tmp_path: object, capsys: object) -> None:
+    directory = tmp_path  # type: ignore[assignment]
+    split_path = directory / "split.json"
+    split_path.write_text(
+        AnalysisResult(metadata=ResultMetadata(method="cv.purged_kfold")).to_json(),
+        encoding="utf-8",
+    )
+
+    assert (
+        main(
+            [
+                "audit",
+                "--scope",
+                "strategy",
+                "--evidence",
+                f"split={split_path}",
+                "--format",
+                "json",
+            ]
+        )
+        == 0
+    )
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    payload = json.loads(captured.out)
+    assert payload["metadata"]["method"] == "audit.standard"
+    assert payload["metrics"]["recognized_result_count"] == 1
+    assert payload["metrics"]["required_evidence_coverage"] > 0.0
+    assert "robustness_score" not in payload["metrics"]
+    assert captured.err == ""
+
+
+def test_standard_audit_command_bundles_named_evidence(tmp_path: object, capsys: object) -> None:
+    directory = tmp_path  # type: ignore[assignment]
+    evidence_path = directory / "adapter.json"
+    evidence_path.write_text(
+        AnalysisResult(metadata=ResultMetadata(method="adapters.vendor_schema")).to_json(),
+        encoding="utf-8",
+    )
+    bundle_path = directory / "standard.lacuna"
+
+    assert (
+        main(
+            [
+                "audit",
+                "--scope",
+                "strategy",
+                "--evidence",
+                f"vendor={evidence_path}",
+                "--bundle",
+                str(bundle_path),
+                "--format",
+                "json",
+            ]
+        )
+        == 0
+    )
+    created = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "wrote Lacuna reproducibility bundle" in created.err
+
+    assert main(["bundle", "verify", str(bundle_path), "--json"]) == 0
+    verified = capsys.readouterr()  # type: ignore[attr-defined]
+    payload = json.loads(verified.out)
+    assert payload["integrity_verified"] is True
+    assert payload["artifact_count"] == 7
+
+
+def test_standard_audit_command_rejects_duplicate_or_invalid_evidence(
+    tmp_path: object,
+    capsys: object,
+) -> None:
+    directory = tmp_path  # type: ignore[assignment]
+    valid = directory / "valid.json"
+    valid.write_text(
+        AnalysisResult(metadata=ResultMetadata(method="cv.purged_kfold")).to_json(),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "audit",
+                "--evidence",
+                f"same={valid}",
+                "--evidence",
+                f"same={valid}",
+            ]
+        )
+        == 1
+    )
+    duplicate = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "duplicate evidence name" in duplicate.err
+
+    invalid = directory / "invalid.json"
+    invalid.write_text('{"value": NaN}', encoding="utf-8")
+    assert main(["audit", "--evidence", f"invalid={invalid}"]) == 1
+    rejected = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "non-finite constant" in rejected.err
+    assert "NaN" not in rejected.out
+
+
+def test_standard_audit_command_fail_on_warn_uses_audit_exit_code(
+    tmp_path: object,
+    capsys: object,
+) -> None:
+    directory = tmp_path  # type: ignore[assignment]
+    evidence_path = directory / "unknown.json"
+    evidence_path.write_text(
+        AnalysisResult(metadata=ResultMetadata(method="future.method")).to_json(),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "audit",
+                "--evidence",
+                f"unknown={evidence_path}",
+                "--fail-on",
+                "warn",
+                "--format",
+                "json",
+            ]
+        )
+        == 3
+    )
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    assert json.loads(captured.out)["metrics"]["unrecognized_result_count"] == 1
 
 
 def test_bench_command_emits_versioned_json(capsys: object) -> None:

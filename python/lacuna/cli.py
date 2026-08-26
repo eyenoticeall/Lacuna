@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import platform
+import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -13,6 +14,7 @@ from typing import Literal, cast
 import polars as pl
 
 from lacuna import __version__
+from lacuna.audit_profiles import standard_audit
 from lacuna.bundle import verify_bundle
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, LacunaError, ReportError
@@ -20,9 +22,10 @@ from lacuna.labels import PriceAdjustment
 from lacuna.native import native_status
 from lacuna.report import AuditReport
 from lacuna.study import SignalStudy
-from lacuna.types import FindingState, JsonValue
+from lacuna.types import AnalysisResult, FindingState, JsonValue
 
 ReportFormat = Literal["json", "markdown", "html"]
+_MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
 
 
 def _positive_int(value: str) -> int:
@@ -100,6 +103,41 @@ def _audit_exit_code(report: AuditReport, fail_on: str) -> int:
     return 0
 
 
+def _evidence_spec(value: str) -> tuple[str, str]:
+    name, separator, path = value.partition("=")
+    if not separator or not name or not path:
+        raise argparse.ArgumentTypeError("evidence must use NAME=PATH")
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", name):
+        raise argparse.ArgumentTypeError(
+            "evidence NAME must use 1-64 letters, digits, dots, underscores, or hyphens"
+        )
+    return name, path
+
+
+def _load_evidence(specifications: Sequence[tuple[str, str]]) -> dict[str, AnalysisResult]:
+    results: dict[str, AnalysisResult] = {}
+    for name, raw_path in specifications:
+        if name in results:
+            raise DataContractError(f"duplicate evidence name {name!r}")
+        path = Path(raw_path)
+        try:
+            size = path.stat().st_size
+        except OSError as error:
+            raise DataContractError(f"cannot inspect evidence file for {name!r}: {path}") from error
+        if size > _MAX_EVIDENCE_BYTES:
+            raise DataContractError(
+                f"evidence file for {name!r} exceeds the {_MAX_EVIDENCE_BYTES}-byte limit"
+            )
+        try:
+            content = path.read_text(encoding="utf-8")
+            results[name] = AnalysisResult.from_json(content)
+        except (OSError, UnicodeError, TypeError, ValueError) as error:
+            raise DataContractError(
+                f"invalid v1 evidence file for {name!r}: {path}: {error}"
+            ) from error
+    return results
+
+
 def _run_signal(arguments: argparse.Namespace) -> int:
     horizons = tuple(arguments.horizon or ("1D", "5D", "20D"))
     study = SignalStudy(
@@ -132,6 +170,38 @@ def _run_signal(arguments: argparse.Namespace) -> int:
     )
     if arguments.bundle is not None:
         destination = report.bundle(arguments.bundle, overwrite=arguments.overwrite)
+        print(f"wrote Lacuna reproducibility bundle to {destination}", file=sys.stderr)
+    if arguments.out is not None:
+        destination = report.write(
+            arguments.out,
+            format=arguments.format,
+            overwrite=arguments.overwrite,
+        )
+        print(f"wrote Lacuna audit to {destination}", file=sys.stderr)
+    else:
+        selected = cast(ReportFormat, arguments.format or "markdown")
+        print(_render_report(report, selected), end="")
+    return _audit_exit_code(report, arguments.fail_on)
+
+
+def _run_standard_audit(arguments: argparse.Namespace) -> int:
+    results = _load_evidence(arguments.evidence)
+    report = standard_audit(results=results, scope=arguments.scope)
+    if arguments.bundle is not None:
+        destination = report.bundle(
+            arguments.bundle,
+            configuration={
+                "audit_profile": f"standard.{arguments.scope}",
+                "audit_profile_version": 1,
+            },
+            evidence=results,
+            invocation={
+                "command": "lacuna audit",
+                "scope": arguments.scope,
+                "evidence_names": tuple(sorted(results)),
+            },
+            overwrite=arguments.overwrite,
+        )
         print(f"wrote Lacuna reproducibility bundle to {destination}", file=sys.stderr)
     if arguments.out is not None:
         destination = report.write(
@@ -197,6 +267,43 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor = subcommands.add_parser("doctor", help="show build and runtime diagnostics")
     doctor.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+
+    audit = subcommands.add_parser(
+        "audit",
+        help="assemble a standardized cross-phase audit from result JSON evidence",
+    )
+    audit.add_argument(
+        "--evidence",
+        action="append",
+        type=_evidence_spec,
+        default=[],
+        metavar="NAME=PATH",
+        help="named AnalysisResult v1 JSON; repeat for multiple results",
+    )
+    audit.add_argument(
+        "--scope",
+        choices=("signal", "strategy", "options"),
+        default="strategy",
+        help="research scope controlling required, optional, and inapplicable evidence",
+    )
+    audit.add_argument("--no-color", action="store_true", help="disable terminal color")
+    audit.add_argument(
+        "--format",
+        choices=("json", "markdown", "html"),
+        help="report format; inferred from --out or Markdown on stdout",
+    )
+    audit.add_argument("--out", help="write the report to this path")
+    audit.add_argument(
+        "--bundle",
+        help="also write a deterministic .lacuna reproducibility bundle",
+    )
+    audit.add_argument("--overwrite", action="store_true", help="replace an existing artifact")
+    audit.add_argument(
+        "--fail-on",
+        choices=("never", "fail", "warn"),
+        default="never",
+        help="return exit code 3 when the selected finding state is present",
+    )
 
     signal = subcommands.add_parser(
         "signal",
@@ -317,6 +424,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             return _run_signal(arguments)
         except (LacunaError, OSError, pl.exceptions.PolarsError) as error:
+            print(f"lacuna: error: {error}", file=sys.stderr)
+            return 1
+
+    if arguments.command == "audit":
+        try:
+            return _run_standard_audit(arguments)
+        except (LacunaError, OSError) as error:
             print(f"lacuna: error: {error}", file=sys.stderr)
             return 1
 
