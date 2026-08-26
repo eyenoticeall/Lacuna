@@ -104,6 +104,7 @@ Check whether the change needs a new:
 - result schema version for changed fields/meaning;
 - rule version for changed audit logic/threshold;
 - score version for changed aggregation;
+- audit profile or coverage-rule version for changed method-family membership or applicability;
 - bundle version for changed artifact layout;
 - changelog entry for user-visible behavior.
 
@@ -139,6 +140,15 @@ Begin with capability metadata and semantic column mapping. Add structural valid
 #### Audit rule
 
 Define required evidence and applicability before the threshold. Add pass/warn/fail/unknown/not-applicable fixtures, stable evidence references, rule versioning, score-coverage impact, and renderer escaping cases.
+
+#### Standardized audit profile
+
+Start from a concrete research scope, not a desire to make the matrix look complete. Assign each
+capability required, optional, or not applicable with a reviewable reason. Prove that every accepted
+method maps to exactly one capability. Treat coverage findings as presence evidence only, propagate
+source findings without reinterpretation, and do not invent a universal score. Update profile/API
+fixtures, public and packaged schemas, result-reader/CLI limits, extension integration, bundle and
+wheel smoke paths, and the v1 readiness ledger together.
 
 #### Schema or persistence change
 

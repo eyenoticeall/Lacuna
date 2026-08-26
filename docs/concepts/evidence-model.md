@@ -86,6 +86,12 @@ integrity and result meaning remain separate: `bundle_version` selects the archi
 `schema_version` selects the result envelope, and `method_version` selects analytical semantics.
 See [Reproducibility bundle v1](../reference/reproducibility-bundle.md).
 
+The v0.8 standardized audit consumes named `AnalysisResult` values without rerunning their methods.
+Its profile schema is distinct from both the result envelope and bundle layout. Coverage findings
+state whether accepted evidence is present; source findings are carried forward without threshold,
+state, or severity reinterpretation. See
+[Standardized cross-phase audit](../reference/standardized-audit.md).
+
 ## Findings lifecycle
 
 An audit rule follows a deterministic lifecycle:

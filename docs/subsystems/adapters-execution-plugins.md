@@ -244,7 +244,7 @@ CLI behavior should define:
 - dry-run/explain-plan support before expensive work;
 - safe overwrite behavior for artifacts.
 
-The implemented v0.1 command is a thin file adapter around `SignalStudy`:
+The implemented signal command is a thin file adapter around `SignalStudy`:
 
 ```bash
 lacuna signal \
@@ -265,6 +265,24 @@ errors go to stderr. Existing artifacts are not replaced without `--overwrite`. 
 execution completed under the requested finding policy, `1` means execution failed, and `3` means
 `--fail-on fail` or `--fail-on warn` matched an audit finding. `--format json` emits JSON without
 progress or color sequences. `--no-color` is accepted and terminal output is currently plain text.
+
+v0.8 adds a second thin path over `standard_audit`:
+
+```bash
+lacuna audit \
+  --scope strategy \
+  --evidence vendor=vendor-adapter.json \
+  --evidence backtest=backtest-adapter.json \
+  --evidence costs=cost-stress.json \
+  --out strategy-audit.html \
+  --bundle strategy-audit.lacuna
+```
+
+The CLI applies no analytical rule beyond the public service. It bounds each JSON evidence file,
+uses the strict non-executing schema-v1 result reader, rejects duplicate names, and passes named
+results to the selected built-in profile. Serialized plugin evidence never authorizes activation.
+The complete contract is in the
+[standardized-audit reference](../reference/standardized-audit.md).
 
 `lacuna doctor [--json]` remains available for build and native-extension diagnostics. Audit of
 standalone return/trade artifacts, dataset checks, dry-run planning, and developer benchmarks are

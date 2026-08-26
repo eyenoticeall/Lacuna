@@ -65,6 +65,7 @@ nav:
       - Public API compatibility: reference/public-api.md
       - Result schema: reference/result-schema.md
       - Reproducibility bundle: reference/reproducibility-bundle.md
+      - Standardized audit: reference/standardized-audit.md
       - Architecture decisions: reference/architecture-decisions.md
 markdown_extensions:
   - admonition

@@ -140,7 +140,8 @@ Do not create every package as an empty placeholder. Add a package when its firs
 
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
 v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
-milestone, the v0.6 optional-integration milestone, and the v0.7 portable-evidence milestone:
+milestone, the v0.6 optional-integration milestone, the v0.7 portable-evidence milestone, and the
+v0.8 standardized-audit milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -171,10 +172,15 @@ milestone, the v0.6 optional-integration milestone, and the v0.7 portable-eviden
   chains, carry forwards, log-forward moneyness, delta buckets, and empirical surface residuals.
 - deterministic `.lacuna` evidence archives with a published manifest schema, bounded non-executing
   verification, privacy redaction, and SHA-256 member/artifact-set integrity.
+- versioned signal/strategy/options audit profiles that recognize every released method family,
+  expose required/optional/not-applicable coverage, propagate domain findings unchanged, and avoid
+  a misleading universal cross-phase score;
+- strict current-schema result JSON ingestion plus file-oriented standardized-audit CLI and
+  vendor/backtester/options-to-audit integration paths.
 
 DataFusion, framework-specific adapters, automatic execution planning, model-based option pricing/
 calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
-through documented migrations; the published `0.1.x` through `0.7.x` contracts govern their
+through documented migrations; the published `0.1.x` through `0.8.x` contracts govern their
 respective release lines.
 
 ## Detailed guides

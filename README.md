@@ -145,6 +145,26 @@ print(verification.archive_sha256)
 Missing price-adjustment, delisting, survivorship, trial-history, or validation evidence stays visible
 as `UNKNOWN`; it is never silently promoted to a pass.
 
+Compose evidence from every released phase with a scope-specific standardized profile:
+
+```python
+evidence = {
+    "purged_split": split.evidence,
+    "trials": registry.snapshot(),
+    "costs": cost_stress,
+    "future_data": future_data_check,
+    "vendor": adapted_vendor.evidence,
+    "backtest": adapted_returns.evidence,
+}
+
+standard = lc.standard_audit(results=evidence, scope="strategy")
+print(standard.table("category_coverage"))
+standard.bundle("strategy-audit.lacuna", evidence=evidence)
+```
+
+The profile distinguishes required, optional, and not-applicable evidence, carries domain findings
+forward without changing their meaning, and deliberately emits no universal strategy-quality score.
+
 The same methods are composable through the functional API:
 
 ```python
@@ -285,6 +305,14 @@ uv run lacuna signal \
   --bundle study.lacuna
 
 uv run lacuna bundle verify study.lacuna
+
+uv run lacuna audit \
+  --scope strategy \
+  --evidence split=purged-split.json \
+  --evidence costs=cost-stress.json \
+  --evidence bias=future-data.json \
+  --out strategy-audit.html \
+  --bundle strategy-audit.lacuna
 ```
 
 ## Repository map
@@ -314,9 +342,9 @@ Versions `0.1` through `0.5` cover foundations, signal diagnostics, temporal val
 bootstrap, audit/reporting, experiment lineage, multiple-testing correction, robustness,
 trading-realism evidence, point-in-time data correctness, and advanced inference. Released `0.6`
 adds optional adapters/plugins and the separate options package without expanding the core
-dependency surface. Released `0.7` adds portable identifiable-level evidence bundles. Versions
-`0.8`–`0.9` are reserved for cross-phase standardized audit, migration, performance, and real-user
-hardening before a stable `1.0.0` contract.
+dependency surface. Released `0.7` adds portable identifiable-level evidence bundles, and released
+`0.8` adds scope-specific cross-phase standardized audits. `0.9` is reserved for migration,
+integrated performance, diagnostics, and real-user hardening before a stable `1.0.0` contract.
 
 See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
 and the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for architecture and statistical
@@ -333,7 +361,7 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes released v0.1–v0.7 behavior from later contracts. Contributors
+The documentation distinguishes released v0.1–v0.8 behavior from later contracts. Contributors
 and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 

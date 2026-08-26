@@ -11,10 +11,10 @@ evaluated in four states:
 
 ## Definition ledger
 
-| v1 definition item | Status after the `0.7` milestone | Evidence and remaining gate |
+| v1 definition item | Status after the `0.8` milestone | Evidence and remaining gate |
 | --- | --- | --- |
-| stable data-contract semantics | Hardening | Labels, adapters, point-in-time joins, dataset specs, and backtest schemas are released; `0.8` must reconcile their error/provenance behavior and `1.0` must make the stability declaration. |
-| stable result schema | Hardening | `AnalysisResult` schema 1, JSON Schema, golden fixtures, and preserved API series exist; migration tests must exercise persisted `0.1`–`0.7` evidence before the v1 freeze. |
+| stable data-contract semantics | Hardening | Labels, adapters, point-in-time joins, dataset specs, and backtest schemas are released and enter one explicit profile inventory; `0.9` must close cross-release diagnostics and `1.0` must make the stability declaration. |
+| stable result schema | Hardening | `AnalysisResult` schema 1, strict current-schema reader, JSON Schema, golden fixtures, and preserved API series exist; migration tests must exercise persisted `0.1`–`0.8` evidence before the v1 freeze. |
 | mature signal diagnostics | Released | Forward labels, IC, quantiles, turnover, and multi-horizon decay shipped in `0.1`. |
 | mature financial CV | Released | Walk-forward, purged K-fold, embargo, and CPCV/path evidence shipped through `0.5`. |
 | robust bootstrap/permutation | Released | IID and dependent bootstrap plus explicit permutation nulls and deterministic streams shipped through `0.5`. |
@@ -24,12 +24,12 @@ evaluated in four states:
 | regime analysis | Released | Fixed, trailing point-in-time, and explicitly retrospective regimes plus conditional evidence shipped in `0.2`. |
 | cost stress | Released | Composable costs, stress scenarios, break-even, liquidity, and capacity evidence shipped in `0.3`. |
 | point-in-time checks | Released | Availability-safe joins, revisions, future-data checks, survivorship, membership, drift, and dataset validation shipped in `0.4`. |
-| standardized audit | Hardening | The versioned rule engine is stable, but the default audit is still centered on the original signal workflow. `0.8` must compose robustness, experiment, cost, bias, advanced-inference, adapter, and extension evidence without turning absent evidence into pass. |
+| standardized audit | Released | `0.8` profiles signal, strategy, and options scopes; recognizes every released method family; exposes categorical required/optional/not-applicable coverage; preserves source findings; and emits no universal cross-phase score. |
 | reproducible reports | Hardening | `0.7` adds deterministic, checksummed, independently verifiable bundles at the `identifiable` level. Recomputable/numerical claims remain out of scope until a verified reproducer exists. |
-| Polars/pandas/Arrow interoperability | Released | Eager/lazy Polars, NumPy, optional pandas/Arrow, DuckDB Arrow streams, and adapter matrices run in CI. Broader cross-phase workflows remain a `0.8` integration check. |
+| Polars/pandas/Arrow interoperability | Released | Eager/lazy Polars, NumPy, optional pandas/Arrow, DuckDB Arrow streams, and adapter matrices run in CI; vendor/backtester and options evidence enter the standardized profile in executable integration and wheel checks. |
 | published benchmark suite | Released | Versioned Python artifact v4 and Criterion kernels cover public workflows; `0.9` must profile the integrated workflow and act only on measured bottlenecks. |
 | cross-platform wheels | Released | Stable-ABI Linux x86_64/aarch64, macOS arm64, and Windows x86_64 wheels are target-smoke-tested, checksummed, and attested. |
-| comprehensive methodology docs | Hardening | Every released analytical phase has methodology and subsystem contracts; `0.8`–`0.9` must close cross-links, complete integrated how-tos, and audit reference coverage. |
+| comprehensive methodology docs | Hardening | Every released analytical phase has methodology and subsystem contracts; `0.9` must audit reference coverage and close defects found through integrated or independent use. |
 | real users on independent stacks | External | No independent users are currently available. Maintainer testing and CI do not satisfy this item; `1.0.0` remains blocked until real independent use is evidenced or the specification is explicitly changed. |
 
 ## Coherent pre-v1 milestones
@@ -47,15 +47,17 @@ features merely to consume a number.
 
 ### `0.8` — cross-phase standardized audit
 
-The candidate scope is a versioned audit profile that accepts released evidence from signal,
-validation, experiments, robustness, regimes, costs, bias, advanced inference, adapters, and
-extensions. Design must preserve domain method semantics, distinguish required/optional/inapplicable
-evidence, expose coverage by category, and avoid one misleading universal score. Complete
-vendor/backtester-to-audit examples and bundle output belong in this milestone.
+- versioned built-in `signal`, `strategy`, and `options` profiles;
+- a published profile JSON Schema, frozen strategy fixture, and additive public API fixture;
+- unique method-family mapping across every released analytical and integration subsystem;
+- categorical required/optional/not-applicable coverage without a universal score;
+- source finding propagation without threshold, state, or severity reinterpretation;
+- bounded strict result JSON ingestion and `lacuna audit --evidence NAME=PATH`;
+- vendor/backtester example, options integration, deterministic bundle, and installed-wheel gates.
 
 ### `0.9` — migration and operational hardening
 
-The candidate scope is persisted-artifact migration/read compatibility, integrated workload
+The remaining scope is persisted-artifact migration/read compatibility, integrated workload
 benchmarks, installation diagnostics, bounded performance improvements, documentation reference
 coverage, and defects found by real external use. Work that has no evidence-backed need does not
 enter merely because `0.9` is the last pre-v1 minor.

@@ -62,6 +62,8 @@ Review Lacuna changes in risk order. A clean style check cannot compensate for t
 - [ ] Missing evidence is `UNKNOWN`; inapplicable checks are `NOT_APPLICABLE`.
 - [ ] Audit rule applicability, threshold, and rule version are explicit.
 - [ ] Score coverage shows missing evidence and excludes non-applicable rules correctly.
+- [ ] Standardized profile capabilities have explicit scope dispositions and unique method mapping.
+- [ ] Coverage passes do not replace source findings or imply one universal research-quality score.
 - [ ] Renderers do not recompute or reinterpret analytical evidence.
 - [ ] JSON is finite and schema-compatible; ordering/rounding are deterministic.
 - [ ] Markdown/HTML and terminal output handle hostile/untrusted text safely.

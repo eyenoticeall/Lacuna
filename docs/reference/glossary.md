@@ -183,6 +183,14 @@ Terms in this glossary are normative where they describe Lacuna data and evidenc
 **Score version**
 : Identity of weights, state treatment, normalization, and aggregation used for an audit score.
 
+**Audit profile**
+: Versioned mapping from result method families to scope-specific required, optional, or
+  not-applicable evidence capabilities. A profile defines coverage, not research quality.
+
+**Coverage finding**
+: Finding about whether recognized evidence was supplied for a profile capability. A coverage
+  `PASS` does not replace or reinterpret findings produced by the source method.
+
 **Experiment family**
 : Declared set of comparable trials associated with one research question and search process.
 

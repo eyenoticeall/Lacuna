@@ -19,6 +19,7 @@ This page expands the decision summary in the technical specification into imple
 | ADR-011 | Extensions are independently versioned distributions | Optional domains evolve without coupling core SemVer or dependencies |
 | ADR-012 | Plugin discovery never authorizes execution | Installed metadata is safe to enumerate; loading is an explicit trust decision |
 | ADR-013 | Evidence bundles are deterministic data, never code | Portable reports are checksummed, bounded, and verified without extraction or execution |
+| ADR-014 | Cross-phase audits use categorical coverage | Unlike evidence remains visible without one misleading universal score |
 
 ## ADR-001 — Python public API
 
@@ -243,6 +244,31 @@ nothing.
 **Revisit when:** a reproducer can securely obtain declared inputs, construct an environment,
 execute a versioned invocation, and compare results under a documented tolerance. Preserve the
 non-executing verifier and explicit authenticity boundary.
+
+## ADR-014 — Cross-phase audits use categorical coverage, not one universal score
+
+**Context:** signal efficacy, temporal leakage, selection-aware inference, parameter stability,
+execution costs, adapter declarations, and extension evidence answer unlike questions. Assigning
+one weight system across all scopes would make omitted or inapplicable evidence easy to hide and
+would imply comparability that the methods do not establish.
+
+**Decision:** standardized audits select a versioned scope profile and expose capability/category
+coverage. Each capability is required, optional, or not applicable. Coverage conclusions remain
+separate from source findings, which are propagated without state, severity, threshold, category,
+or evidence reinterpretation. The standardized profile has no universal score model.
+
+**Consequences:**
+
+- users can see exactly which released method families count for each capability;
+- missing required evidence is `UNKNOWN`, not zero credit hidden inside one number;
+- source-method upgrades retain their own independent method/finding versions;
+- custom organizational profiles must be explicitly identified and versioned;
+- profile matching fails when a method maps ambiguously, and unrecognized evidence remains visible;
+- the original v0.1 signal score remains available only within its frozen narrow contract.
+
+**Revisit when:** an empirically validated decision model exists for one narrowly declared use case.
+It must remain optional, publish its estimand/weights/calibration, show coverage separately, and
+must not replace categorical evidence or source findings.
 
 ## Recording future decisions
 

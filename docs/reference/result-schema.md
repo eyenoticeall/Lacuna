@@ -40,6 +40,12 @@ A consumer should:
 5. retain unknown method identifiers as data only if the application can display them without
    interpreting their meaning.
 
+`AnalysisResult.from_json(...)` implements the strict supported v1 reader. It rejects duplicate
+object keys at any depth, non-finite JSON constants, unsupported schema versions, unknown or missing
+envelope/finding fields, invalid enum values, and non-UTC timestamps. `from_dict(...)` applies the
+same structural and semantic checks after JSON decoding. Neither reader loads plugins or executes
+serialized content.
+
 ## Validation example
 
 `jsonschema` is a development dependency, not a Lacuna runtime dependency:
@@ -71,3 +77,14 @@ A new bundle layout does not silently change the meaning of an embedded result, 
 schema does not automatically require another ZIP layout. Consumers validate both boundaries and
 reject either unsupported version. See the
 [reproducibility-bundle reference](reproducibility-bundle.md) for artifact and trust semantics.
+
+## Standardized audit profile schema
+
+The standardized-audit profile definition has a third independent schema selector. Profile schema
+v1 publishes the profile ID/version, scope, explicit absence of a score model, coverage-rule
+version, and the capability/method/disposition matrix at
+`schemas/standard-audit-profile-v1.schema.json`. The identical installed resource is available from
+`lacuna.schemas.standard_audit_profile_v1_text()`.
+
+Profile schema version governs the portable definition shape; `profile_version` governs its
+applicability meaning. The generated audit remains an ordinary `AnalysisResult` schema-v1 object.

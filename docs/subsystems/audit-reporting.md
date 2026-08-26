@@ -1,9 +1,10 @@
 # Audit engine and reporting
 
-**Status:** the v0.1 rule protocol, explicit applicability states, versioned scoring,
+**Status:** the v0.1 signal rule protocol, explicit applicability states, versioned scoring,
 `SignalStudy` orchestration, and deterministic JSON/Markdown/basic HTML renderers are implemented.
-v0.7 adds checksummed reproducibility bundles over the same immutable report. Cross-phase default
-rules, plotting, interactive exploration, and third-party rules arrive later.
+v0.7 adds checksummed reproducibility bundles. v0.8 adds separately versioned signal, strategy,
+and options cross-phase profiles with categorical coverage and no universal score. Plotting,
+interactive exploration, and third-party rule loading remain later work.
 
 The audit engine turns analytical evidence into reviewable findings. Reporting renders that evidence. Keeping the two separate prevents presentation choices from changing audit conclusions.
 
@@ -58,6 +59,39 @@ Lower-level callers can assemble evidence explicitly with `AuditContext` and `ru
 call `lacuna.audit(results=..., policies=...)`. This is useful when the analysis was computed by
 separate jobs. Result names are part of the v0.1 audit contract: `labels`, `ic`, `quantiles`,
 `turnover`, `decay`, `bootstrap`, and `split`.
+
+## Standardized cross-phase workflow
+
+`standard_audit` composes already-computed evidence from every released subsystem:
+
+```python
+report = lacuna.standard_audit(
+    results={
+        "split": split.evidence,
+        "trials": registry.snapshot(),
+        "surface": parameter_surface,
+        "costs": cost_stress,
+        "future_data": future_data,
+        "vendor": adapted_vendor.evidence,
+    },
+    scope="strategy",
+)
+```
+
+The built-in profile classifies method identities into explicit capabilities and declares each
+required, optional, or not applicable for `signal`, `strategy`, or `options`. Missing required
+capabilities emit `UNKNOWN`; absent optional or genuinely inapplicable capabilities emit
+`NOT_APPLICABLE`; evidence supplied to a not-applicable row emits `WARN` so a scope mismatch cannot
+hide.
+
+Coverage findings do not reinterpret domain results. Source findings are propagated with their
+original state, severity, category, message, evidence, method, and finding code. The standardized
+report exposes required and optional coverage plus category, requirement, inventory, and domain-
+finding tables. It deliberately omits `robustness_score` because weights across signal efficacy,
+temporal validity, execution realism, and source provenance would imply unsupported comparability.
+
+See the [standardized-audit reference](../reference/standardized-audit.md) for the complete method
+matrix, CLI, JSON reader, bundle, compatibility, and review contracts.
 
 ## Audit context
 
@@ -179,6 +213,9 @@ The implemented rule set is:
 | `SURVIVORSHIP_HANDLING_DECLARED` | 2 | policy | historical-universe safety is declared |
 | `TRIAL_HISTORY_AVAILABLE` | 2 | policy | full research trial history is declared |
 | `TRANSACTION_COST_EVIDENCE` | 4 | policy | not applicable to a signal-only study |
+
+This scoring policy remains specific to the frozen v0.1 signal audit. The v0.8 standardized profile
+does not reuse, rescale, or average these weights.
 
 Threshold or weight changes require a rule or score version change. A score is an audit summary,
 not a probability of future profitability.

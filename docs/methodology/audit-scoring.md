@@ -3,6 +3,10 @@
 The v0.1 audit converts named analytical results and declared policies into deterministic findings.
 The score is a review index over that evidence, not a probability that a signal will profit.
 
+This page applies only to the frozen v0.1 signal audit. The v0.8 standardized cross-phase profiles
+show categorical evidence coverage and source findings but compute no universal score. See
+[Standardized cross-phase audit](../reference/standardized-audit.md).
+
 ## Evidence flow
 
 Rules receive an immutable `AuditContext`. They first declare applicability:

@@ -23,6 +23,7 @@ When these disagree, do not quietly choose one. Preserve working behavior unless
 | change an extension package | extension subsystem + release guide | independent version/API fixture, isolated build and joint smoke test |
 | fix a temporal bug | data model + bias/CV guide | boundary fixture, leakage analysis, affected outputs |
 | add an audit rule | evidence model + audit guide | applicability cases, rule version, score effect |
+| change a standardized audit profile | standardized-audit reference + audit guide | scope matrix, unique method mapping, coverage and compatibility fixtures |
 | change report output | audit/report guide | schema compatibility, escaping, golden diff |
 | change `.lacuna` bundles | bundle reference + experiment guide + security rules | schema fixture, canonical bytes, hostile archive/redaction tests |
 | change experiment storage | experiment guide | migration, concurrency, canonicalization tests |

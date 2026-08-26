@@ -18,7 +18,8 @@ such as `0.2.0rc1`.
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Released |
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Released |
 | `0.7.x` | Portable, deterministic, independently verifiable evidence bundles | Released |
-| `0.8`–`0.9` | Cross-phase audit integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
+| `0.8.x` | Versioned cross-phase standardized audit profiles and evidence composition | Released |
+| `0.9.x` | Persisted-artifact migration, integrated performance, diagnostics, and real-user hardening | No missing internal v1 contract or unresolved release blocker |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -210,7 +211,14 @@ redaction/fail-closed behavior, CLI support, hostile-archive tests, frozen addit
 clean-wheel exercise. It claims identifiable reproducibility only; recomputability and numerical or
 bitwise reproduction across independent executions are not implied.
 
-The current status of every stable-release criterion and the candidate `0.8`/`0.9` boundaries live
+The second coherent integration milestone is `0.8`: standardized signal, strategy, and options
+profiles over every released evidence method family. The profile schema and API are frozen;
+required, optional, and not-applicable coverage is explicit by category; domain findings are
+propagated without reinterpretation; no universal score is emitted; strict v1 result JSON and CLI
+composition are bounded; vendor, backtester, options, bundle, installed-wheel, and release archive
+paths are executable.
+
+The current status of every stable-release criterion and the remaining `0.9` boundary live
 in the [v1 readiness ledger](v1-readiness.md).
 
 ## Historical v0.1 boundary
