@@ -101,9 +101,12 @@ def _sanitize_supplemental(
 ) -> object:
     if isinstance(value, Mapping):
         normalized: dict[str, object] = {}
-        for key, item in value.items():
+        if any(not isinstance(key, str) for key in value):
+            raise DataContractError(f"{path} contains a non-string mapping key")
+        for key in sorted(value):
+            item = value[key]
             if not isinstance(key, str):
-                raise DataContractError(f"{path} contains a non-string mapping key")
+                raise RuntimeError("validated bundle mapping key changed type")
             child_path = f"{path}.{key}"
             if _is_sensitive_key(key):
                 redacted_key = f"{key}_redacted"
@@ -205,14 +208,20 @@ class BundleArtifact:
     size: int
 
     def __post_init__(self) -> None:
+        if not isinstance(self.path, str):
+            raise TypeError("bundle artifact path must be a string")
         _validate_member_path(self.path)
         if self.path == _MANIFEST_PATH:
             raise ReportError("the manifest cannot declare itself as an artifact")
-        if self.role not in _ROLES:
+        if not isinstance(self.role, str) or self.role not in _ROLES:
             raise ReportError(f"unsupported bundle artifact role: {self.role!r}")
-        if not self.media_type or self.media_type.strip() != self.media_type:
+        if (
+            not isinstance(self.media_type, str)
+            or not self.media_type
+            or self.media_type.strip() != self.media_type
+        ):
             raise ReportError("bundle artifact media_type must be a non-empty trimmed string")
-        if _SHA256.fullmatch(self.sha256) is None:
+        if not isinstance(self.sha256, str) or _SHA256.fullmatch(self.sha256) is None:
             raise ReportError("bundle artifact sha256 must be 64 lowercase hexadecimal characters")
         if isinstance(self.size, bool) or not isinstance(self.size, int) or self.size < 0:
             raise ReportError("bundle artifact size must be a non-negative integer")
@@ -247,16 +256,35 @@ class BundleManifest:
             raise ReportError(f"unsupported bundle format: {self.format!r}")
         if self.bundle_version != BUNDLE_VERSION:
             raise ReportError(f"unsupported bundle version: {self.bundle_version!r}")
-        if not self.producer_version:
+        if not isinstance(self.producer_version, str) or not self.producer_version:
             raise ReportError("bundle producer version must not be empty")
-        if not self.report_schema_version or not self.report_method:
+        if (
+            not isinstance(self.report_schema_version, str)
+            or not self.report_schema_version
+            or not isinstance(self.report_method, str)
+            or not self.report_method
+        ):
             raise ReportError("bundle report identity is incomplete")
-        if self.report_method_version < 1:
+        if (
+            isinstance(self.report_method_version, bool)
+            or not isinstance(self.report_method_version, int)
+            or self.report_method_version < 1
+        ):
             raise ReportError("bundle report method version must be positive")
+        if self.report_input_fingerprint is not None and (
+            not isinstance(self.report_input_fingerprint, str) or not self.report_input_fingerprint
+        ):
+            raise ReportError("bundle report input fingerprint must be non-empty when supplied")
         if self.reproducibility_level != "identifiable":
             raise ReportError("bundle v1 supports only the verified 'identifiable' level")
-        if _SHA256.fullmatch(self.artifact_set_sha256) is None:
+        if (
+            not isinstance(self.artifact_set_sha256, str)
+            or _SHA256.fullmatch(self.artifact_set_sha256) is None
+        ):
             raise ReportError("artifact_set_sha256 must be 64 lowercase hexadecimal characters")
+        if any(not isinstance(artifact, BundleArtifact) for artifact in self.artifacts):
+            raise TypeError("bundle manifest artifacts must contain BundleArtifact values")
+        object.__setattr__(self, "artifacts", tuple(self.artifacts))
         paths = tuple(artifact.path for artifact in self.artifacts)
         if not paths or paths != tuple(sorted(paths)) or len(paths) != len(set(paths)):
             raise ReportError("bundle artifacts must be non-empty, uniquely path-sorted entries")
@@ -307,9 +335,19 @@ class BundleVerification:
     total_size: int
 
     def __post_init__(self) -> None:
-        if _SHA256.fullmatch(self.archive_sha256) is None:
+        object.__setattr__(self, "path", Path(self.path))
+        if not isinstance(self.manifest, BundleManifest):
+            raise TypeError("bundle verification manifest must be a BundleManifest")
+        if (
+            not isinstance(self.archive_sha256, str)
+            or _SHA256.fullmatch(self.archive_sha256) is None
+        ):
             raise ReportError("archive_sha256 must be 64 lowercase hexadecimal characters")
-        if self.total_size < 0:
+        if (
+            isinstance(self.total_size, bool)
+            or not isinstance(self.total_size, int)
+            or self.total_size < 0
+        ):
             raise ReportError("bundle total size must be non-negative")
 
     @property
@@ -451,6 +489,19 @@ def create_bundle(
 ) -> Path:
     """Create a deterministic version-1 evidence bundle without source data or code."""
 
+    from lacuna.report import AuditReport
+
+    if not isinstance(report, AuditReport):
+        raise TypeError("report must be an AuditReport")
+    for name, value in (
+        ("configuration", configuration),
+        ("evidence", evidence),
+        ("provenance", provenance),
+        ("invocation", invocation),
+    ):
+        if value is not None and not isinstance(value, Mapping):
+            raise TypeError(f"{name} must be a mapping when supplied")
+
     destination = Path(path)
     if destination.suffix.casefold() != ".lacuna":
         raise ReportError("reproducibility bundle paths must use the .lacuna suffix")
@@ -535,6 +586,19 @@ def create_bundle(
         artifacts=artifacts,
     )
     members[_MANIFEST_PATH] = _canonical_bytes(manifest.to_dict())
+    if len(members) > _MAX_MEMBERS:
+        raise ReportError(f"bundle exceeds the {_MAX_MEMBERS}-member version-1 safety limit")
+    oversized = [name for name, content in members.items() if len(content) > _MAX_MEMBER_SIZE]
+    if oversized:
+        raise ReportError(
+            f"bundle member {sorted(oversized)[0]!r} exceeds the "
+            f"{_MAX_MEMBER_SIZE}-byte version-1 safety limit"
+        )
+    total_size = sum(len(content) for content in members.values())
+    if total_size > _MAX_TOTAL_SIZE:
+        raise ReportError(
+            f"bundle members exceed the {_MAX_TOTAL_SIZE}-byte total version-1 safety limit"
+        )
     archive = _write_zip(members)
     if len(archive) > _MAX_ARCHIVE_SIZE:
         raise ReportError(

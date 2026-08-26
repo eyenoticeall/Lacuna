@@ -21,6 +21,11 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Publish the reproducibility-bundle contract, v1-readiness ledger, architectural trust decision,
   migration boundary, and `0.8`/`0.9` candidate hardening scopes.
 
+### Fixed
+
+- Escape source-derived HTML metacharacters in Markdown reports so a downstream Markdown renderer
+  cannot interpret hostile finding text as embedded HTML.
+
 ## [0.6.0] - 2026-08-26
 
 ### Added

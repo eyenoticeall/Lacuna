@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import lacuna.bundle as bundle_module
 from lacuna.bundle import BUNDLE_FORMAT, BUNDLE_VERSION, verify_bundle
 from lacuna.exceptions import ReportError
 from lacuna.report import AuditReport
@@ -95,6 +96,7 @@ def test_bundle_is_byte_stable_and_independently_verifiable(tmp_path: Path) -> N
 
 def test_bundle_adds_named_evidence_and_redacts_supplemental_metadata(tmp_path: Path) -> None:
     path = tmp_path / "study.lacuna"
+    reordered_path = tmp_path / "study-reordered.lacuna"
     evidence = AnalysisResult(
         metadata=ResultMetadata(
             method="experiment.registry_snapshot",
@@ -115,8 +117,22 @@ def test_bundle_adds_named_evidence_and_redacts_supplemental_metadata(tmp_path: 
         },
         invocation={"api": "SignalStudy.audit", "parameters": {"seed": 42}},
     )
+    _report().bundle(
+        reordered_path,
+        configuration={
+            "cache_dir": "/Users/researcher/private/cache",
+            "api_key": "do-not-package",
+        },
+        evidence={"experiment_history": evidence},
+        provenance={
+            "dataset_fingerprint": "sha256:dataset",
+            "dataset_url": "https://data.example/snapshot?signature=do-not-package#token",
+        },
+        invocation={"parameters": {"seed": 42}, "api": "SignalStudy.audit"},
+    )
 
     assert verify_bundle(path).artifact_count == 9
+    assert path.read_bytes() == reordered_path.read_bytes()
     raw = path.read_bytes()
     assert b"do-not-package" not in raw
     assert b"/Users/researcher/private/cache" not in raw
@@ -206,3 +222,11 @@ def test_verifier_rejects_non_archives_and_noncanonical_json(tmp_path: Path) -> 
     _rewrite_archive(source, malformed, replace={"manifest.json": b'{"format": "x"}\n'})
     with pytest.raises(ReportError, match="not in canonical"):
         verify_bundle(malformed)
+
+
+def test_creator_enforces_verifier_member_limits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(bundle_module, "_MAX_MEMBER_SIZE", 128)
+    with pytest.raises(ReportError, match=r"member.*safety limit"):
+        _report().bundle(tmp_path / "oversized.lacuna")

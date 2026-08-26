@@ -40,7 +40,14 @@ def _plain(value: object) -> str:
 
 def _markdown_cell(value: object) -> str:
     text = _CONTROL_CHARACTERS.sub("", _plain(value))
-    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", "<br>")
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\\", "\\\\")
+        .replace("|", "\\|")
+        .replace("\n", "<br>")
+    )
 
 
 def _html_text(value: object) -> str:

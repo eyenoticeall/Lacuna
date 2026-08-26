@@ -231,6 +231,10 @@ Markdown should optimize for code review and issue attachment:
 5. key evidence tables;
 6. methodology and provenance appendix.
 
+Source-derived HTML metacharacters, table delimiters, backslashes, newlines, and control characters
+are escaped or normalized before Markdown output. A downstream renderer must never receive a
+source-provided `<script>` or event-handler element as live embedded HTML.
+
 Terminal output is a compact view of the same data and uses text labels in addition to color. `--no-color` must be supported. Exit-code behavior belongs to the CLI contract and should distinguish execution failure from an audit containing failed findings.
 
 `AuditReport` provides in-memory `to_json()`, `to_markdown()`, and `to_html()` calls. Passing a path

@@ -54,7 +54,7 @@ def test_json_round_trips_and_summary_is_stable() -> None:
 def test_markdown_escapes_tables_and_removes_control_characters() -> None:
     markdown = _report().to_markdown()
 
-    assert "bad \\| title<br><script>alert(1)</script>" in markdown
+    assert "bad \\| title<br>&lt;script&gt;alert(1)&lt;/script&gt;" in markdown
     assert "x\\|y<br>z" in markdown
     assert "\x00" not in markdown
     assert markdown == _report().to_markdown()
