@@ -12,10 +12,10 @@
 
   <p>
     <a href="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml"><img src="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>&nbsp;&nbsp;
-    <code>Python 3.11+</code>&nbsp;&nbsp;
-    <code>Rust 2024</code>&nbsp;&nbsp;
-    <code>Arrow-native</code>&nbsp;&nbsp;
-    <code>MIT</code>
+    <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&amp;logoColor=white&amp;style=flat" alt="Python 3.11+" /></a>&nbsp;&nbsp;
+    <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024-000000?logo=rust&amp;logoColor=white&amp;style=flat" alt="Rust 2024" /></a>&nbsp;&nbsp;
+    <a href="docs/development/data-boundary.md"><img src="https://img.shields.io/badge/Arrow-native-2563EB?logo=apachearrow&amp;logoColor=white&amp;style=flat" alt="Arrow native" /></a>&nbsp;&nbsp;
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-3DA639?style=flat" alt="MIT License" /></a>
   </p>
 </div>
 
