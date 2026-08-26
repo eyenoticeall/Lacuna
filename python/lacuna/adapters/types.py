@@ -40,6 +40,7 @@ def normalize_mapped_frame(
     columns: Mapping[str, str],
     required: Sequence[str],
     collect: bool,
+    include_pandas_index: bool = False,
 ) -> tuple[PolarsFrame, tuple[str, ...]]:
     """Rename explicit source fields to canonical names without silent collisions."""
 
@@ -62,7 +63,11 @@ def normalize_mapped_frame(
             f"required canonical columns are not mapped: {', '.join(unknown_required)}"
         )
 
-    frame = to_polars(data, collect=collect)
+    frame = to_polars(
+        data,
+        collect=collect,
+        include_pandas_index=include_pandas_index,
+    )
     original_columns = frame_summary(frame).columns
     require_columns(frame, [columns[column] for column in required])
     rename = {source: canonical for canonical, source in columns.items() if source != canonical}

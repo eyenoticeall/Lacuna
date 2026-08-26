@@ -1,0 +1,24 @@
+{
+  "attribution": {
+    "project": "alphalens-reloaded",
+    "repository": "https://github.com/stefan-jansen/alphalens-reloaded",
+    "revision": "f0a07c22d554e4b4036983cc80320b432714fe7e",
+    "source": "tests/test_performance.py::TestInformationCoefficient.test_information_coefficient",
+    "license": "Apache-2.0",
+    "note": "Only the small numeric fixture and expected compatible IC values are retained; Lacuna contains no Alphalens implementation code."
+  },
+  "panel": {
+    "date": [
+      "2015-01-01", "2015-01-01", "2015-01-01", "2015-01-01",
+      "2015-01-02", "2015-01-02", "2015-01-02", "2015-01-02"
+    ],
+    "asset": ["A", "B", "C", "D", "A", "B", "C", "D"],
+    "factor": [1.0, 2.0, 3.0, 4.0, 4.0, 3.0, 2.0, 1.0],
+    "group": [1, 1, 2, 2, 1, 1, 2, 2],
+    "1D": [1.0, 2.0, 3.0, 4.0, 4.0, 3.0, 2.0, 1.0]
+  },
+  "expected": {
+    "ic_by_period": [1.0, 1.0],
+    "grouped_ic_by_period": [1.0, 1.0, 1.0, 1.0]
+  }
+}

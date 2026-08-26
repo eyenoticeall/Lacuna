@@ -9,6 +9,11 @@ from lacuna.adapters.backtest import (
     adapt_backtest,
 )
 from lacuna.adapters.duckdb import from_duckdb
+from lacuna.adapters.factor_panel import (
+    FactorPanelSchema,
+    FactorPanelSemantics,
+    adapt_factor_panel,
+)
 from lacuna.adapters.polars import (
     FrameSummary,
     PolarsFrame,
@@ -44,6 +49,8 @@ __all__ = [
     "BacktestArtifactKind",
     "BacktestSchema",
     "BacktestSemantics",
+    "FactorPanelSchema",
+    "FactorPanelSemantics",
     "FrameSummary",
     "PolarsFrame",
     "RevisionPolicy",
@@ -51,6 +58,7 @@ __all__ = [
     "SupportedSplitter",
     "VendorSchema",
     "adapt_backtest",
+    "adapt_factor_panel",
     "adapt_vendor",
     "as_sklearn_cv",
     "frame_summary",
