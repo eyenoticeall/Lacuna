@@ -324,6 +324,48 @@ class BundleManifest:
             },
         }
 
+    @classmethod
+    def from_dict(cls, value: Mapping[str, object]) -> BundleManifest:
+        """Parse a strict standalone bundle-v1 manifest without reading archive members."""
+
+        if cls is not BundleManifest:
+            raise TypeError("BundleManifest.from_dict does not construct subclasses")
+        if not isinstance(value, Mapping):
+            raise TypeError("bundle manifest must be a mapping")
+        return _parse_manifest(value)
+
+    @classmethod
+    def from_json(cls, value: str) -> BundleManifest:
+        """Parse finite bundle-v1 manifest JSON while rejecting duplicate keys."""
+
+        if cls is not BundleManifest:
+            raise TypeError("BundleManifest.from_json does not construct subclasses")
+        if not isinstance(value, str):
+            raise TypeError("bundle manifest JSON must be a string")
+
+        def reject_duplicates(pairs: list[tuple[str, object]]) -> dict[str, object]:
+            result: dict[str, object] = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ReportError(f"bundle manifest JSON contains duplicate key {key!r}")
+                result[key] = item
+            return result
+
+        def reject_constant(constant: str) -> object:
+            raise ReportError(f"bundle manifest JSON contains non-finite value {constant!r}")
+
+        try:
+            parsed = json.loads(
+                value,
+                object_pairs_hook=reject_duplicates,
+                parse_constant=reject_constant,
+            )
+        except json.JSONDecodeError as error:
+            raise ReportError(f"invalid bundle manifest JSON: {error.msg}") from error
+        if not isinstance(parsed, Mapping):
+            raise ReportError("bundle manifest JSON must contain an object at the top level")
+        return _parse_manifest(parsed)
+
 
 @dataclass(frozen=True, slots=True)
 class BundleVerification:

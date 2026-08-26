@@ -82,6 +82,11 @@ The language-independent JSON Schema is
 `lacuna.schemas.bundle_manifest_v1_text()`. The committed
 `tests/fixtures/bundle-manifest-v1.json` preserves the first migration fixture.
 
+`BundleManifest.from_dict(...)` and `from_json(...)` parse that standalone manifest contract. They
+do not read or hash archive members; use `verify_bundle(...)` when archive integrity is required.
+Bundle v1 is an identity migration across the retained `0.7`–`0.9` compatibility matrix documented
+in [Persisted-artifact compatibility](persisted-artifacts.md).
+
 Each artifact entry records:
 
 - canonical POSIX-relative path;

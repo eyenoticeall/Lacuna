@@ -17,6 +17,7 @@ from lacuna import _native
 from lacuna.schemas import (
     audit_result_v1_text,
     bundle_manifest_v1_text,
+    persisted_artifact_compatibility_v1_text,
     standard_audit_profile_v1_text,
 )
 
@@ -279,6 +280,16 @@ profile_schema = json.loads(standard_audit_profile_v1_text())
 require(
     profile_schema.get("title") == "Lacuna standardized audit profile v1",
     "wheel is missing the standardized audit profile schema",
+)
+compatibility = json.loads(persisted_artifact_compatibility_v1_text())
+require(
+    compatibility.get("format") == "lacuna.persisted-artifact-compatibility",
+    "wheel is missing the persisted-artifact compatibility manifest",
+)
+require(
+    lacuna.AuditProfile.from_json(json.dumps(lacuna.standard_profile("strategy").to_dict()))
+    == lacuna.standard_profile("strategy"),
+    "installed profile-v1 strict reader failed",
 )
 
 print(

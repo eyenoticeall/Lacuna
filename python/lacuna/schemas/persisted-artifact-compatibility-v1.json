@@ -1,0 +1,51 @@
+{
+  "consumer_package_series": "0.9",
+  "contracts": [
+    {
+      "artifact": "analysis_result",
+      "migration": "identity",
+      "producer_package_series": [
+        "0.1",
+        "0.2",
+        "0.3",
+        "0.4",
+        "0.5",
+        "0.6",
+        "0.7",
+        "0.8",
+        "0.9"
+      ],
+      "reader": "lacuna.AnalysisResult.from_json",
+      "source_version": "1",
+      "target_version": "1",
+      "version_field": "schema_version"
+    },
+    {
+      "artifact": "reproducibility_bundle",
+      "migration": "identity",
+      "producer_package_series": [
+        "0.7",
+        "0.8",
+        "0.9"
+      ],
+      "reader": "lacuna.verify_bundle",
+      "source_version": "1",
+      "target_version": "1",
+      "version_field": "bundle_version"
+    },
+    {
+      "artifact": "standard_audit_profile",
+      "migration": "identity",
+      "producer_package_series": [
+        "0.8",
+        "0.9"
+      ],
+      "reader": "lacuna.AuditProfile.from_json",
+      "source_version": "1",
+      "target_version": "1",
+      "version_field": "schema_version"
+    }
+  ],
+  "format": "lacuna.persisted-artifact-compatibility",
+  "manifest_version": 1
+}

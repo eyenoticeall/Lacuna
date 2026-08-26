@@ -212,7 +212,9 @@ scope; the separately versioned extension remains optional to core.
 `schema_version = "1"`. The JSON Schema is published at
 `schemas/standard-audit-profile-v1.schema.json` and packaged as
 `lacuna.schemas.standard_audit_profile_v1_text()`. A frozen `standard.strategy` fixture detects
-unreviewed changes.
+unreviewed changes. `AuditProfile.from_dict(...)` and `from_json(...)` read that exact definition
+without discovering or activating plugins; duplicate keys, non-finite values, unsupported fields,
+and unknown versions fail closed.
 
 Three versions remain independent:
 

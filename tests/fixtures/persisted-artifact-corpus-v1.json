@@ -1,0 +1,50 @@
+{
+  "artifacts": [
+    {
+      "artifact": "analysis_result",
+      "git_blob_sha1": "f5a7e392b1b7e3d23597d1f3a4175564e492fd3e",
+      "migration": "identity",
+      "path": "tests/fixtures/audit-result-v1.json",
+      "reader": "lacuna.AnalysisResult.from_json",
+      "release_tags": [
+        "v0.1.0",
+        "v0.2.0",
+        "v0.3.0",
+        "v0.4.0",
+        "v0.5.0",
+        "v0.6.0",
+        "v0.7.0",
+        "v0.8.0"
+      ],
+      "sha256": "ff52bcc38e6e3689244a4980ebb62c0b84a1f0e12cdb7a693f73ee68822082b5",
+      "source_version": "1"
+    },
+    {
+      "artifact": "reproducibility_bundle",
+      "git_blob_sha1": "8b50886a7263874da88a97208911d9889a79ac3c",
+      "migration": "identity",
+      "path": "tests/fixtures/bundle-manifest-v1.json",
+      "reader": "lacuna.BundleManifest.from_json",
+      "release_tags": [
+        "v0.7.0",
+        "v0.8.0"
+      ],
+      "sha256": "9fb26193965501b051379e03dd65f0caa4605b185696bb8a5490bba1ccdf819e",
+      "source_version": "1"
+    },
+    {
+      "artifact": "standard_audit_profile",
+      "git_blob_sha1": "a8f132d1708f32fe6ad9baded43e3eb3e8df00a8",
+      "migration": "identity",
+      "path": "tests/fixtures/standard-audit-profile-v1.json",
+      "reader": "lacuna.AuditProfile.from_json",
+      "release_tags": [
+        "v0.8.0"
+      ],
+      "sha256": "9e401189943e56454a94c64d460eb795b52c0ca3df1a88c28a7d746f2bcb37c8",
+      "source_version": "1"
+    }
+  ],
+  "format": "lacuna.persisted-artifact-corpus",
+  "manifest_version": 1
+}

@@ -1,0 +1,27 @@
+{
+  "callables": [
+    {"module": "lacuna", "qualname": "AuditProfile.from_dict", "signature": "(value)"},
+    {"module": "lacuna", "qualname": "AuditProfile.from_json", "signature": "(value)"},
+    {"module": "lacuna", "qualname": "BundleManifest.from_dict", "signature": "(value)"},
+    {"module": "lacuna", "qualname": "BundleManifest.from_json", "signature": "(value)"},
+    {"module": "lacuna.schemas", "qualname": "persisted_artifact_compatibility_v1_text", "signature": "()"}
+  ],
+  "contract": "lacuna-public-api-v0.9",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6",
+    "lacuna-public-api-v0.7",
+    "lacuna-public-api-v0.8"
+  ],
+  "module_exports": {
+    "lacuna.schemas": [
+      "persisted_artifact_compatibility_v1_text"
+    ]
+  },
+  "package_series": "0.9",
+  "root_exports": []
+}

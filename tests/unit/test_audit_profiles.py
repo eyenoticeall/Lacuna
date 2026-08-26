@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 import pytest
@@ -229,6 +230,48 @@ def test_custom_profile_identifiers_versions_and_method_tuples_are_validated() -
         AuditProfile("Invalid Profile", 1, AuditScope.STRATEGY, (requirement,))
     with pytest.raises(ValueError, match="positive integer"):
         AuditProfile("custom.strategy", True, AuditScope.STRATEGY, (requirement,))
+
+
+def test_profile_v1_strict_reader_round_trips_without_executing_content() -> None:
+    profile = standard_profile("options")
+
+    assert AuditProfile.from_dict(profile.to_dict()) == profile
+    assert AuditProfile.from_json(json.dumps(profile.to_dict())) == profile
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        ('{"schema_version":"1","schema_version":"1"}', "duplicate object key"),
+        ('{"value":NaN}', "non-finite constant"),
+        ("[]", "top level"),
+    ],
+)
+def test_profile_v1_reader_rejects_noncanonical_or_incomplete_json(
+    content: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        AuditProfile.from_json(content)
+
+
+def test_profile_v1_reader_rejects_version_drift_and_unknown_fields() -> None:
+    payload = standard_profile("strategy").to_dict()
+    payload["schema_version"] = "2"
+    with pytest.raises(ValueError, match="unsupported audit profile schema version"):
+        AuditProfile.from_dict(payload)
+
+    payload = standard_profile("strategy").to_dict()
+    payload["unexpected"] = True
+    with pytest.raises(ValueError, match="unexpected"):
+        AuditProfile.from_dict(payload)
+
+    payload = standard_profile("strategy").to_dict()
+    requirements = payload["requirements"]
+    assert isinstance(requirements, list)
+    requirements[0]["disposition"] = "maybe"
+    with pytest.raises(ValueError, match="unsupported disposition"):
+        AuditProfile.from_dict(payload)
 
 
 def test_public_wrapper_returns_a_renderable_categorical_report() -> None:

@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections import Counter, defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from math import isfinite
+from numbers import Integral
 from types import MappingProxyType
+from typing import cast
 
 from lacuna.audit import AuditContext
 from lacuna.report import AuditReport
@@ -137,6 +140,186 @@ class AuditProfile:
                 for requirement in self.requirements
             ],
         }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, object]) -> AuditProfile:
+        """Parse the strict supported profile-v1 definition without executing content."""
+
+        if cls is not AuditProfile:
+            raise TypeError("AuditProfile.from_dict does not construct subclasses")
+        return _audit_profile_from_dict(value)
+
+    @classmethod
+    def from_json(cls, value: str) -> AuditProfile:
+        """Parse finite profile-v1 JSON while rejecting duplicate keys at every depth."""
+
+        if cls is not AuditProfile:
+            raise TypeError("AuditProfile.from_json does not construct subclasses")
+        if not isinstance(value, str):
+            raise TypeError("audit profile JSON must be a string")
+
+        def reject_constant(constant: str) -> object:
+            raise ValueError(f"audit profile JSON contains non-finite constant {constant!r}")
+
+        def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+            result: dict[str, object] = {}
+            for key, item in pairs:
+                if key in result:
+                    raise ValueError(f"audit profile JSON contains duplicate object key {key!r}")
+                result[key] = item
+            return result
+
+        try:
+            parsed = json.loads(
+                value,
+                parse_constant=reject_constant,
+                object_pairs_hook=unique_object,
+            )
+        except json.JSONDecodeError as error:
+            raise ValueError(f"invalid audit profile JSON: {error.msg}") from error
+        if not isinstance(parsed, Mapping):
+            raise ValueError("audit profile JSON must contain an object at the top level")
+        return _audit_profile_from_dict(parsed)
+
+
+def _strict_profile_object(
+    value: object,
+    *,
+    name: str,
+    required: set[str],
+) -> Mapping[str, object]:
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{name} must be an object")
+    if any(not isinstance(key, str) for key in value):
+        raise ValueError(f"{name} keys must be strings")
+    typed = cast(Mapping[str, object], value)
+    observed = set(typed)
+    missing = sorted(required - observed)
+    extra = sorted(observed - required)
+    if missing or extra:
+        raise ValueError(
+            f"{name} fields do not match profile v1: missing={missing}, unexpected={extra}"
+        )
+    return typed
+
+
+def _profile_positive_integer(value: object, *, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, Integral) or value < 1:
+        raise ValueError(f"{name} must be a positive integer")
+    return int(value)
+
+
+def _audit_profile_from_dict(value: Mapping[str, object]) -> AuditProfile:
+    payload = _strict_profile_object(
+        value,
+        name="audit profile",
+        required={
+            "schema_version",
+            "profile_id",
+            "profile_version",
+            "scope",
+            "scoring_model",
+            "coverage_rule_version",
+            "requirements",
+        },
+    )
+    if payload["schema_version"] != "1":
+        raise ValueError(f"unsupported audit profile schema version {payload['schema_version']!r}")
+    if payload["scoring_model"] is not None:
+        raise ValueError("audit profile v1 scoring_model must be null")
+    if (
+        _profile_positive_integer(
+            payload["coverage_rule_version"], name="audit profile coverage_rule_version"
+        )
+        != 1
+    ):
+        raise ValueError("audit profile v1 coverage_rule_version must be 1")
+
+    profile_id = payload["profile_id"]
+    if not isinstance(profile_id, str):
+        raise ValueError("audit profile profile_id must be a string")
+    scope_raw = payload["scope"]
+    try:
+        scope = AuditScope(scope_raw) if isinstance(scope_raw, str) else None
+    except ValueError as error:
+        raise ValueError("audit profile has an unsupported scope") from error
+    if scope is None:
+        raise ValueError("audit profile has an unsupported scope")
+
+    requirements_raw = payload["requirements"]
+    if not isinstance(requirements_raw, Sequence) or isinstance(requirements_raw, str | bytes):
+        raise ValueError("audit profile requirements must be an array")
+    requirements: list[EvidenceRequirement] = []
+    for index, raw_requirement in enumerate(requirements_raw):
+        item = _strict_profile_object(
+            raw_requirement,
+            name=f"audit profile requirement {index}",
+            required={
+                "capability",
+                "title",
+                "category",
+                "disposition",
+                "accepted_methods",
+                "missing_severity",
+            },
+        )
+        strings: dict[str, str] = {}
+        for key in ("capability", "title", "category"):
+            item_value = item[key]
+            if not isinstance(item_value, str) or not item_value:
+                raise ValueError(
+                    f"audit profile requirement {index} {key} must be a non-empty string"
+                )
+            strings[key] = item_value
+
+        methods_raw = item["accepted_methods"]
+        if not isinstance(methods_raw, Sequence) or isinstance(methods_raw, str | bytes):
+            raise ValueError(f"audit profile requirement {index} accepted_methods must be an array")
+        if any(not isinstance(method, str) for method in methods_raw):
+            raise ValueError(
+                f"audit profile requirement {index} accepted_methods must contain strings"
+            )
+        disposition_raw = item["disposition"]
+        try:
+            disposition = (
+                EvidenceDisposition(disposition_raw) if isinstance(disposition_raw, str) else None
+            )
+        except ValueError as error:
+            raise ValueError(
+                f"audit profile requirement {index} has an unsupported disposition"
+            ) from error
+        if disposition is None:
+            raise ValueError(f"audit profile requirement {index} has an unsupported disposition")
+        severity_raw = item["missing_severity"]
+        try:
+            severity = Severity(severity_raw) if isinstance(severity_raw, str) else None
+        except ValueError as error:
+            raise ValueError(
+                f"audit profile requirement {index} has an unsupported missing_severity"
+            ) from error
+        if severity is None:
+            raise ValueError(
+                f"audit profile requirement {index} has an unsupported missing_severity"
+            )
+        requirements.append(
+            EvidenceRequirement(
+                capability_id=strings["capability"],
+                title=strings["title"],
+                category=strings["category"],
+                methods=cast(tuple[str, ...], tuple(methods_raw)),
+                disposition=disposition,
+                severity=severity,
+            )
+        )
+
+    return AuditProfile(
+        profile_id=profile_id,
+        profile_version=_profile_positive_integer(
+            payload["profile_version"], name="audit profile profile_version"
+        ),
+        scope=scope,
+        requirements=tuple(requirements),
+    )
 
 
 _BASE_REQUIREMENTS: tuple[tuple[str, str, str, tuple[str, ...], Severity], ...] = (

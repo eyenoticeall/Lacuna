@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 import lacuna.bundle as bundle_module
-from lacuna.bundle import BUNDLE_FORMAT, BUNDLE_VERSION, verify_bundle
+from lacuna.bundle import BUNDLE_FORMAT, BUNDLE_VERSION, BundleManifest, verify_bundle
 from lacuna.exceptions import ReportError
 from lacuna.report import AuditReport
 from lacuna.types import AnalysisResult, ResultMetadata
@@ -92,6 +92,16 @@ def test_bundle_is_byte_stable_and_independently_verifiable(tmp_path: Path) -> N
         assert manifest["security"]["source_data"] == "not_included_automatically"
         assert manifest["security"]["executable_code"] is False
         assert manifest["reproducibility"]["level"] == "identifiable"
+        parsed = BundleManifest.from_json(archive.read("manifest.json").decode())
+        assert BundleManifest.from_dict(manifest) == parsed
+        assert parsed.to_dict() == manifest
+
+
+def test_standalone_manifest_reader_rejects_duplicate_and_unsupported_content() -> None:
+    with pytest.raises(ReportError, match="duplicate key"):
+        BundleManifest.from_json('{"bundle_version":1,"bundle_version":1}')
+    with pytest.raises(ReportError, match="fields differ"):
+        BundleManifest.from_json('{"bundle_version":2}')
 
 
 def test_bundle_adds_named_evidence_and_redacts_supplemental_metadata(tmp_path: Path) -> None:

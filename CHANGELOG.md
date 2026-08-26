@@ -4,6 +4,15 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Added
+
+- Add a published persisted-artifact compatibility matrix and tagged-fixture regression corpus for
+  result schema v1 across core `0.1`–`0.8`, bundle v1 across `0.7`–`0.8`, and standardized audit
+  profile v1 from `0.8`.
+- Add strict non-executing `AuditProfile.from_dict(...)` / `from_json(...)` and standalone
+  `BundleManifest.from_dict(...)` / `from_json(...)` readers with fail-closed version, field,
+  duplicate-key, non-finite, and nested-contract validation.
+
 ## [0.8.0] - 2026-08-26
 
 ### Added

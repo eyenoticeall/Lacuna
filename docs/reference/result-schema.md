@@ -46,6 +46,11 @@ envelope/finding fields, invalid enum values, and non-UTC timestamps. `from_dict
 same structural and semantic checks after JSON decoding. Neither reader loads plugins or executes
 serialized content.
 
+The same v1 envelope and representative fixture were retained byte-for-byte by every stable
+`v0.1.0` through `v0.8.0` tag. The `0.9` compatibility gate treats those release lines as identity
+migrations: validate under schema v1 and preserve the recorded method evidence unchanged. See
+[Persisted-artifact compatibility](persisted-artifacts.md) for the public matrix and tagged corpus.
+
 ## Validation example
 
 `jsonschema` is a development dependency, not a Lacuna runtime dependency:
@@ -87,4 +92,6 @@ version, and the capability/method/disposition matrix at
 `lacuna.schemas.standard_audit_profile_v1_text()`.
 
 Profile schema version governs the portable definition shape; `profile_version` governs its
-applicability meaning. The generated audit remains an ordinary `AnalysisResult` schema-v1 object.
+applicability meaning. `AuditProfile.from_dict(...)` and `from_json(...)` are the strict,
+non-executing profile-v1 readers. The generated audit remains an ordinary `AnalysisResult`
+schema-v1 object.
