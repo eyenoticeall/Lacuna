@@ -284,9 +284,11 @@ results to the selected built-in profile. Serialized plugin evidence never autho
 The complete contract is in the
 [standardized-audit reference](../reference/standardized-audit.md).
 
-`lacuna doctor [--json]` remains available for build and native-extension diagnostics. Audit of
-standalone return/trade artifacts, dataset checks, dry-run planning, and developer benchmarks are
-separate later CLI stages.
+`lacuna doctor [--json] [--strict]` provides versioned, non-invasive installation diagnostics for
+the package, native core, supported runtime, dependencies, packaged schemas, and configuration. It
+does not inspect data or discover or activate plugins. The complete operational contract is in the
+[installation diagnostics guide](../development/installation-diagnostics.md). Audit of standalone
+return/trade artifacts, dataset checks, and dry-run planning remain separate later CLI stages.
 
 ## Observability
 

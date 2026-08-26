@@ -325,7 +325,7 @@ jobs:
         run: |
           .wheel-smoke/bin/python .github/scripts/wheel_smoke.py
           .wheel-smoke/bin/python .github/scripts/options_wheel_smoke.py
-          .wheel-smoke/bin/lacuna doctor --json
+          .wheel-smoke/bin/lacuna doctor --json --strict
       - name: Retain distributable artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

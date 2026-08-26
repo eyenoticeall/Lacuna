@@ -13,7 +13,10 @@ uv sync --group dev --group docs
 uv run lacuna doctor
 ```
 
-`uv sync` builds the mixed Python/Rust package in the local environment. The doctor command confirms that the compiled extension is importable and shows the active thread, seed, memory, cache, and logging configuration.
+`uv sync` builds the mixed Python/Rust package in the local environment. The doctor command checks
+package and native-core identity, Python and wheel support, dependency metadata, packaged schemas,
+and runtime configuration. Every result has a stable code and an actionable message. Use
+`lacuna doctor --json --strict` in automation; strict mode also rejects warnings.
 
 ## Run quality checks
 

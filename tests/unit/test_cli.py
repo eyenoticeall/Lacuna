@@ -8,6 +8,12 @@ import pytest
 
 import lacuna.cli as cli
 from lacuna.cli import main
+from lacuna.diagnostics import (
+    DiagnosticCheck,
+    DiagnosticState,
+    InstallationDiagnostics,
+)
+from lacuna.native import NativeStatus
 from lacuna.types import AnalysisResult, ResultMetadata
 
 
@@ -15,8 +21,60 @@ def test_doctor_has_machine_readable_output(capsys: object) -> None:
     assert main(["doctor", "--json"]) == 0
     captured = capsys.readouterr()  # type: ignore[attr-defined]
     payload = json.loads(captured.out)
-    assert "lacuna_version" in payload
+    assert payload["schema_version"] == "1"
+    assert payload["diagnostic_version"] == 1
+    assert payload["status"] in {"PASS", "WARN"}
+    assert payload["healthy"] is True
+    assert payload["lacuna_version"] == cli.__version__
+    assert [item["code"] for item in payload["checks"]] == sorted(
+        item["code"] for item in payload["checks"]
+    )
     assert "native" in payload
+    assert captured.err == ""
+
+
+def _doctor_report(state: DiagnosticState) -> InstallationDiagnostics:
+    return InstallationDiagnostics(
+        checks=(
+            DiagnosticCheck(
+                code="TEST_STATE",
+                state=state,
+                message="Synthetic doctor state.",
+            ),
+        ),
+        distribution_version=cli.__version__,
+        native=NativeStatus(True, cli.__version__),
+        configuration={},
+        dependencies={},
+        runtime={},
+    )
+
+
+def test_doctor_strict_mode_promotes_warnings_to_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: object,
+) -> None:
+    monkeypatch.setattr(cli, "diagnose_installation", lambda: _doctor_report(DiagnosticState.WARN))
+
+    assert main(["doctor", "--json"]) == 0
+    capsys.readouterr()  # type: ignore[attr-defined]
+    assert main(["doctor", "--json", "--strict"]) == 1
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    assert json.loads(captured.out)["status"] == "WARN"
+    assert captured.err == ""
+
+
+def test_doctor_failed_check_returns_failure_and_text_detail(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: object,
+) -> None:
+    monkeypatch.setattr(cli, "diagnose_installation", lambda: _doctor_report(DiagnosticState.FAIL))
+
+    assert main(["doctor"]) == 1
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "Status       FAIL" in captured.out
+    assert "[FAIL] TEST_STATE: Synthetic doctor state." in captured.out
+    assert captured.err == ""
 
 
 def _write_signal_inputs(root: object) -> tuple[str, str]:

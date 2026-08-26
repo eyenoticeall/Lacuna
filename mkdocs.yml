@@ -27,6 +27,7 @@ nav:
       - Data boundary: development/data-boundary.md
       - Testing strategy: development/testing.md
       - Continuous integration: development/continuous-integration.md
+      - Installation diagnostics: development/installation-diagnostics.md
       - Performance: development/performance.md
       - Contributing a method: development/contributing-a-method.md
       - Release engineering: development/release.md

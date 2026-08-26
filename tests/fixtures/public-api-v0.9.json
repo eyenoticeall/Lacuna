@@ -4,6 +4,12 @@
     {"module": "lacuna", "qualname": "AuditProfile.from_json", "signature": "(value)"},
     {"module": "lacuna", "qualname": "BundleManifest.from_dict", "signature": "(value)"},
     {"module": "lacuna", "qualname": "BundleManifest.from_json", "signature": "(value)"},
+    {"module": "lacuna", "qualname": "DiagnosticCheck", "signature": "(code, state, message, evidence=<factory>)"},
+    {"module": "lacuna", "qualname": "DiagnosticCheck.to_dict", "signature": "(self)"},
+    {"module": "lacuna", "qualname": "InstallationDiagnostics", "signature": "(checks, distribution_version, native, configuration, dependencies, runtime, schema_version='1', diagnostic_version=1)"},
+    {"module": "lacuna", "qualname": "InstallationDiagnostics.to_dict", "signature": "(self)"},
+    {"module": "lacuna", "qualname": "InstallationDiagnostics.to_json", "signature": "(self, *, indent=2)"},
+    {"module": "lacuna", "qualname": "diagnose_installation", "signature": "()"},
     {"module": "lacuna.schemas", "qualname": "persisted_artifact_compatibility_v1_text", "signature": "()"}
   ],
   "contract": "lacuna-public-api-v0.9",
@@ -18,10 +24,24 @@
     "lacuna-public-api-v0.8"
   ],
   "module_exports": {
+    "lacuna.diagnostics": [
+      "DIAGNOSTIC_VERSION",
+      "DiagnosticCheck",
+      "DiagnosticState",
+      "InstallationDiagnostics",
+      "diagnose_installation"
+    ],
     "lacuna.schemas": [
       "persisted_artifact_compatibility_v1_text"
     ]
   },
   "package_series": "0.9",
-  "root_exports": []
+  "root_exports": [
+    "DIAGNOSTIC_VERSION",
+    "DiagnosticCheck",
+    "DiagnosticState",
+    "InstallationDiagnostics",
+    "diagnose_installation",
+    "diagnostics"
+  ]
 }

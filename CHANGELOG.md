@@ -12,6 +12,10 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Add strict non-executing `AuditProfile.from_dict(...)` / `from_json(...)` and standalone
   `BundleManifest.from_dict(...)` / `from_json(...)` readers with fail-closed version, field,
   duplicate-key, non-finite, and nested-contract validation.
+- Add a versioned public installation-diagnostics API and `lacuna doctor --strict` gate with stable
+  check codes for package/native identity, Python and wheel support, dependency metadata, packaged
+  schemas, and runtime configuration; diagnostics redact configured paths and never inspect user
+  data or activate plugins.
 
 ## [0.8.0] - 2026-08-26
 

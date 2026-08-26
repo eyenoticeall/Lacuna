@@ -32,6 +32,7 @@ PUBLIC_MODULES = (
     "lacuna.config",
     "lacuna.costs",
     "lacuna.cv",
+    "lacuna.diagnostics",
     "lacuna.experiment",
     "lacuna.labels",
     "lacuna.native",
@@ -59,6 +60,27 @@ distribution_version = metadata.version("lacuna")
 require(lacuna.__version__ == distribution_version, "package and distribution versions disagree")
 require(_native.version() == distribution_version, "native and distribution versions disagree")
 require(_native.checked_mean([1.0, 2.0, 3.0]) == 2.0, "native mean kernel failed")
+
+installation = lacuna.diagnose_installation()
+require(installation.status.value == "PASS", "installed-wheel diagnostics did not pass")
+require(installation.healthy, "installed-wheel diagnostics reported an unhealthy runtime")
+diagnostic_codes = {check.code for check in installation.checks}
+require(
+    {
+        "AUDIT_RESULT_SCHEMA",
+        "BUNDLE_MANIFEST_SCHEMA",
+        "DISTRIBUTION_METADATA",
+        "NATIVE_CORE",
+        "PACKAGE_VERSION",
+        "PERSISTED_ARTIFACT_COMPATIBILITY",
+        "PLATFORM_WHEEL",
+        "PYTHON_RUNTIME",
+        "RUNTIME_CONFIGURATION",
+        "RUNTIME_DEPENDENCIES",
+        "STANDARD_AUDIT_PROFILE_SCHEMA",
+    }.issubset(diagnostic_codes),
+    "installed-wheel diagnostics omitted a release check",
+)
 
 rank_ic = _native.grouped_rank_ic(
     [1.0, 2.0, 3.0, 1.0, 2.0],
@@ -296,6 +318,7 @@ print(
     json.dumps(
         {
             "distribution_version": distribution_version,
+            "diagnostic_status": installation.status.value,
             "native_version": _native.version(),
             "public_modules": len(PUBLIC_MODULES),
             "schema": schema["title"],

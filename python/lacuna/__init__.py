@@ -6,6 +6,7 @@ from lacuna import (
     bundle,
     costs,
     cv,
+    diagnostics,
     experiment,
     labels,
     plugins,
@@ -50,6 +51,13 @@ from lacuna.bundle import (
     verify_bundle,
 )
 from lacuna.config import Config, config, configure, get_config
+from lacuna.diagnostics import (
+    DIAGNOSTIC_VERSION,
+    DiagnosticCheck,
+    DiagnosticState,
+    InstallationDiagnostics,
+    diagnose_installation,
+)
 from lacuna.exceptions import (
     ConfigurationError,
     DataContractError,
@@ -68,6 +76,7 @@ from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, 
 __all__ = [
     "BUNDLE_FORMAT",
     "BUNDLE_VERSION",
+    "DIAGNOSTIC_VERSION",
     "AnalysisResult",
     "Applicability",
     "ApplicabilityState",
@@ -85,11 +94,14 @@ __all__ = [
     "Config",
     "ConfigurationError",
     "DataContractError",
+    "DiagnosticCheck",
+    "DiagnosticState",
     "EvidenceDisposition",
     "EvidenceRequirement",
     "ExperimentRegistry",
     "Finding",
     "FindingState",
+    "InstallationDiagnostics",
     "LabelResult",
     "LacunaError",
     "MethodContractError",
@@ -111,6 +123,8 @@ __all__ = [
     "create_bundle",
     "cv",
     "default_rules",
+    "diagnose_installation",
+    "diagnostics",
     "experiment",
     "get_config",
     "labels",

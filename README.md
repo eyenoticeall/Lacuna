@@ -110,8 +110,13 @@ cargo test --workspace
 Inspect the runtime in machine-readable form:
 
 ```bash
-uv run lacuna doctor --json
+uv run lacuna doctor --json --strict
 ```
+
+The versioned diagnostic report checks package/native identity, the supported Python and wheel
+matrix, dependency metadata, packaged schemas, and runtime configuration. Stable check codes and
+nonzero strict-mode exits make it suitable for CI without reading research data or activating
+plugins.
 
 Turn a cross-sectional signal and price panel into structured evidence:
 

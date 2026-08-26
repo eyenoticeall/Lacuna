@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import platform
 import re
 import sys
 from collections.abc import Sequence
@@ -16,10 +15,9 @@ import polars as pl
 from lacuna import __version__
 from lacuna.audit_profiles import standard_audit
 from lacuna.bundle import verify_bundle
-from lacuna.config import get_config
+from lacuna.diagnostics import DiagnosticState, diagnose_installation
 from lacuna.exceptions import DataContractError, LacunaError, ReportError
 from lacuna.labels import PriceAdjustment
-from lacuna.native import native_status
 from lacuna.report import AuditReport
 from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult, FindingState, JsonValue
@@ -47,28 +45,6 @@ def _non_negative_int(value: str) -> int:
     if parsed < 0:
         raise argparse.ArgumentTypeError("value must be non-negative")
     return parsed
-
-
-def _doctor_payload() -> dict[str, object]:
-    configuration = get_config()
-    native = native_status()
-    return {
-        "lacuna_version": __version__,
-        "python_version": platform.python_version(),
-        "platform": platform.platform(),
-        "native": {
-            "available": native.available,
-            "version": native.version,
-            "error": native.error,
-        },
-        "config": {
-            "threads": configuration.threads,
-            "seed": configuration.seed,
-            "memory_limit": configuration.memory_limit,
-            "cache_dir": configuration.cache_dir,
-            "log_level": configuration.log_level,
-        },
-    }
 
 
 def _scan_frame(path: str) -> pl.LazyFrame:
@@ -277,6 +253,11 @@ def _parser() -> argparse.ArgumentParser:
 
     doctor = subcommands.add_parser("doctor", help="show build and runtime diagnostics")
     doctor.add_argument("--json", action="store_true", help="emit machine-readable JSON")
+    doctor.add_argument(
+        "--strict",
+        action="store_true",
+        help="return a failure exit code for warnings as well as failed checks",
+    )
 
     audit = subcommands.add_parser(
         "audit",
@@ -458,17 +439,26 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"lacuna: error: {error}", file=sys.stderr)
             return 1
 
-    payload = _doctor_payload()
+    diagnostics = diagnose_installation()
+    payload = diagnostics.to_dict()
+    exit_code = int(
+        diagnostics.status == DiagnosticState.FAIL
+        or (arguments.strict and diagnostics.status == DiagnosticState.WARN)
+    )
     if arguments.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
-        return 0
+        return exit_code
 
     native = payload["native"]
     assert isinstance(native, dict)
+    print(f"Status       {payload['status']}")
     print(f"Lacuna       {payload['lacuna_version']}")
     print(f"Python       {payload['python_version']}")
     print(f"Platform     {payload['platform']}")
     print(f"Native core  {'available' if native['available'] else 'unavailable'}")
     if native["version"]:
         print(f"Native ver.  {native['version']}")
-    return 0
+    print()
+    for check in diagnostics.checks:
+        print(f"[{check.state.value:4}] {check.code}: {check.message}")
+    return exit_code
