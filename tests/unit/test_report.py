@@ -134,7 +134,10 @@ def test_named_evidence_lookup_is_immutable_and_rejects_ambiguity() -> None:
         ambiguous.table("ic_by_period")
 
 
+@pytest.mark.optional_dependency(reason="Plotly and Jinja2 are provided by the report extra")
 def test_plotly_html_is_deterministic_traced_and_self_contained() -> None:
+    pytest.importorskip("jinja2")
+    pytest.importorskip("plotly")
     base = _report()
     report = AuditReport(base.result, evidence={"ic": _signal_evidence()})
 

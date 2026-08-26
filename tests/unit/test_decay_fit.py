@@ -36,7 +36,9 @@ def _decay_evidence(
     )
 
 
+@pytest.mark.optional_dependency(reason="SciPy is provided by the statistics extra")
 def test_fit_decay_recovers_known_half_life_and_is_seed_deterministic() -> None:
+    pytest.importorskip("scipy")
     source = _decay_evidence()
     first = fit_decay(source, resamples=100, seed=42, minimum_r_squared=0.99)
     second = fit_decay(source, resamples=100, seed=42, minimum_r_squared=0.99)
@@ -49,7 +51,9 @@ def test_fit_decay_recovers_known_half_life_and_is_seed_deterministic() -> None:
     assert {finding.state for finding in first.findings} == {FindingState.PASS}
 
 
+@pytest.mark.optional_dependency(reason="SciPy is provided by the statistics extra")
 def test_fit_decay_handles_expected_negative_direction() -> None:
+    pytest.importorskip("scipy")
     result = fit_decay(
         _decay_evidence(direction=-1.0),
         expected_direction="negative",
@@ -66,7 +70,9 @@ def test_fit_decay_with_inadequate_support_returns_unknown_not_a_number() -> Non
     assert result.findings[0].code == "DECAY_SUPPORT_INSUFFICIENT"
 
 
+@pytest.mark.optional_dependency(reason="SciPy is provided by the statistics extra")
 def test_fit_decay_rejects_zero_or_nonidentifiable_curves() -> None:
+    pytest.importorskip("scipy")
     zero = fit_decay(_decay_evidence(flat=0.0), resamples=100, seed=1)
     assert zero.metrics["half_life"] is None
     assert zero.findings[0].code == "DECAY_DIRECTION_INVALID"
