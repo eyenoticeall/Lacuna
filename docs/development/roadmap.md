@@ -16,7 +16,7 @@ such as `0.2.0rc1`.
 | `0.3.x` | Phase 5: trading realism, cost stress, liquidity, capacity | Released |
 | `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Released |
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Released |
-| `0.6.x` | Phase 8: separately optional adapters and extensions | Implementation complete; release verification pending |
+| `0.6.x` | Phase 8: separately optional adapters and extensions | Released |
 | `0.7`–`0.9` | Cross-phase integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
@@ -154,7 +154,7 @@ differentially tested implementation.
 
 ## Phase 8 — extensions
 
-**v0.6 implementation candidate:** optional integrations are explicit boundaries rather than new
+**v0.6 implemented:** optional integrations are explicit boundaries rather than new
 research methodology. Core adds no mandatory runtime dependency.
 
 Delivered in dependency order:
@@ -177,8 +177,10 @@ ambiguous temporal/methodological semantics; core `0.6.x` and extension `0.1.x` 
 frozen independently; both distributions build, clean-install together, and enter the checksummed,
 attested release set.
 
-The implementation and focused gates satisfy these criteria. Stable `v0.6.0` remains contingent on
-the exact release-preparation commit passing the complete CI matrix and tag workflow.
+The release criteria are covered by real DuckDB and scikit-learn interoperability, adapter/plugin
+unit and contract fixtures, extension property/adversarial tests, independent frozen API contracts,
+clean joint wheel installation, the complete cross-platform CI matrix, and the tagged checksum and
+provenance workflow.
 
 Deferred beyond the phase: DataFusion/query pushdown, framework-specific vectorbt/LEAN/Nautilus
 helpers, plugin isolation or marketplace behavior, universal IV/Greeks solvers, SVI calibration,

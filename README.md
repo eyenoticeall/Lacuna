@@ -24,16 +24,18 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> The main branch now contains the **v0.6 implementation candidate**: DuckDB Arrow streaming,
+> Lacuna **v0.6** adds DuckDB Arrow streaming,
 > scikit-learn temporal folds, explicit vendor/backtest schemas, trusted plugin activation, and the
 > separate `lacuna-options` 0.1 package. The additive core `0.6.x` and extension `0.1.x` contracts
-> are independently frozen and regression-tested. The latest stable release remains v0.5.0 until
-> the exact v0.6 release commit passes CI and the tagged release gate.
+> are independently frozen and regression-tested while every earlier core compatibility fixture
+> remains executable. Lacuna remains pre-1.0 software; later minor versions may evolve through
+> documented migrations.
 
 > [!NOTE]
-> [`v0.5.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.5.0)
-> as checksummed, provenance-attested wheels and a source distribution. The PyPI distribution name
-> `lacuna` belongs to an unrelated project, so do not install that package expecting this software.
+> [`v0.6.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.6.0)
+> as checksummed, provenance-attested core and options wheels/source distributions. The PyPI
+> distribution name `lacuna` belongs to an unrelated project, so do not install that package
+> expecting this software.
 
 ## Why Lacuna?
 
@@ -300,8 +302,8 @@ uv run lacuna signal \
 
 Versions `0.1` through `0.5` cover foundations, signal diagnostics, temporal validation, dependent
 bootstrap, audit/reporting, experiment lineage, multiple-testing correction, robustness,
-trading-realism evidence, point-in-time data correctness, and advanced inference. The implemented
-`0.6` candidate adds optional adapters/plugins and the separate options package without expanding
+trading-realism evidence, point-in-time data correctness, and advanced inference. Released `0.6`
+adds optional adapters/plugins and the separate options package without expanding
 the core dependency surface. Versions `0.7`–`0.9` are reserved for cross-phase integration,
 migration, performance, and real-user hardening before a stable `1.0.0` contract.
 
@@ -320,7 +322,7 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes released v0.1–v0.5 behavior, the implemented v0.6 candidate, and later contracts. Contributors
+The documentation distinguishes released v0.1–v0.6 behavior from later contracts. Contributors
 and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 

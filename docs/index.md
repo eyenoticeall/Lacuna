@@ -8,10 +8,9 @@ Lacuna is an open-source quantitative research validation library for discoverin
 
     The repository implements the v0.1 signal-validation path, v0.2 robustness/experiment
     milestone, v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5
-    advanced-inference milestone, and the v0.6 implementation candidate for optional adapters,
-    explicit plugins, and the separately versioned options package. It remains pre-1.0: later minor
-    APIs may change through documented migrations, and a completed implementation is not a release
-    until the exact tagged commit passes the release gate.
+    advanced-inference milestone, and the v0.6 optional-adapter/plugin milestone with the separately
+    versioned options package. It remains pre-1.0: later minor APIs may change through documented
+    migrations.
 
 ## Choose a path
 

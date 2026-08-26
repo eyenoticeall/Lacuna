@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "lacuna"
-version = "0.5.0"
+version = "0.6.0"
 description = "Open-source quantitative research validation for finding where alpha breaks."
 readme = "README.md"
 requires-python = ">=3.11"

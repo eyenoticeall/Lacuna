@@ -140,12 +140,12 @@ its checksummed, attested GitHub Release artifacts.
 Stable and candidate tags use Cargo/SemVer spelling:
 
 ```text
-v0.5.0
-v0.5.0-rc.1
+v0.6.0
+v0.6.0-rc.1
 ```
 
-Python package metadata normalizes a candidate such as `0.5.0-rc.1` to `0.5.0rc1`; stable package
-metadata is `0.5.0`. The release verifier owns this mapping and prevents the two surfaces from
+Python package metadata normalizes a candidate such as `0.6.0-rc.1` to `0.6.0rc1`; stable package
+metadata is `0.6.0`. The release verifier owns this mapping and prevents the two surfaces from
 drifting.
 
 The core tag does not rename the extension. The verifier independently checks the extension

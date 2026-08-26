@@ -140,7 +140,7 @@ Do not create every package as an empty placeholder. Add a package when its firs
 
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
 v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
-milestone, and the implementation candidate for the v0.6 optional-integration milestone:
+milestone, and the v0.6 optional-integration milestone:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -172,8 +172,8 @@ milestone, and the implementation candidate for the v0.6 optional-integration mi
 
 DataFusion, framework-specific adapters, automatic execution planning, model-based option pricing/
 calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
-through documented migrations; the published `0.1.x` through `0.5.x` contracts and the reviewed
-`0.6.x` candidate fixture govern their respective lines.
+through documented migrations; the published `0.1.x` through `0.6.x` contracts govern their
+respective release lines.
 
 ## Detailed guides
 
