@@ -1,0 +1,11 @@
+{
+  "artifact": "plotly-signal-report.png",
+  "device_scale_factor": 1,
+  "panels": [
+    {"id": "lacuna-panel-01", "source": "audit", "table": "metrics/findings"},
+    {"id": "lacuna-panel-02", "source": "ic", "table": "ic_by_period"},
+    {"id": "lacuna-panel-03", "source": "ic", "table": "data_attrition"}
+  ],
+  "renderer_version": 1,
+  "viewport": {"height": 900, "width": 1440}
+}

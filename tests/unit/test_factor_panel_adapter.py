@@ -15,6 +15,10 @@ from lacuna.adapters import (
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.signal import ic
 
+pytestmark = pytest.mark.optional_dependency(
+    reason="pandas MultiIndex and Arrow cases require the pandas optional extra"
+)
+
 FIXTURE = Path(__file__).parents[1] / "fixtures" / "alphalens-reloaded-f0a07c22.json"
 
 

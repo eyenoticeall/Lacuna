@@ -278,6 +278,17 @@ As suites grow, use explicit markers such as:
 
 Default CI must still cover all public behavior on representative small fixtures.
 
+The implemented optional-dependency policy uses `optional_dependency(reason="...")`. A test that
+can skip in the core-only environment must carry this marker with a specific reason. Full-extra,
+affected-extra, browser, nightly, and release jobs pass `--fail-on-skip`; in those environments any
+skip is a failed capability check, not a neutral outcome.
+
+Event/decay calibration uses a small deterministic sample in pull-request CI. Nightly and tagged
+release jobs run 500 fixed-seed simulations and enforce explicit finite-sample bounds for half-life
+interval coverage, event pointwise interval coverage, and simultaneous-band family false-positive
+rate. These tests preserve the seed and simulation count in job evidence; changing a bound requires
+a methodology review rather than a retry until green.
+
 ## Definition of tested
 
 A method is not “tested” because one happy-path example passes. It needs evidence for the formula, invariants, edge policies, temporal semantics, serialization, supported adapters, and any optimized path.

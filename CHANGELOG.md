@@ -24,6 +24,16 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Add the cumulative `0.12.x` public API fixture while preserving every earlier compatibility
   contract and result schema version 1.
 
+### Changed
+
+- Advance the reproducible benchmark artifact to version 6 with grouped/null bucketing,
+  neutralization, multi-lag turnover, diagnostic projection, event-window, and chunked factor-panel
+  cases.
+- Require zero skips in full-extra CI, exercise statistics/report/pandas wheels independently,
+  render Plotly reports in the Chromium revision pinned by Playwright, enforce a same-runner 15%
+  legacy median-regression budget, and run 500-simulation event/decay calibration for nightly and
+  tagged releases.
+
 ## [0.11.0] - 2026-08-26
 
 ### Added

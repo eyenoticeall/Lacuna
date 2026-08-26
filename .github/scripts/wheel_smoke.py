@@ -33,6 +33,7 @@ PUBLIC_MODULES = (
     "lacuna.costs",
     "lacuna.cv",
     "lacuna.diagnostics",
+    "lacuna.events",
     "lacuna.experiment",
     "lacuna.labels",
     "lacuna.native",
@@ -240,6 +241,30 @@ backtest = lacuna.adapters.adapt_backtest(
     collect=True,
 )
 require(backtest.columns == ("time", "strategy", "return"), "backtest adapter failed")
+
+factor_panel = lacuna.adapters.adapt_factor_panel(
+    {"date": [1], "asset": ["A"], "factor": [0.25]},
+    lacuna.adapters.FactorPanelSchema(
+        "wheel-smoke.factor-panel.v1",
+        {"observation_time": "date", "instrument": "asset", "signal": "factor"},
+        lacuna.adapters.FactorPanelSemantics(
+            signal_observation="synthetic",
+            decision_time_rule="synthetic",
+            forward_return_entry="not_applicable",
+            forward_return_exit="not_applicable",
+            horizon_clock="trading_observations",
+            timezone="UTC",
+            calendar="synthetic",
+            adjustment_policy="not_applicable",
+            group_availability="not_applicable",
+            imported_bucket_definition="not_applicable",
+        ),
+    ),
+)
+require(
+    factor_panel.columns == ("observation_time", "instrument", "signal"),
+    "factor-panel adapter failed",
+)
 
 sklearn_cv = lacuna.adapters.as_sklearn_cv(
     lacuna.cv.WalkForward(train=2, test=1, step=1),

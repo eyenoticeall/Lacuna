@@ -24,7 +24,7 @@ def test_smoke_benchmark_runs_public_reference_and_native_paths() -> None:
     names = {case["name"] for case in payload["cases"]}
 
     assert payload["schema_version"] == "1"
-    assert payload["benchmark_version"] == 5
+    assert payload["benchmark_version"] == 6
     assert payload["config"]["rows"] == 40
     assert "signal.ic.reference" in names
     assert "signal.ic.native" in names
@@ -40,6 +40,12 @@ def test_smoke_benchmark_runs_public_reference_and_native_paths() -> None:
     assert "costs.stress.reference" in names
     assert "bias.asof_join.reference" in names
     assert "workflow.standard_audit.strategy" in names
+    assert "signal.bucketize.grouped_nulls" in names
+    assert "signal.neutralize.grouped" in names
+    assert "signal.turnover.multi_lag" in names
+    assert "signal.portfolio_projection" in names
+    assert "adapters.factor_panel.chunked" in names
+    assert "events.event_windows" in names
     checksums = {case["name"]: case["checksum"] for case in payload["cases"]}
     assert checksums["signal.ic.reference"] == checksums["signal.ic.native"]
     assert checksums["validation.bootstrap.reference"] == checksums["validation.bootstrap.native"]
@@ -73,3 +79,26 @@ def test_benchmark_configuration_rejects_invalid_contracts() -> None:
         BenchmarkConfig(periods=3, horizons=(3,))
     with pytest.raises(MethodContractError):
         benchmark_config_for_tier("large")
+
+
+def test_minimum_valid_benchmark_shape_exercises_new_cases() -> None:
+    suite = run_benchmarks(
+        BenchmarkConfig(
+            periods=3,
+            instruments=3,
+            horizons=(1,),
+            quantiles=3,
+            bootstrap_resamples=100,
+            repetitions=1,
+            warmups=0,
+        ),
+        use_native=False,
+    )
+    assert {case.name for case in suite.cases}.issuperset(
+        {
+            "signal.bucketize.grouped_nulls",
+            "signal.neutralize.grouped",
+            "signal.portfolio_projection",
+            "events.event_windows",
+        }
+    )

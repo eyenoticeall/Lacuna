@@ -20,21 +20,27 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from lacuna import bias, costs, signal
+from lacuna import bias, costs, events, signal
 from lacuna.adapters import (
+    AdaptedFrame,
     BacktestSchema,
     BacktestSemantics,
+    FactorPanelSchema,
+    FactorPanelSemantics,
     VendorSchema,
     adapt_backtest,
+    adapt_factor_panel,
     adapt_vendor,
 )
 from lacuna.audit_profiles import standard_audit
 from lacuna.bias import PointInTimeJoinResult
 from lacuna.cv import CombinatorialPurgedKFold, CombinatorialSplitResult, PurgedKFold, SplitResult
+from lacuna.events import EventWindowResult
 from lacuna.exceptions import MethodContractError
 from lacuna.labels import LabelResult, forward_returns
 from lacuna.native import native_status
 from lacuna.report import AuditReport
+from lacuna.signal import PortfolioProjectionResult, SignalTransformResult
 from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult
 from lacuna.validation import (
@@ -47,9 +53,13 @@ from lacuna.validation import (
 BenchmarkOutput: TypeAlias = (
     AnalysisResult
     | AuditReport
+    | AdaptedFrame
     | CombinatorialSplitResult
+    | EventWindowResult
     | LabelResult
     | PointInTimeJoinResult
+    | PortfolioProjectionResult
+    | SignalTransformResult
     | SplitResult
 )
 BenchmarkCallable: TypeAlias = Callable[[], BenchmarkOutput]
@@ -156,7 +166,7 @@ class BenchmarkSuite:
     generated_at: datetime
     environment: Mapping[str, object]
     schema_version: str = "1"
-    benchmark_version: int = 5
+    benchmark_version: int = 6
 
     def to_dict(self) -> dict[str, object]:
         """Return the complete benchmark artifact."""
@@ -280,6 +290,21 @@ def _output_payload(output: BenchmarkOutput) -> tuple[dict[str, object], str]:
             "evidence": _without_created_at(output.evidence),
             "frame_summary": summary,
         }, "polars"
+    if isinstance(
+        output,
+        AdaptedFrame | EventWindowResult | PortfolioProjectionResult | SignalTransformResult,
+    ):
+        source_frame = output.frame
+        frame = source_frame.collect() if isinstance(source_frame, pl.LazyFrame) else source_frame
+        result = output.evidence
+        return {
+            "evidence": _without_created_at(result),
+            "frame_summary": {
+                "rows": frame.height,
+                "columns": frame.width,
+                "column_names": tuple(frame.columns),
+            },
+        }, str(result.metadata.parameters.get("backend") or "polars")
     result = (
         output.evidence
         if isinstance(output, SplitResult | CombinatorialSplitResult | PointInTimeJoinResult)
@@ -513,6 +538,67 @@ def run_benchmarks(
     inference_matrix = (
         np.sin(inference_time * 0.17 + inference_identity * 0.31) + inference_identity * 0.01
     )
+    group_count = max(1, min(10, resolved.instruments // resolved.quantiles))
+    diagnostic_observations = observations.with_columns(
+        (pl.col("instrument") % group_count).cast(pl.String).alias("sector"),
+        (pl.col("instrument") / max(resolved.instruments - 1, 1)).alias("market_beta"),
+    )
+    null_stride = max(resolved.instruments * 7, 1)
+    null_heavy_observations = (
+        diagnostic_observations.with_row_index("_row")
+        .with_columns(
+            pl.when(pl.col("_row") % null_stride == 0)
+            .then(None)
+            .otherwise(pl.col("signal"))
+            .alias("signal")
+        )
+        .drop("_row")
+    )
+    bucket_spec = signal.BucketSpec.quantiles(count=resolved.quantiles)
+    bucketed = signal.bucketize(observations, spec=bucket_spec)
+    chunk_size = max(1, observations.height // 3)
+    chunked_observations = pl.concat(
+        [
+            observations.slice(0, chunk_size),
+            observations.slice(chunk_size, chunk_size),
+            observations.slice(chunk_size * 2),
+        ],
+        rechunk=False,
+    )
+    factor_schema = FactorPanelSchema(
+        schema_id="benchmark.factor-panel.v1",
+        columns={
+            "observation_time": "time",
+            "instrument": "instrument",
+            "signal": "signal",
+        },
+        semantics=FactorPanelSemantics(
+            signal_observation="synthetic observation index",
+            decision_time_rule="same synthetic observation",
+            forward_return_entry="not_applicable",
+            forward_return_exit="not_applicable",
+            horizon_clock="trading_observations",
+            timezone="UTC",
+            calendar="synthetic",
+            adjustment_policy="not_applicable",
+            group_availability="not_applicable",
+            imported_bucket_definition="not_applicable",
+        ),
+    )
+    event_rows: list[dict[str, object]] = []
+    event_number = 0
+    for instrument in range(min(resolved.instruments, 8)):
+        for event_time in range(1, max(2, resolved.periods - 2), 4):
+            event_rows.append(
+                {
+                    "event_id": f"event-{event_number}",
+                    "instrument": instrument,
+                    "event_time": event_time,
+                    "available_time": event_time,
+                }
+            )
+            event_number += 1
+    event_frame = pl.DataFrame(event_rows)
 
     cases: list[tuple[str, BenchmarkCallable, int, str]] = [
         (
@@ -546,6 +632,68 @@ def run_benchmarks(
             lambda: signal.turnover(observations, quantiles=resolved.quantiles),
             resolved.rows,
             "input_rows/second",
+        ),
+        (
+            "signal.bucketize.grouped_nulls",
+            lambda: signal.bucketize(
+                null_heavy_observations,
+                spec=bucket_spec,
+                by=("time", "sector"),
+                small_group_policy="drop",
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.neutralize.grouped",
+            lambda: signal.neutralize(
+                diagnostic_observations,
+                exposures=("market_beta", "sector"),
+                categorical=("sector",),
+                min_residual_df=1,
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.turnover.multi_lag",
+            lambda: signal.turnover(
+                observations,
+                quantiles=resolved.quantiles,
+                lags=(1, min(5, resolved.periods - 1)),
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "signal.portfolio_projection",
+            lambda: signal.portfolio_projection(
+                bucketed,
+                labels,
+                horizon=resolved.horizon_names[0],
+                long_buckets=(resolved.quantiles,),
+                short_buckets=(1,),
+            ),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "adapters.factor_panel.chunked",
+            lambda: adapt_factor_panel(chunked_observations, factor_schema),
+            resolved.rows,
+            "input_rows/second",
+        ),
+        (
+            "events.event_windows",
+            lambda: events.event_windows(
+                event_frame,
+                prices,
+                before=1,
+                after=2,
+                price_adjustment="raw",
+            ),
+            len(event_rows) * 4,
+            "window_rows/second",
         ),
         (
             "signal.decay.reference",

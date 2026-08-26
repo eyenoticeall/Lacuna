@@ -20,7 +20,10 @@ receives a publishing token, deployment credential, or repository write permissi
 Quality ───────────────┐
 Python compatibility ─┤
 Rust stable + MSRV ───┤
-Interoperability ─────┼──> Package ──> CI gate
+Full extras/no skips ─┤
+Affected extras ──────┤
+Plotly Chromium ──────┼──> Package ──> CI gate
+Benchmark regression ┤
 Optional extensions ─┤
 Documentation ────────┘
 ```
@@ -38,10 +41,13 @@ a successful branch-protection check.
 | `Python` | Complete suite on Python 3.11–3.14/Linux and Python 3.13/macOS/Windows; branch coverage on the primary Linux runtime |
 | `Rust` | rustfmt, Clippy with warnings denied, workspace tests, and Criterion benchmark compilation under `Cargo.lock` |
 | `Rust / MSRV 1.85` | Every target compiles and the workspace tests pass on the declared minimum Rust version |
-| `Interoperability` | pandas, Arrow, Polars, NumPy, lazy/eager, and SciPy-reference comparisons with optional extras installed |
+| `Full extras / no skips` | Complete suite with every public extra installed; any skip fails the job |
+| `Extra / ...` | Statistics, report, and pandas suites installed and exercised independently with no skips |
+| `Plotly report / pinned Chromium` | Self-contained Plotly HTML runs in the Chromium revision tied to Playwright 1.55.0; DOM traceability, browser errors, external requests, layout, and screenshot evidence are checked |
+| `Benchmark / same-runner legacy guard` | Baseline and candidate small tiers run sequentially on one Ubuntu 24.04 runner; checksum drift or an unexplained legacy median regression above 15% blocks packaging |
 | `Optional extensions` | Locked workspace install; extension Ruff/mypy; branch-aware options tests and independent API contract |
 | `Documentation` | Strict MkDocs build with the rendered handbook retained for inspection |
-| `Package` | Build core sdist/wheel plus options wheel/sdist, install all wheels into a clean environment, then exercise both distributions, typing resources, result/bundle schemas, CLI, bundles, public APIs, adapters/plugins, and native kernels |
+| `Package` | Build core sdist/wheel plus options wheel/sdist; exercise core-only, statistics, report, pandas, and joint options installations in separate clean environments |
 | `CI gate` | Stable aggregate result intended for branch protection |
 
 Every job has a bounded timeout. The Python matrix uses `fail-fast: false` so one compatibility
@@ -69,6 +75,9 @@ CI retains evidence for diagnosis without turning the repository into permanent 
 - JUnit XML from every Python platform/version for 7 days;
 - primary-runtime branch coverage XML for 7 days;
 - optional-adapter/reference JUnit XML for 7 days;
+- affected-extra and zero-skip JUnit XML for 7 days;
+- a pinned-Chromium report screenshot and browser JUnit XML for 14 days;
+- same-runner baseline/candidate benchmark JSON for 14 days;
 - options-extension coverage and JUnit XML for 7 days;
 - the rendered documentation site for 7 days;
 - the verified Linux source distribution and wheel for 14 days.
@@ -123,10 +132,20 @@ aggregate contract, and the explicit final gate makes that state visible.
 
 ## Intentionally separate workflows
 
-CI does not publish packages, sign artifacts, deploy documentation, or enforce noisy benchmark timing
-thresholds on shared runners. Release credentials and provenance attestations require a narrower,
-tag-driven workflow. Performance regression policy requires controlled baselines rather than treating
-variable hosted-runner timings as exact measurements.
+CI does not publish packages, sign artifacts, or deploy documentation. Release credentials and
+provenance attestations require a narrower, tag-driven workflow. Timing comparisons are restricted
+to baseline and candidate measurements on the same pinned OS runner with fixed thread budgets;
+cross-runner or historical hosted-runner timings remain descriptive only.
+
+Core-only runs may skip a test only when it carries the named `optional_dependency` marker with a
+non-empty reason. The full-extra and affected-extra jobs use `--fail-on-skip`, so a missing wheel,
+dependency-resolution regression, or unexpectedly unsupported runtime cannot appear green through
+`pytest.importorskip`.
+
+Pull requests run a small fixed-seed event/decay calibration. The nightly workflow and every tagged
+release set `LACUNA_RELEASE_CALIBRATION_SIMULATIONS=500` and enforce declared Monte Carlo bounds for
+decay half-life interval coverage, event pointwise coverage, and simultaneous-band family false
+positives. Release artifact builds wait for this statistical gate.
 
 The separate `Release` workflow consumes a version-matching core tag only after the tagged commit's
 `CI gate` succeeded. It builds and target-smoke-tests the complete stable-ABI core wheel matrix,

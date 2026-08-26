@@ -1,8 +1,9 @@
 # Performance architecture and benchmarking
 
-**Status:** benchmark artifact version 5 covers public signal/audit workflows, the three native
+**Status:** benchmark artifact version 6 covers public signal/audit workflows, the three native
 kernels, the v0.3 path-independent cost-stress surface, the v0.4 point-in-time as-of path, v0.5
-CPCV/PBO/Reality Check/SPA reference paths, and the v0.9 integrated strategy-audit workload. The
+CPCV/PBO/Reality Check/SPA reference paths, the v0.9 integrated strategy-audit workload, and the
+v0.10-v0.12 factor-diagnostic, event-window, projection, and adapter paths. The
 measurements establish reproducible baselines; no hardware-independent latency promise is claimed.
 
 Performance is a product requirement, but only measured workloads justify optimization decisions.
@@ -93,6 +94,12 @@ measured in input intervals, PBO in enumerated symmetric combinations, and Reali
 joint bootstrap replicates. Any later optimized path must reproduce the same checksums in
 differential tests before it can replace or accompany these baselines.
 
+Artifact v6 adds grouped bucketing with deterministic null attrition, grouped neutralization,
+multi-lag turnover, explicit diagnostic portfolio projection, availability-anchored event windows,
+and chunk-preserving factor-panel adaptation. The shared generator records period/instrument scale,
+group cardinality, deterministic null stride, and chunk construction. These cases expose transfer,
+sorting, grouping, frame construction, and evidence costs; no new native path is implied.
+
 Artifact v5 adds `workflow.standard_audit.strategy`. One measured call constructs forward labels,
 signal IC, purged K-fold evidence, a stationary bootstrap, a nine-scenario cost surface, a
 point-in-time join, vendor and backtest adapter evidence, and then the standardized strategy audit.
@@ -179,7 +186,15 @@ Report warm and cold behavior separately when caches or dynamic loading matter.
 
 ## Regression policy
 
-For stable benchmark cases, a greater than roughly 10% regression in throughput or peak memory requires investigation and an explicit explanation. Statistical benchmark tooling must account for noise before failing CI.
+For every pull request and main push, the baseline and candidate small tiers run in the same Ubuntu
+24.04 job with fixed Polars and BLAS thread budgets. All legacy cases must remain present and retain
+their correctness checksum. An unexplained candidate median above 115% of its same-runner baseline
+blocks packaging. New cases are measured immediately but become regression-protected legacy cases
+after they exist in the comparison revision.
+
+Historical artifacts and measurements from different hosted runners remain descriptive. Peak-memory
+changes require investigation and explanation but are not reduced to a noisy cross-machine hard
+threshold.
 
 An accepted regression may be appropriate for correctness, stronger validation, or clearer semantics, but it is documented rather than hidden.
 

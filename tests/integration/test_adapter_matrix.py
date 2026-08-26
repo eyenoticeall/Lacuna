@@ -13,6 +13,10 @@ from lacuna.labels import forward_returns
 from lacuna.signal import ic, quantiles, turnover
 from lacuna.validation import probability_of_backtest_overfitting, superior_predictive_ability
 
+pytestmark = pytest.mark.optional_dependency(
+    reason="pandas and Arrow matrix cases require the pandas optional extra"
+)
+
 
 def _records() -> tuple[dict[str, list[object]], dict[str, list[object]]]:
     periods = 6

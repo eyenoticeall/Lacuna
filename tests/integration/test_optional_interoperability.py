@@ -7,6 +7,10 @@ import pytest
 from lacuna.adapters import as_sklearn_cv, from_duckdb
 from lacuna.cv import WalkForward
 
+pytestmark = pytest.mark.optional_dependency(
+    reason="DuckDB and scikit-learn interoperability requires their optional extras"
+)
+
 
 def test_duckdb_relation_streams_through_arrow_without_pandas() -> None:
     duckdb = pytest.importorskip("duckdb")

@@ -5,6 +5,10 @@ import pytest
 
 from lacuna.signal import ic
 
+pytestmark = pytest.mark.optional_dependency(
+    reason="SciPy reference comparisons require the statistics extra"
+)
+
 
 @pytest.mark.parametrize("method", ["pearson", "spearman"])
 def test_ic_matches_scipy_reference_with_ties(method: str) -> None:
