@@ -11,10 +11,10 @@ evaluated in four states:
 
 ## Definition ledger
 
-| v1 definition item | Status after the `0.8` milestone | Evidence and remaining gate |
+| v1 definition item | Status after the `0.9` milestone | Evidence and remaining gate |
 | --- | --- | --- |
-| stable data-contract semantics | Hardening | Labels, adapters, point-in-time joins, dataset specs, and backtest schemas are released and enter one explicit profile inventory; `0.9` must close cross-release diagnostics and `1.0` must make the stability declaration. |
-| stable result schema | Hardening | `AnalysisResult` schema 1, strict current-schema reader, JSON Schema, golden fixtures, and preserved API series exist; migration tests must exercise persisted `0.1`–`0.8` evidence before the v1 freeze. |
+| stable data-contract semantics | Released | Labels, adapters, point-in-time joins, dataset specs, and backtest schemas are released, documented, covered by frozen API series, and represented in the standardized profile and integrated workload. The `1.0` tag can make the long-term stability declaration without another internal implementation. |
+| stable result schema | Released | `AnalysisResult` schema 1 has a strict non-executing reader, JSON Schema, golden fixture, additive API series, and tagged identity-migration evidence across every `0.1`–`0.8` producer line consumed by `0.9`. |
 | mature signal diagnostics | Released | Forward labels, IC, quantiles, turnover, and multi-horizon decay shipped in `0.1`. |
 | mature financial CV | Released | Walk-forward, purged K-fold, embargo, and CPCV/path evidence shipped through `0.5`. |
 | robust bootstrap/permutation | Released | IID and dependent bootstrap plus explicit permutation nulls and deterministic streams shipped through `0.5`. |
@@ -25,11 +25,11 @@ evaluated in four states:
 | cost stress | Released | Composable costs, stress scenarios, break-even, liquidity, and capacity evidence shipped in `0.3`. |
 | point-in-time checks | Released | Availability-safe joins, revisions, future-data checks, survivorship, membership, drift, and dataset validation shipped in `0.4`. |
 | standardized audit | Released | `0.8` profiles signal, strategy, and options scopes; recognizes every released method family; exposes categorical required/optional/not-applicable coverage; preserves source findings; and emits no universal cross-phase score. |
-| reproducible reports | Hardening | `0.7` adds deterministic, checksummed, independently verifiable bundles at the `identifiable` level. Recomputable/numerical claims remain out of scope until a verified reproducer exists. |
+| reproducible reports | Released | Deterministic bundle v1 records input fingerprints, resolved configuration, Lacuna/method versions, seeds in report evidence, environment metadata, and checksummed report projections. Its explicit `identifiable` claim satisfies the specification without claiming inaccessible inputs or cross-machine numerical equality. |
 | Polars/pandas/Arrow interoperability | Released | Eager/lazy Polars, NumPy, optional pandas/Arrow, DuckDB Arrow streams, and adapter matrices run in CI; vendor/backtester and options evidence enter the standardized profile in executable integration and wheel checks. |
-| published benchmark suite | Hardening | Versioned Python artifact v5 and Criterion kernels cover public workflows; `0.9` adds a deterministic integrated strategy-audit case and a measured profile without an unjustified production optimization. |
+| published benchmark suite | Released | Versioned Python artifact v5 and Criterion kernels cover public workflows; the deterministic integrated strategy-audit case has a measured profile and no unjustified production optimization. |
 | cross-platform wheels | Released | Stable-ABI Linux x86_64/aarch64, macOS arm64, and Windows x86_64 wheels are target-smoke-tested, checksummed, and attested. |
-| comprehensive methodology docs | Hardening | Every released analytical phase has methodology and subsystem contracts; `0.9` adds an exact machine-checked root/module export inventory and semantic route for every supported module. Independent-use defects remain external evidence. |
+| comprehensive methodology docs | Released | Every analytical phase has methodology and subsystem contracts; an exact machine-checked root/module export inventory routes every supported name to its semantic documentation. Independent-use defects remain external evidence, not missing documentation structure. |
 | real users on independent stacks | External | No independent users are currently available. Maintainer testing and CI do not satisfy this item; `1.0.0` remains blocked until real independent use is evidenced or the specification is explicitly changed. |
 
 ## Coherent pre-v1 milestones
@@ -57,14 +57,22 @@ features merely to consume a number.
 
 ### `0.9` — migration and operational hardening
 
-The remaining scope is persisted-artifact migration/read compatibility, integrated workload
-benchmarks, installation diagnostics, bounded performance improvements, documentation reference
-coverage, and defects found by real external use. Work that has no evidence-backed need does not
-enter merely because `0.9` is the last pre-v1 minor.
+Completed internal scope:
+
+- persisted-artifact identity migrations and strict current readers;
+- tagged historical fixture identity and semantic round-trip regression tests;
+- integrated benchmark artifact v5 plus profile-led performance review;
+- stable-code installation diagnostics and strict automation exits;
+- exact public export/reference/design-route coverage;
+- clean-wheel, archive-content, extension-integration, and release gates for the new contracts.
+
+No independent users were available, so `0.9` does not claim real-user validation or defects found
+through it. That evidence is tracked only by the external row rather than fabricated or silently
+waived.
 
 ## Stable-release decision
 
-`1.0.0` requires every row to be released or otherwise satisfied with reviewable evidence. Internal
-tests may close internal rows; they cannot close the independent-use row. The earlier maintainer
-waiver that permitted the initial public release does not silently waive the technical
-specification's v1 definition.
+Every internal row now has released or release-gated evidence. `1.0.0` remains blocked solely by the
+independent-use row: repository tests cannot prove that real users can apply Lacuna on independent
+research stacks. The earlier maintainer waiver that permitted the initial public release does not
+silently waive the technical specification's v1 definition.

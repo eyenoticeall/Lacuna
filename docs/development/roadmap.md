@@ -19,7 +19,7 @@ such as `0.2.0rc1`.
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Released |
 | `0.7.x` | Portable, deterministic, independently verifiable evidence bundles | Released |
 | `0.8.x` | Versioned cross-phase standardized audit profiles and evidence composition | Released |
-| `0.9.x` | Persisted-artifact migration, integrated performance, diagnostics, and real-user hardening | No missing internal v1 contract or unresolved release blocker |
+| `0.9.x` | Persisted-artifact migration, integrated performance, diagnostics, and reference hardening | Released |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -218,7 +218,13 @@ propagated without reinterpretation; no universal score is emitted; strict v1 re
 composition are bounded; vendor, backtester, options, bundle, installed-wheel, and release archive
 paths are executable.
 
-The current status of every stable-release criterion and the remaining `0.9` boundary live
+The third coherent integration milestone is `0.9`: an explicit identity-migration matrix and
+tagged-fixture corpus for persisted formats; strict profile/manifest readers; versioned, non-invasive
+installation diagnostics; benchmark artifact v5 with a profiled integrated strategy workflow; and
+an exact machine-checked reference route for every supported export. No speculative performance
+path was added when profiling found no justified semantic-preserving change.
+
+The current status of every stable-release criterion and the remaining external `1.0` boundary live
 in the [v1 readiness ledger](v1-readiness.md).
 
 ## Historical v0.1 boundary

@@ -629,7 +629,7 @@ wheels = [
 
 [[package]]
 name = "lacuna"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -720,7 +720,7 @@ docs = [{ name = "mkdocs-material", specifier = ">=9.6" }]
 
 [[package]]
 name = "lacuna-options"
-version = "0.1.2"
+version = "0.1.3"
 source = { editable = "extensions/lacuna-options" }
 dependencies = [
     { name = "lacuna" },

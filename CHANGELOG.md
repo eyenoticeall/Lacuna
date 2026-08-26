@@ -4,6 +4,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.9.0] - 2026-08-26
+
 ### Added
 
 - Add a published persisted-artifact compatibility matrix and tagged-fixture regression corpus for
@@ -23,6 +25,14 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Add a complete Python API surface reference and versioned coverage manifest; contract tests now
   require every cumulative root/module export, compatibility fixture, human symbol section, and
   semantic design route to agree exactly.
+
+### Changed
+
+- Advance `lacuna-options` to `0.1.3` only to widen its compatible core range to
+  `lacuna>=0.5,<0.10`; its independent `0.1.x` Python API and analytical semantics are unchanged.
+- Complete the internal `0.9` roadmap boundary and v1 ledger audit. Every internal v1 definition
+  item now has released or release-gated evidence; `1.0.0` remains blocked by the explicitly
+  external requirement for real users applying Lacuna to independent research stacks.
 
 ## [0.8.0] - 2026-08-26
 

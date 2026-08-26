@@ -127,8 +127,8 @@ universal `lacuna-options` wheel and source distribution, installs that wheel wi
 target-smoke-tested Linux core wheel, and runs the extension smoke contract.
 
 A separate job downloads the complete matrix, rejects missing or unexpected filenames/tags/names/
-versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.8.0` tag
-with extension `0.1.2`, the release set is exactly four core wheels, one extension wheel, two source
+versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.9.0` tag
+with extension `0.1.3`, the release set is exactly four core wheels, one extension wheel, two source
 distributions, and the checksum manifest.
 
 Only the final publication job has `contents: write`, attestation, and OIDC permissions. Build jobs
@@ -145,12 +145,12 @@ its checksummed, attested GitHub Release artifacts.
 Stable and candidate tags use Cargo/SemVer spelling:
 
 ```text
-v0.8.0
-v0.8.0-rc.1
+v0.9.0
+v0.9.0-rc.1
 ```
 
-Python package metadata normalizes a candidate such as `0.8.0-rc.1` to `0.8.0rc1`; stable package
-metadata is `0.8.0`. The release verifier owns this mapping and prevents the two surfaces from
+Python package metadata normalizes a candidate such as `0.9.0-rc.1` to `0.9.0rc1`; stable package
+metadata is `0.9.0`. The release verifier owns this mapping and prevents the two surfaces from
 drifting.
 
 The core tag does not rename the extension. The verifier independently checks the extension

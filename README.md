@@ -24,15 +24,15 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.8** adds standardized signal, strategy, and options audit profiles across every
-> released evidence family, with explicit categorical coverage, unchanged domain findings, strict
-> result JSON ingestion, and no misleading universal score. The additive core `0.8.x` contract
-> preserves every earlier compatibility fixture; `lacuna-options` `0.1.2` keeps the same API while
-> expanding compatibility through core `0.8.x`.
+> Lacuna **v0.9** is the migration and operational-hardening milestone: tagged-fixture compatibility
+> covers persisted result, bundle, and audit-profile contracts; versioned installation diagnostics
+> provide an automation-ready strict gate; benchmark artifact v5 measures the integrated strategy
+> audit; and an executable documentation manifest covers every public export. `lacuna-options`
+> `0.1.3` keeps the same API while expanding compatibility through core `0.9.x`.
 > Lacuna remains pre-1.0 software; later minor versions may evolve through documented migrations.
 
 > [!NOTE]
-> [`v0.8.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.8.0)
+> [`v0.9.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.9.0)
 > as checksummed, provenance-attested core and options wheels/source distributions. The PyPI
 > distribution name `lacuna` belongs to an unrelated project, so do not install that package
 > expecting this software.
