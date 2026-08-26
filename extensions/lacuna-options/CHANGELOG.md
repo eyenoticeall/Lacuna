@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4] - 2026-08-26
+
+### Changed
+
+- Expand the compatible core range to `lacuna>=0.5,<0.11` after the additive Lacuna `0.10`
+  signal-transformation and evidence-rendering milestone passed the unchanged extension API,
+  property, packaging, and joint-install gates.
+
 ## [0.1.3] - 2026-08-26
 
 ### Changed

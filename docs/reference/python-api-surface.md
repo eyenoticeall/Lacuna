@@ -1,6 +1,6 @@
 # Python API surface
 
-This is the complete import inventory for Lacuna core `0.9.x`. It answers where a supported name
+This is the complete import inventory for Lacuna core `0.10.x`. It answers where a supported name
 lives and routes each module to the document that defines its semantics. Callable signatures are
 frozen by the cumulative `tests/fixtures/public-api-v0.*.json` contracts; formulas, temporal rules,
 failure modes, and result interpretation live in the linked design and methodology pages.
@@ -43,12 +43,12 @@ available without importing implementation modules. See [Python API design](../d
 
 Exports: `BUNDLE_FORMAT`, `BUNDLE_VERSION`, `DIAGNOSTIC_VERSION`, `AnalysisResult`, `Applicability`,
 `ApplicabilityState`, `AuditContext`, `AuditProfile`, `AuditReport`, `AuditRule`, `AuditScope`,
-`BenchmarkCase`, `BenchmarkConfig`, `BenchmarkSuite`, `BundleArtifact`, `BundleManifest`,
+`BenchmarkCase`, `BenchmarkConfig`, `BenchmarkSuite`, `BucketSpec`, `BundleArtifact`, `BundleManifest`,
 `BundleVerification`, `Config`, `ConfigurationError`, `DataContractError`, `DiagnosticCheck`,
 `DiagnosticState`, `EvidenceDisposition`, `EvidenceRequirement`, `ExperimentRegistry`, `Finding`,
 `FindingState`, `InstallationDiagnostics`, `LabelResult`, `LacunaError`, `MethodContractError`,
 `NativeExtensionError`, `PluginError`, `ReportError`, `ResultMetadata`, `Severity`, `SignalStudy`,
-`__version__`, `adapters`, `audit`, `benchmark_config_for_tier`, `bias`, `bundle`, `config`,
+`SignalTransformResult`, `__version__`, `adapters`, `audit`, `benchmark_config_for_tier`, `bias`, `bundle`, `config`,
 `configure`, `costs`, `create_bundle`, `cv`, `default_rules`, `diagnose_installation`, `diagnostics`,
 `experiment`, `get_config`, `labels`, `plugins`, `regime`, `robustness`, `run_audit`,
 `run_benchmarks`, `run_standard_audit`, `signal`, `standard_audit`, `standard_profile`, `validation`,
@@ -175,10 +175,13 @@ Exports: `ClassificationMode`, `QuantileMethod`, `quantile_regimes`, `regime_ana
 
 ## `lacuna.report`
 
-Projects immutable audit evidence into canonical JSON, Markdown, and self-contained escaped HTML.
-Rendering does not reinterpret finding states. See [Audit and reporting](../subsystems/audit-reporting.md).
+Projects immutable audit and named analytical evidence into canonical JSON, Markdown, and
+self-contained escaped HTML. The optional Plotly renderer reads stored rows only; rendering does not
+reinterpret findings or calculate statistics. See
+[Audit and reporting](../subsystems/audit-reporting.md).
 
-Exports: `AuditReport`, `render_html`, `render_markdown`.
+Exports: `AuditReport`, `ReportRenderer`, `ReportView`, `render_html`, `render_markdown`,
+`render_plotly_html`.
 
 ## `lacuna.robustness`
 
@@ -199,10 +202,13 @@ Exports: `audit_result_v1_text`, `bundle_manifest_v1_text`,
 
 ## `lacuna.signal`
 
-Computes Pearson/Spearman information coefficient, balanced quantile evidence, turnover, and
-multi-horizon decay over explicit label contracts. See [Signals and labels](../subsystems/signal-labels.md).
+Constructs explicit immutable buckets and neutralized signals, then computes grouped
+Pearson/Spearman information coefficient, bucket/quantile evidence, multi-lag turnover, and
+multi-horizon decay over explicit label contracts. See
+[Signals and labels](../subsystems/signal-labels.md).
 
-Exports: `CorrelationMethod`, `decay`, `ic`, `quantiles`, `turnover`.
+Exports: `BucketSpec`, `CorrelationMethod`, `SignalTransformResult`, `bucket_returns`, `bucketize`,
+`decay`, `ic`, `neutralize`, `quantiles`, `turnover`.
 
 ## `lacuna.validation`
 

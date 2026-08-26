@@ -35,6 +35,27 @@ def _signature(value: object) -> str:
     )
 
 
+def _assert_additive_signature(value: object, expected_text: str) -> None:
+    namespace: dict[str, object] = {}
+    exec(compile(f"def _contract{expected_text}:\n    pass", "<api-contract>", "exec"), namespace)
+    expected = inspect.signature(namespace["_contract"])
+    current = inspect.signature(value)
+    current_names = tuple(current.parameters)
+    previous_index = -1
+    for name, parameter in expected.parameters.items():
+        index = current_names.index(name)
+        assert index > previous_index
+        previous_index = index
+        observed = current.parameters[name]
+        assert observed.kind == parameter.kind
+        assert observed.default == parameter.default
+    additions = set(current.parameters) - set(expected.parameters)
+    for name in additions:
+        parameter = current.parameters[name]
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        assert parameter.default is not inspect.Parameter.empty
+
+
 def test_root_exports_preserve_the_v0_1_contract() -> None:
     contract = _contract()
     expected = contract["root_exports"]
@@ -59,18 +80,14 @@ def test_public_call_signatures_match_the_v0_1_contract() -> None:
     callables = contract["callables"]
     assert isinstance(callables, list)
 
-    observed = []
     for item in callables:
         assert isinstance(item, dict)
         module_name = item["module"]
         qualname = item["qualname"]
         assert isinstance(module_name, str)
         assert isinstance(qualname, str)
-        observed.append(
-            {
-                "module": module_name,
-                "qualname": qualname,
-                "signature": _signature(_resolve(module_name, qualname)),
-            }
-        )
-    assert observed == callables
+        value = _resolve(module_name, qualname)
+        expected = item["signature"]
+        assert isinstance(expected, str)
+        if _signature(value) != expected:
+            _assert_additive_signature(value, expected)

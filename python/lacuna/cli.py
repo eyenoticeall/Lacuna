@@ -18,7 +18,7 @@ from lacuna.bundle import verify_bundle
 from lacuna.diagnostics import DiagnosticState, diagnose_installation
 from lacuna.exceptions import DataContractError, LacunaError, ReportError
 from lacuna.labels import PriceAdjustment
-from lacuna.report import AuditReport
+from lacuna.report import AuditReport, ReportRenderer
 from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult, FindingState, JsonValue
 
@@ -62,11 +62,16 @@ def _scan_frame(path: str) -> pl.LazyFrame:
     )
 
 
-def _render_report(report: AuditReport, selected: ReportFormat) -> str:
+def _render_report(
+    report: AuditReport,
+    selected: ReportFormat,
+    *,
+    html_renderer: ReportRenderer,
+) -> str:
     if selected == "json":
         return report.to_json() + "\n"
     if selected == "html":
-        return report.to_html()
+        return report.to_html(renderer=html_renderer)
     return report.to_markdown()
 
 
@@ -160,12 +165,13 @@ def _run_signal(arguments: argparse.Namespace) -> int:
         destination = report.write(
             arguments.out,
             format=arguments.format,
+            renderer=arguments.html_renderer,
             overwrite=arguments.overwrite,
         )
         print(f"wrote Lacuna audit to {destination}", file=sys.stderr)
     else:
         selected = cast(ReportFormat, arguments.format or "markdown")
-        print(_render_report(report, selected), end="")
+        print(_render_report(report, selected, html_renderer=arguments.html_renderer), end="")
     return _audit_exit_code(report, arguments.fail_on)
 
 
@@ -193,12 +199,13 @@ def _run_standard_audit(arguments: argparse.Namespace) -> int:
         destination = report.write(
             arguments.out,
             format=arguments.format,
+            renderer=arguments.html_renderer,
             overwrite=arguments.overwrite,
         )
         print(f"wrote Lacuna audit to {destination}", file=sys.stderr)
     else:
         selected = cast(ReportFormat, arguments.format or "markdown")
-        print(_render_report(report, selected), end="")
+        print(_render_report(report, selected, html_renderer=arguments.html_renderer), end="")
     return _audit_exit_code(report, arguments.fail_on)
 
 
@@ -285,6 +292,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     audit.add_argument("--out", help="write the report to this path")
     audit.add_argument(
+        "--html-renderer",
+        choices=("core", "plotly"),
+        default="core",
+        help="HTML renderer; Plotly requires the report extra",
+    )
+    audit.add_argument(
         "--bundle",
         help="also write a deterministic .lacuna reproducibility bundle",
     )
@@ -366,6 +379,12 @@ def _parser() -> argparse.ArgumentParser:
         help="report format; inferred from --out or Markdown on stdout",
     )
     signal.add_argument("--out", help="write the report to this path")
+    signal.add_argument(
+        "--html-renderer",
+        choices=("core", "plotly"),
+        default="core",
+        help="HTML renderer; Plotly requires the report extra",
+    )
     signal.add_argument(
         "--bundle",
         help="also write a deterministic .lacuna reproducibility bundle",

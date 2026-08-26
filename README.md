@@ -24,11 +24,10 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.9** is the migration and operational-hardening milestone: tagged-fixture compatibility
-> covers persisted result, bundle, and audit-profile contracts; versioned installation diagnostics
-> provide an automation-ready strict gate; benchmark artifact v5 measures the integrated strategy
-> audit; and an executable documentation manifest covers every public export. `lacuna-options`
-> `0.1.3` keeps the same API while expanding compatibility through core `0.9.x`.
+> Lacuna **v0.10** adds explicit group-aware signal transformations, attrition evidence, multi-lag
+> stability diagnostics, and an opt-in interactive renderer over retained evidence. These additions
+> preserve the core renderer, audit-result schema, and the boundary between diagnostics and
+> backtesting. `v0.9.0` remains the latest published GitHub release while the v0.10 release gates run.
 > Lacuna remains pre-1.0 software; later minor versions may evolve through documented migrations.
 
 > [!NOTE]
@@ -349,8 +348,10 @@ bootstrap, audit/reporting, experiment lineage, multiple-testing correction, rob
 trading-realism evidence, point-in-time data correctness, and advanced inference. Released `0.6`
 adds optional adapters/plugins and the separate options package without expanding the core
 dependency surface. Released `0.7` adds portable identifiable-level evidence bundles, and released
-`0.8` adds scope-specific cross-phase standardized audits. `0.9` is reserved for migration,
-integrated performance, diagnostics, and real-user hardening before a stable `1.0.0` contract.
+`0.8` adds scope-specific cross-phase standardized audits, and `0.9` adds migration, integrated
+performance, and installation diagnostics. `0.10`–`0.12` add factor-research ergonomics through
+explicit transformations, inference, event analysis, and generic interoperability while retaining
+the no-backtester boundary.
 
 See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
 and the full [technical specification](LACUNA_TECHNICAL_SPEC.md) for architecture and statistical
@@ -367,7 +368,7 @@ The technical specification is backed by implementation-oriented documentation:
 - [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
 - [coding-agent playbooks and review checklist](docs/agents/index.md).
 
-The documentation distinguishes released v0.1–v0.8 behavior from later contracts. Contributors
+The documentation distinguishes released v0.1–v0.9 behavior from later contracts. Contributors
 and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
 subsystem pages before changing a method.
 

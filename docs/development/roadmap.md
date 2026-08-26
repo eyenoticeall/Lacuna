@@ -20,6 +20,9 @@ such as `0.2.0rc1`.
 | `0.7.x` | Portable, deterministic, independently verifiable evidence bundles | Released |
 | `0.8.x` | Versioned cross-phase standardized audit profiles and evidence composition | Released |
 | `0.9.x` | Persisted-artifact migration, integrated performance, diagnostics, and reference hardening | Released |
+| `0.10.x` | Group-aware signal transformations, attrition, multi-lag stability, interactive evidence | Implemented; release gates pending |
+| `0.11.x` | Validated decay inference, diagnostic portfolio projection, robust event studies | Planned |
+| `0.12.x` | Generic factor-panel interoperability and migration guidance | Planned |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -226,6 +229,28 @@ path was added when profiling found no justified semantic-preserving change.
 
 The current status of every stable-release criterion and the remaining external `1.0` boundary live
 in the [v1 readiness ledger](v1-readiness.md).
+
+## Factor-research ergonomics (`0.10`–`0.12`)
+
+These milestones adopt proven factor-research ergonomics without turning Lacuna into a notebook
+plotting package, cumulative backtester, or order simulator.
+
+`0.10` introduces immutable `BucketSpec`/`SignalTransformResult` contracts, explicit bucket-return
+analysis, availability-aware grouping, weighted least-squares neutralization, reconciled attrition,
+exact multi-lag turnover, retained study evidence, and an opt-in Plotly renderer over stored rows.
+Core rendering and schema-v1 audit JSON remain unchanged.
+
+`0.11` adds a validated positive exponential decay fit with dependence-aware joint resampling,
+explicit diagnostic portfolio weights without compounding or execution simulation, and event
+windows anchored to availability with clustered path inference. The portfolio boundary requires an
+ADR before implementation.
+
+`0.12` adds generic factor-panel schemas and fully declared timing semantics across Polars, Arrow,
+and optional pandas MultiIndexes. It also publishes migration guidance and frozen compatible
+numeric fixtures without a runtime Alphalens dependency.
+
+Excluded throughout: lookahead z-score filtering, implicit calendars or timing, mandatory pandas
+or plotting, cumulative backtesting, order/fill simulation, and plotting side effects.
 
 ## Historical v0.1 boundary
 

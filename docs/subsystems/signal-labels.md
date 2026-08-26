@@ -1,7 +1,8 @@
 # Signal analytics and forward labels
 
-**Status:** the v0.1 forward-label and signal-diagnostic APIs are implemented. Weighted IC,
-neutralization, specialized half-life models, and additional tie policies remain later work.
+**Status:** v0.10 adds explicit group-aware bucket transformations, weighted least-squares
+neutralization, standardized attrition ledgers, and exact multi-lag turnover to the v0.1 label and
+signal foundation. Weighted IC and validated half-life inference remain later work.
 
 This subsystem answers: does a cross-sectional feature contain predictive information under explicit earning and execution assumptions?
 
@@ -24,7 +25,9 @@ explicit forward-return labels
           ▼
 aligned signal-label panel
           │
-          ├── IC / quantiles / turnover / decay
+          ├── explicit transformations
+          │      bucketize / neutralize
+          ├── IC / bucket returns / turnover / decay
           ▼
 structured signal evidence
 ```
@@ -91,6 +94,9 @@ Label construction defines:
 - last-period censoring.
 
 Unknown price adjustment or delisting behavior becomes structured evidence in downstream audits.
+Label evidence includes a `data_attrition` table. Each source-quality or horizon-eligibility row
+records `input_rows`, `retained_rows`, `excluded_rows`, `excluded_fraction`, and the applied policy;
+the counts reconcile exactly within that stage.
 
 ## Alignment
 
@@ -153,13 +159,52 @@ n_periods
 n_observations
 ```
 
-Tables include period IC, observation count, excluded count, and optional group/horizon keys. Inference over the IC time series must account for serial dependence when claimed.
+Tables include period IC, observation count, excluded count, and optional group/horizon keys.
+Inference over the IC time series must account for serial dependence when claimed.
+
+When `by` contains declared group columns, subgroup rows and pooled headline rows are computed
+independently. Group columns survive alignment and appear in the period/horizon tables. A headline
+metric never comes from the first subgroup. `group_available_time` proves that classifications were
+available no later than observation time; future availability raises and absent availability emits
+`GROUP_AVAILABILITY_UNKNOWN`.
 
 ## Weighted IC
 
 Weights are non-negative finite values aligned row-wise. The result documents whether weights are normalized within period and which weighted covariance definition is used. Zero-total-weight groups are undefined, not zero.
 
-## Quantile analysis
+## Explicit bucketing and quantile analysis
+
+`BucketSpec` freezes assignment semantics before returns are examined:
+
+```python
+bucketed = lc.signal.bucketize(
+    signal,
+    spec=lc.BucketSpec.quantiles(
+        10,
+        tie_policy="preserve",
+        split_at=0.0,
+        equal_to="upper",
+    ),
+    by=("time", "sector"),
+    available_time="sector_available_time",
+)
+bucket_evidence = lc.signal.bucket_returns(
+    bucketed,
+    labels,
+    by=("observation_time", "sector"),
+)
+```
+
+Supported specifications are quantiles, equal-width ranges, explicit numeric edges, and a binary
+threshold. Numeric intervals are left-closed/right-open except for the final closed interval.
+Quantile boundaries include zero and one and are strictly increasing. Balanced ties use stable
+instrument identity as the final ordering key; preserve-ties uses average-rank percentiles and never
+splits equal values. Split-aware quantiles allocate the odd extra bucket to the side selected by
+`equal_to`.
+
+Transformations raise on undersized groups and out-of-range edge values by default. Explicit drop
+policies retain exact `data_attrition` rows and findings. Weighted buckets are intentionally absent
+until their estimand and boundary-tie semantics are specified.
 
 Public API:
 
@@ -197,15 +242,20 @@ No single component is labeled universal “signal quality.”
 
 ## Turnover
 
-v0.1 exposes distinct concepts:
+Turnover exposes distinct concepts:
 
 - rank turnover between consecutive observations;
 - top/bottom membership turnover;
 - signal autocorrelation.
 
-Portfolio-weight turnover is later because a signal study does not contain portfolio weights.
+`lags=(1, ...)` uses positive global observation-index lags and always includes one. The legacy
+`turnover_by_period` and lag-one headlines remain unchanged. Additive tables expose every requested
+lag, common-instrument count, exact from/to observation times, rank turnover, autocorrelation, and
+symmetric membership turnover for every bucket.
 
-Membership turnover must define entry, exit, and denominator conventions. Portfolio turnover distinguishes one-way from two-way turnover. Gaps in an instrument's observations are not automatically consecutive.
+An instrument participates only when it exists at both exact endpoints. A missing intermediate row
+does not prevent a lag-two comparison, and a missing endpoint is never replaced by the nearest row.
+Portfolio-weight turnover is separate because a signal study does not contain portfolio weights.
 
 ## Decay
 
@@ -215,7 +265,10 @@ A half-life estimate is emitted only when the decay curve and model assumptions 
 
 ## Neutralization
 
-Neutralization residualizes a signal against declared exposures within each period. Initial implementations should use mature weighted least-squares routines.
+`neutralize()` residualizes a signal against declared, already aligned exposures within each group.
+It uses float64 `numpy.linalg.lstsq`, an intercept by default, deterministic reference-level
+categorical encoding, and positive finite weights. A separate exposure frame joins on observation
+time and stable instrument identity; the operation never performs an implicit as-of join.
 
 The contract defines:
 
@@ -227,7 +280,14 @@ The contract defines:
 - minimum degrees of freedom;
 - whether winsorization or standardization occurs before or after residualization.
 
-Neutralization is a transformation result with diagnostics, not a hidden option inside IC.
+The immutable result preserves `source_signal`, places residuals in canonical `signal`, and records
+coefficients, matrix rank, condition, residual degrees of freedom, weighted fit diagnostics, and
+attrition. Rank deficiency uses the minimum-norm solution with a finding. Insufficient residual
+degrees of freedom raise by default. Exposure availability is verified when provided, future-dated
+rows raise, and absent availability remains `UNKNOWN`.
+
+Neutralization is a transformation result with diagnostics, not a hidden option inside IC. It does
+not standardize, winsorize, join historical revisions, or choose exposures for the caller.
 
 ## Native candidates
 
@@ -246,13 +306,22 @@ Polars should own alignment, projection, and ordinary grouping unless benchmarks
 - Average-rank tie fixtures.
 - Constant signal/label and undersized groups.
 - Quantile conservation and deterministic ties.
-- Known turnover transitions.
+- Known single- and multi-lag turnover transitions, missing endpoints, and exact lag-one fixtures.
+- Bucket edge closure, tie preservation, split-aware assignment, conservation, and permutation.
+- Hand-solvable and weighted-orthogonality neutralization fixtures, rank deficiency, and invalid
+  weights.
+- Time-varying group classifications with verified, unknown, and future availability.
+- Exact reconciliation for every `data_attrition` row.
 - No same-close entry under `signal_time="close"`, `entry="next_open"`.
 - Calendar, missing-bar, delisting, and last-horizon censoring.
 - Eager/lazy and adapter equivalence.
 - Native/reference differential tests.
 - Null, NaN, infinity, duplicate, and timezone policies.
 
-## v0.1 versus later
+## Current boundary versus later
 
-v0.1 includes forward returns, Pearson/Spearman IC, IC time series, quantiles, spread, monotonicity, turnover, and decay. Weighted/grouped extensions can land when their contracts are complete. Large repeated neutralization kernels and specialized estimators are later optimization work.
+The current boundary includes forward returns, grouped Pearson/Spearman IC, explicit buckets,
+quantile compatibility, spread, monotonicity, multi-lag turnover, neutralization, and descriptive
+decay. Weighted IC, weighted bucketing, decay inference, portfolio projections, and event studies
+require their separately versioned contracts. A native transformation kernel is not justified
+without profiling, a reference path, and differential evidence.

@@ -1,7 +1,7 @@
 {
   "format": "lacuna.public-reference-coverage",
   "manifest_version": 1,
-  "package_series": "0.9",
+  "package_series": "0.10",
   "root": {
     "module": "lacuna",
     "reference": "docs/reference/python-api-surface.md",
@@ -21,6 +21,7 @@
       "BenchmarkCase",
       "BenchmarkConfig",
       "BenchmarkSuite",
+      "BucketSpec",
       "BundleArtifact",
       "BundleManifest",
       "BundleVerification",
@@ -44,6 +45,7 @@
       "ResultMetadata",
       "Severity",
       "SignalStudy",
+      "SignalTransformResult",
       "__version__",
       "adapters",
       "audit",
@@ -283,7 +285,14 @@
       "module": "lacuna.report",
       "reference": "docs/reference/python-api-surface.md",
       "design": "docs/subsystems/audit-reporting.md",
-      "exports": ["AuditReport", "render_html", "render_markdown"]
+      "exports": [
+        "AuditReport",
+        "ReportRenderer",
+        "ReportView",
+        "render_html",
+        "render_markdown",
+        "render_plotly_html"
+      ]
     },
     {
       "module": "lacuna.robustness",
@@ -316,7 +325,18 @@
       "module": "lacuna.signal",
       "reference": "docs/reference/python-api-surface.md",
       "design": "docs/subsystems/signal-labels.md",
-      "exports": ["CorrelationMethod", "decay", "ic", "quantiles", "turnover"]
+      "exports": [
+        "BucketSpec",
+        "CorrelationMethod",
+        "SignalTransformResult",
+        "bucket_returns",
+        "bucketize",
+        "decay",
+        "ic",
+        "neutralize",
+        "quantiles",
+        "turnover"
+      ]
     },
     {
       "module": "lacuna.validation",

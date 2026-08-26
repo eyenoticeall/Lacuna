@@ -11,15 +11,23 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from lacuna._attrition import attrition_record
 from lacuna._frames import (
     FrameDiagnostics,
     eager_frame,
     frame_records,
     paired_numeric_policy,
     require_compatible_keys,
+    require_no_nulls,
     require_unique,
     validate_label_intervals,
     validate_panel_schema,
+)
+from lacuna._signal_transform import (
+    BucketSpec,
+    SignalTransformResult,
+    bucketize,
+    neutralize,
 )
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.labels import Horizon, LabelResult, forward_returns
@@ -128,8 +136,11 @@ def _aligned_panel(
     signal_value: str,
     label_value: str,
     null_policy: Literal["drop", "raise"],
+    extra_signal_columns: Sequence[str] = (),
 ) -> tuple[pl.DataFrame, FrameDiagnostics, FrameDiagnostics, int, int, int]:
     if isinstance(signal_data, np.ndarray) and isinstance(labels, np.ndarray):
+        if extra_signal_columns:
+            raise DataContractError("NumPy signal input cannot provide grouping columns")
         panel, signal_diagnostics, label_diagnostics = _array_panel(signal_data, labels)
         panel, excluded = paired_numeric_policy(
             panel, ["signal", "forward_return"], null_policy=null_policy
@@ -145,7 +156,7 @@ def _aligned_panel(
 
     signal_frame, signal_diagnostics = eager_frame(
         signal_data,
-        required=[signal_time, instrument, signal_value],
+        required=[signal_time, instrument, signal_value, *extra_signal_columns],
     )
     label_source = labels.frame if isinstance(labels, LabelResult) else labels
     label_frame, label_diagnostics = eager_frame(
@@ -159,6 +170,7 @@ def _aligned_panel(
         numeric=[signal_value],
         name="signal",
     )
+    require_no_nulls(signal_frame, extra_signal_columns, name="signal grouping columns")
     label_key = [label_time, instrument]
     if "horizon" in label_frame.columns:
         label_key.append("horizon")
@@ -188,11 +200,15 @@ def _aligned_panel(
         "inner_join_signal_labels",
     )
 
-    signal_projection = signal_frame.select(
+    signal_expressions = [
         pl.col(signal_time).alias("observation_time"),
         pl.col(instrument).alias("instrument"),
         pl.col(signal_value).cast(pl.Float64).alias("signal"),
-    )
+    ]
+    for column in extra_signal_columns:
+        if column not in {signal_time, instrument, signal_value}:
+            signal_expressions.append(pl.col(column))
+    signal_projection = signal_frame.select(signal_expressions)
     label_expressions = [
         pl.col(label_time).alias("observation_time"),
         pl.col(instrument).alias("instrument"),
@@ -245,6 +261,68 @@ def _group_keys(panel: pl.DataFrame, by: str | Sequence[str] | None) -> list[str
     if "horizon" in panel.columns and "horizon" not in keys:
         keys.append("horizon")
     return keys
+
+
+def _normalized_group_request(
+    by: str | Sequence[str] | None,
+    *,
+    signal_time: str,
+) -> tuple[str, ...]:
+    if by is None:
+        return ()
+    raw = (by,) if isinstance(by, str) else tuple(by)
+    if any(not key for key in raw) or len(set(raw)) != len(raw):
+        raise MethodContractError("by must contain unique non-empty column names")
+    return tuple("observation_time" if key == signal_time else key for key in raw)
+
+
+def _group_availability_findings(
+    panel: pl.DataFrame,
+    *,
+    keys: Sequence[str],
+    available_time: str | None,
+) -> tuple[Finding, ...]:
+    group_dimensions = [key for key in keys if key not in {"observation_time", "horizon"}]
+    if not group_dimensions:
+        return ()
+    if available_time is None:
+        return (
+            Finding(
+                code="GROUP_AVAILABILITY_UNKNOWN",
+                title="Group availability is not established",
+                message=(
+                    "Grouped analysis cannot prove that classifications were historically "
+                    "available."
+                ),
+                state=FindingState.UNKNOWN,
+                severity=Severity.HIGH,
+                category="temporal_integrity",
+                evidence={"group_columns": tuple(group_dimensions)},
+            ),
+        )
+    if panel.schema[available_time] != panel.schema["observation_time"]:
+        raise DataContractError(
+            "group availability and observation-time columns must use matching dtypes"
+        )
+    future = int(panel.select((pl.col(available_time) > pl.col("observation_time")).sum()).item())
+    if future:
+        raise DataContractError(
+            f"group attributes contain {future} rows available after observation time"
+        )
+    return (
+        Finding(
+            code="GROUP_AVAILABILITY_VERIFIED",
+            title="Group attributes satisfy the availability cutoff",
+            message="Every grouped row was available by its observation time.",
+            state=FindingState.PASS,
+            severity=Severity.INFO,
+            category="temporal_integrity",
+            evidence={
+                "group_columns": tuple(group_dimensions),
+                "available_time_column": available_time,
+            },
+        ),
+    )
 
 
 def _reference_grouped_ic(
@@ -329,8 +407,13 @@ def _ic_metrics(values: Sequence[float], n_observations: int) -> dict[str, JsonV
 def _horizon_summary(period_ic: pl.DataFrame) -> pl.DataFrame:
     if "horizon" not in period_ic.columns:
         return pl.DataFrame()
+    summary_keys = [
+        column
+        for column in period_ic.columns
+        if column not in {"observation_time", "ic", "n_observations"}
+    ]
     return (
-        period_ic.group_by("horizon", maintain_order=True)
+        period_ic.group_by(summary_keys, maintain_order=True)
         .agg(
             pl.col("ic").drop_nulls().mean().alias("mean_ic"),
             pl.col("ic").drop_nulls().median().alias("median_ic"),
@@ -339,7 +422,7 @@ def _horizon_summary(period_ic: pl.DataFrame) -> pl.DataFrame:
             pl.col("n_observations").sum(),
         )
         .with_columns((pl.col("mean_ic") / pl.col("std_ic")).alias("ic_information_ratio"))
-        .sort("horizon")
+        .sort(summary_keys)
     )
 
 
@@ -355,6 +438,7 @@ def ic(
     signal_value: str = "signal",
     label_value: str = "forward_return",
     min_observations: int = 3,
+    group_available_time: str | None = None,
     null_policy: Literal["drop", "raise"] = "drop",
     use_native: bool = True,
 ) -> AnalysisResult:
@@ -364,6 +448,10 @@ def ic(
         raise MethodContractError("method must be 'pearson' or 'spearman'")
     if min_observations < 2:
         raise MethodContractError("min_observations must be at least 2")
+    normalized_by = _normalized_group_request(by, signal_time=signal_time)
+    extra_columns = [key for key in normalized_by if key not in {"observation_time", "horizon"}]
+    if group_available_time is not None:
+        extra_columns.append(group_available_time)
     panel, signal_diagnostics, label_diagnostics, excluded, signal_rows, matched = _aligned_panel(
         signal,
         labels,
@@ -373,8 +461,14 @@ def ic(
         signal_value=signal_value,
         label_value=label_value,
         null_policy=null_policy,
+        extra_signal_columns=tuple(dict.fromkeys(extra_columns)),
     )
-    keys = _group_keys(panel, by)
+    keys = _group_keys(panel, normalized_by)
+    availability_findings = _group_availability_findings(
+        panel,
+        keys=keys,
+        available_time=group_available_time,
+    )
     group_sizes = (
         panel.group_by(keys, maintain_order=True).len(name="_group_size")
         if keys
@@ -388,6 +482,14 @@ def ic(
     if keys:
         panel = panel.join(eligible_sizes.select(keys), on=keys, how="inner")
 
+    def compute(source: pl.DataFrame, group_keys: Sequence[str]) -> pl.DataFrame:
+        if method == "spearman" and use_native:
+            try:
+                return _native_grouped_rank_ic(source, group_keys)
+            except (ImportError, AttributeError):
+                return _reference_grouped_ic(source, group_keys, method)
+        return _reference_grouped_ic(source, group_keys, method)
+
     backend = "numpy_reference"
     if method == "spearman" and use_native:
         try:
@@ -399,12 +501,16 @@ def ic(
         period_ic = _reference_grouped_ic(panel, keys, method)
 
     period_ic = period_ic.sort(keys) if keys else period_ic
+    overall_keys = [key for key in keys if key in {"observation_time", "horizon"}]
+    overall_period_ic = compute(panel, overall_keys) if overall_keys != keys else period_ic
+    overall_period_ic = overall_period_ic.sort(overall_keys) if overall_keys else overall_period_ic
     defined = period_ic.filter(pl.col("ic").is_not_null())
-    values = defined.get_column("ic").to_list()
-    metrics = _ic_metrics(values, int(period_ic.get_column("n_observations").sum()))
+    overall_defined = overall_period_ic.filter(pl.col("ic").is_not_null())
+    values = overall_defined.get_column("ic").to_list()
+    metrics = _ic_metrics(values, int(overall_period_ic.get_column("n_observations").sum()))
     undefined_count = period_ic.height - defined.height
     undersized_count = group_sizes.height - eligible_sizes.height
-    findings: list[Finding] = []
+    findings: list[Finding] = list(availability_findings)
     if undefined_count:
         findings.append(
             Finding(
@@ -429,7 +535,7 @@ def ic(
                 evidence={"excluded_groups": undersized_count, "minimum": min_observations},
             )
         )
-    if defined.height < 20:
+    if overall_defined.height < 20:
         findings.append(
             Finding(
                 code="IC_PERIOD_SUPPORT_LOW",
@@ -442,10 +548,36 @@ def ic(
             )
         )
 
-    tables: dict[str, JsonValue] = {"ic_by_period": frame_records(period_ic)}
+    group_eligible_rows = panel.height
+    attrition: tuple[JsonValue, ...] = (
+        attrition_record(
+            "numeric_policy",
+            "null_or_nan_signal_or_label",
+            input_rows=matched,
+            retained_rows=matched - excluded,
+            policy=null_policy,
+        ),
+        attrition_record(
+            "group_eligibility",
+            "below_minimum_observations",
+            input_rows=matched - excluded,
+            retained_rows=group_eligible_rows,
+            policy="drop",
+        ),
+    )
+    tables: dict[str, JsonValue] = {
+        "ic_by_period": frame_records(period_ic),
+        "data_attrition": attrition,
+    }
+    if overall_keys != keys:
+        tables["ic_overall_by_period"] = frame_records(overall_period_ic)
     horizon_summary = _horizon_summary(period_ic)
     if not horizon_summary.is_empty():
         tables["ic_by_horizon"] = frame_records(horizon_summary)
+    if overall_keys != keys:
+        overall_horizon_summary = _horizon_summary(overall_period_ic)
+        if not overall_horizon_summary.is_empty():
+            tables["ic_overall_by_horizon"] = frame_records(overall_horizon_summary)
     return AnalysisResult(
         metadata=ResultMetadata(
             method=f"signal.ic.{method}",
@@ -453,6 +585,7 @@ def ic(
             parameters={
                 "method": method,
                 "by": tuple(keys),
+                "group_available_time": group_available_time,
                 "tie_policy": "average" if method == "spearman" else None,
                 "minimum_observations": min_observations,
                 "null_policy": null_policy,
@@ -477,6 +610,217 @@ def ic(
     )
 
 
+def _bucket_tables(
+    panel: pl.DataFrame,
+    *,
+    keys: Sequence[str],
+    top_bucket: int,
+) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame, pl.DataFrame]:
+    working = panel.with_columns(pl.lit(0).alias("_single_group")) if not keys else panel
+    effective_keys = ["_single_group"] if not keys else list(keys)
+    period_bucket = (
+        working.group_by([*effective_keys, "bucket"], maintain_order=True)
+        .agg(
+            pl.col("forward_return").mean().alias("mean_return"),
+            pl.col("forward_return").median().alias("median_return"),
+            pl.len().alias("n_observations"),
+        )
+        .sort([*effective_keys, "bucket"])
+    )
+    spread = (
+        period_bucket.group_by(effective_keys, maintain_order=True)
+        .agg(
+            pl.col("mean_return")
+            .filter(pl.col("bucket") == top_bucket)
+            .first()
+            .alias("top_return"),
+            pl.col("mean_return").filter(pl.col("bucket") == 1).first().alias("bottom_return"),
+        )
+        .with_columns((pl.col("top_return") - pl.col("bottom_return")).alias("spread"))
+    )
+    summary_keys = [
+        key for key in effective_keys if key not in {"observation_time", "_single_group"}
+    ]
+    summary_group_keys = [*summary_keys, "bucket"]
+    bucket_summary = (
+        period_bucket.group_by(summary_group_keys, maintain_order=True)
+        .agg(
+            pl.col("mean_return").mean().alias("mean_return"),
+            pl.col("median_return").median().alias("median_return"),
+            pl.col("n_observations").sum().alias("n_observations"),
+            pl.len().alias("n_periods"),
+        )
+        .sort(summary_group_keys)
+    )
+    monotonicity_group_keys = summary_keys or ["_summary_group"]
+    monotonicity_input = (
+        bucket_summary.with_columns(pl.lit(0).alias("_summary_group"))
+        if not summary_keys
+        else bucket_summary
+    )
+    records: list[dict[str, object]] = []
+    for group in monotonicity_input.partition_by(monotonicity_group_keys, maintain_order=True):
+        ordered = group.sort("bucket")
+        means: FloatArray = (
+            ordered.get_column("mean_return").to_numpy().astype(np.float64, copy=False)
+        )
+        buckets: FloatArray = ordered.get_column("bucket").to_numpy().astype(np.float64, copy=False)
+        differences = np.diff(means)
+        record = {
+            key: ordered.get_column(key)[0]
+            for key in monotonicity_group_keys
+            if key != "_summary_group"
+        }
+        record.update(
+            {
+                "spearman_monotonicity": _correlation(buckets, means, "spearman"),
+                "adjacent_order_fraction": (
+                    float(np.mean(differences > 0.0)) if differences.size else None
+                ),
+                "n_buckets": ordered.height,
+            }
+        )
+        records.append(record)
+    monotonicity = pl.DataFrame(records)
+    for table in (period_bucket, spread, bucket_summary, monotonicity):
+        if "_single_group" in table.columns:
+            table.drop_in_place("_single_group")
+    return period_bucket, spread, bucket_summary, monotonicity
+
+
+def bucket_returns(
+    bucketed: SignalTransformResult,
+    labels: object,
+    *,
+    by: str | Sequence[str] | None = "observation_time",
+    label_time: str = "observation_time",
+    instrument: str = "instrument",
+    label_value: str = "forward_return",
+    null_policy: Literal["drop", "raise"] = "drop",
+) -> AnalysisResult:
+    """Summarize forward returns for an explicit bucket transformation."""
+
+    if not isinstance(bucketed, SignalTransformResult):
+        raise MethodContractError("bucketed must be a SignalTransformResult")
+    if bucketed.metadata.method != "signal.bucketize":
+        raise MethodContractError("bucketed must come from signal.bucketize")
+    normalized_by = _normalized_group_request(by, signal_time="observation_time")
+    extra_columns = [key for key in normalized_by if key not in {"observation_time", "horizon"}]
+    extra_columns.append("bucket")
+    panel, signal_diagnostics, label_diagnostics, excluded, signal_rows, matched = _aligned_panel(
+        bucketed.frame,
+        labels,
+        signal_time="observation_time",
+        label_time=label_time,
+        instrument=instrument,
+        signal_value="signal",
+        label_value=label_value,
+        null_policy=null_policy,
+        extra_signal_columns=tuple(dict.fromkeys(extra_columns)),
+    )
+    if not panel.schema["bucket"].is_integer():
+        raise DataContractError("bucket assignments must use an integer dtype")
+    if panel.filter(pl.col("bucket") < 1).height:
+        raise DataContractError("bucket assignments must be positive integers")
+    requested = bucketed.evidence.metrics.get("requested_buckets")
+    if not isinstance(requested, int):
+        raise DataContractError("bucket evidence does not declare requested_buckets")
+    keys = _group_keys(panel, normalized_by)
+    period, spread, summary, monotonicity = _bucket_tables(panel, keys=keys, top_bucket=requested)
+    overall_keys = [key for key in keys if key in {"observation_time", "horizon"}]
+    if overall_keys != keys:
+        overall_period, overall_spread, overall_summary, overall_monotonicity = _bucket_tables(
+            panel, keys=overall_keys, top_bucket=requested
+        )
+    else:
+        overall_period, overall_spread = period, spread
+        overall_summary, overall_monotonicity = summary, monotonicity
+    mean_spread = _float_or_none(overall_spread.get_column("spread").drop_nulls().mean())
+    overall_record = overall_monotonicity.row(0, named=True)
+    findings = list(bucketed.evidence.findings)
+    monotonicity_value = _float_or_none(overall_record.get("spearman_monotonicity"))
+    if monotonicity_value is not None and monotonicity_value < 0.5:
+        findings.append(
+            Finding(
+                code="BUCKET_MONOTONICITY_WEAK",
+                title="Bucket ordering is weak",
+                message="Average bucket returns are not strongly ordered with the signal.",
+                state=FindingState.WARN,
+                severity=Severity.MEDIUM,
+                category="statistical_validity",
+                evidence={"spearman_monotonicity": monotonicity_value},
+            )
+        )
+    attrition: tuple[JsonValue, ...] = (
+        attrition_record(
+            "numeric_policy",
+            "null_or_nan_signal_or_label",
+            input_rows=matched,
+            retained_rows=matched - excluded,
+            policy=null_policy,
+        ),
+    )
+    tables: dict[str, JsonValue] = {
+        "bucket_returns": frame_records(summary),
+        "bucket_returns_by_period": frame_records(period),
+        "bucket_spread_by_period": frame_records(spread),
+        "bucket_monotonicity": frame_records(monotonicity),
+        "data_attrition": attrition,
+    }
+    if overall_keys != keys:
+        tables.update(
+            {
+                "bucket_overall_returns": frame_records(overall_summary),
+                "bucket_overall_returns_by_period": frame_records(overall_period),
+                "bucket_overall_spread_by_period": frame_records(overall_spread),
+                "bucket_overall_monotonicity": frame_records(overall_monotonicity),
+            }
+        )
+    return AnalysisResult(
+        metadata=ResultMetadata(
+            method="signal.bucket_returns",
+            method_version=1,
+            parameters={
+                "by": tuple(keys),
+                "bucket_method": bucketed.metadata.method,
+                "bucket_method_version": bucketed.metadata.method_version,
+                "bucket_spec": bucketed.metadata.parameters.get("spec"),
+                "null_policy": null_policy,
+                "signal_input": signal_diagnostics.to_parameters(),
+                "label_input": label_diagnostics.to_parameters(),
+            },
+        ),
+        metrics={
+            "mean_top_bottom_spread": mean_spread,
+            "spearman_monotonicity": monotonicity_value,
+            "adjacent_order_fraction": overall_record.get("adjacent_order_fraction"),
+            "n_buckets": requested,
+            "n_observations": panel.height,
+            "signal_rows": signal_rows,
+            "matched_rows_before_policy": matched,
+            "excluded_rows": excluded,
+        },
+        findings=tuple(findings),
+        tables=tables,
+    )
+
+
+def _quantile_table(table: object) -> tuple[JsonValue, ...]:
+    if not isinstance(table, list):
+        raise TypeError("quantile compatibility table must contain row records")
+    records: list[JsonValue] = []
+    for row in table:
+        if not isinstance(row, Mapping):
+            raise TypeError("quantile compatibility table rows must be mappings")
+        normalized = dict(row)
+        if "bucket" in normalized:
+            normalized["quantile"] = normalized.pop("bucket")
+        if "n_buckets" in normalized:
+            normalized["n_quantiles"] = normalized.pop("n_buckets")
+        records.append(normalized)
+    return tuple(records)
+
+
 def quantiles(
     signal: object,
     labels: object,
@@ -490,6 +834,7 @@ def quantiles(
     label_value: str = "forward_return",
     ascending: bool = True,
     tie_policy: Literal["balanced"] = "balanced",
+    group_available_time: str | None = None,
     null_policy: Literal["drop", "raise"] = "drop",
 ) -> AnalysisResult:
     """Assign deterministic balanced quantiles and summarize subsequent returns."""
@@ -498,177 +843,92 @@ def quantiles(
         raise MethodContractError("quantiles must be at least 2")
     if tie_policy != "balanced":
         raise MethodContractError("v0.1 supports tie_policy='balanced'")
-    panel, signal_diagnostics, label_diagnostics, excluded, signal_rows, matched = _aligned_panel(
+    normalized_by = _normalized_group_request(by, signal_time=signal_time)
+    bucket_by: str | Sequence[str] = (
+        tuple(signal_time if key == "observation_time" else key for key in normalized_by)
+        or signal_time
+    )
+    bucketed = bucketize(
         signal,
-        labels,
-        signal_time=signal_time,
-        label_time=label_time,
+        spec=BucketSpec.quantiles(quantiles, tie_policy=tie_policy),
+        by=bucket_by,
+        time=signal_time,
         instrument=instrument,
         signal_value=signal_value,
+        available_time=group_available_time,
+        ascending=ascending,
+        small_group_policy="drop",
+        null_policy=null_policy,
+    )
+    result = bucket_returns(
+        bucketed,
+        labels,
+        by=normalized_by,
+        label_time=label_time,
+        instrument=instrument,
         label_value=label_value,
         null_policy=null_policy,
     )
-    keys = _group_keys(panel, by)
-    if not keys:
-        panel = panel.with_columns(pl.lit(0).alias("_single_group"))
-        keys = ["_single_group"]
-    sizes = panel.group_by(keys, maintain_order=True).len(name="_group_size")
-    eligible_sizes = sizes.filter(pl.col("_group_size") >= quantiles)
-    if eligible_sizes.is_empty():
-        raise DataContractError(
-            f"no groups contain at least {quantiles} observations for quantile assignment"
-        )
-    eligible = panel.join(eligible_sizes.select(keys), on=keys, how="inner")
-    sort_keys = [*keys, "signal", "instrument"]
-    if not ascending:
-        descending = [False] * len(keys) + [True, False]
-        eligible = eligible.sort(sort_keys, descending=descending)
-    else:
-        eligible = eligible.sort(sort_keys)
-    assigned = (
-        eligible.with_columns(
-            pl.col("signal").rank(method="ordinal").over(keys).alias("_ordinal"),
-            pl.len().over(keys).alias("_count"),
-        )
-        .with_columns(
-            (
-                ((pl.col("_ordinal") - 1) * quantiles / pl.col("_count")).floor().cast(pl.Int32) + 1
-            ).alias("quantile")
-        )
-        .drop("_ordinal", "_count")
-    )
-    period_quantile = (
-        assigned.group_by([*keys, "quantile"], maintain_order=True)
-        .agg(
-            pl.col("forward_return").mean().alias("mean_return"),
-            pl.col("forward_return").median().alias("median_return"),
-            pl.len().alias("n_observations"),
-        )
-        .sort([*keys, "quantile"])
-    )
-    spread = (
-        period_quantile.group_by(keys, maintain_order=True)
-        .agg(
-            pl.col("mean_return")
-            .filter(pl.col("quantile") == quantiles)
-            .first()
-            .alias("top_return"),
-            pl.col("mean_return").filter(pl.col("quantile") == 1).first().alias("bottom_return"),
-        )
-        .with_columns((pl.col("top_return") - pl.col("bottom_return")).alias("spread"))
-    )
-
-    summary_keys = [key for key in keys if key not in {"observation_time", "_single_group"}]
-    summary_group_keys = [*summary_keys, "quantile"]
-    quantile_summary = (
-        period_quantile.group_by(summary_group_keys, maintain_order=True)
-        .agg(
-            pl.col("mean_return").mean().alias("mean_return"),
-            pl.col("median_return").median().alias("median_return"),
-            pl.col("n_observations").sum().alias("n_observations"),
-            pl.len().alias("n_periods"),
-        )
-        .sort(summary_group_keys)
-    )
-    monotonicity_group_keys = summary_keys or ["_summary_group"]
-    monotonicity_input = (
-        quantile_summary.with_columns(pl.lit(0).alias("_summary_group"))
-        if not summary_keys
-        else quantile_summary
-    )
-    monotonicity_records: list[dict[str, object]] = []
-    for group in monotonicity_input.partition_by(monotonicity_group_keys, maintain_order=True):
-        ordered_group = group.sort("quantile")
-        means: FloatArray = (
-            ordered_group.get_column("mean_return").to_numpy().astype(np.float64, copy=False)
-        )
-        q_values: FloatArray = (
-            ordered_group.get_column("quantile").to_numpy().astype(np.float64, copy=False)
-        )
-        diffs = np.diff(means)
-        record = {
-            key: ordered_group.get_column(key)[0]
-            for key in monotonicity_group_keys
-            if key != "_summary_group"
-        }
-        record.update(
-            {
-                "spearman_monotonicity": _correlation(q_values, means, "spearman"),
-                "adjacent_order_fraction": float(np.mean(diffs > 0.0)) if diffs.size else None,
-                "n_quantiles": ordered_group.height,
-            }
-        )
-        monotonicity_records.append(record)
-    monotonicity = pl.DataFrame(monotonicity_records)
-
-    mean_spread = _float_or_none(spread.get_column("spread").drop_nulls().mean())
-    first_monotonicity = monotonicity.row(0, named=True)
-    undersized_groups = sizes.height - eligible_sizes.height
     findings: list[Finding] = []
-    if undersized_groups:
-        findings.append(
-            Finding(
-                code="QUANTILE_UNDERSIZED_GROUPS",
-                title="Undersized quantile groups were excluded",
-                message="Groups with fewer observations than requested quantiles were excluded.",
-                state=FindingState.WARN,
-                severity=Severity.MEDIUM,
-                category="statistical_validity",
-                evidence={"excluded_groups": undersized_groups, "quantiles": quantiles},
+    for finding in result.findings:
+        if finding.code == "BUCKET_UNDERSIZED_GROUPS":
+            findings.append(
+                Finding(
+                    code="QUANTILE_UNDERSIZED_GROUPS",
+                    title="Undersized quantile groups were excluded",
+                    message=(
+                        "Groups with fewer observations than requested quantiles were excluded."
+                    ),
+                    state=finding.state,
+                    severity=finding.severity,
+                    category=finding.category,
+                    evidence={**finding.evidence, "quantiles": quantiles},
+                )
             )
-        )
-    if first_monotonicity.get("spearman_monotonicity") is not None:
-        monotonicity_value = _float_or_none(first_monotonicity["spearman_monotonicity"])
-        assert monotonicity_value is not None
-        if monotonicity_value < 0.5:
+        elif finding.code == "BUCKET_MONOTONICITY_WEAK":
             findings.append(
                 Finding(
                     code="QUANTILE_MONOTONICITY_WEAK",
                     title="Quantile ordering is weak",
                     message="Average quantile returns are not strongly ordered with the signal.",
-                    state=FindingState.WARN,
-                    severity=Severity.MEDIUM,
-                    category="statistical_validity",
-                    evidence={"spearman_monotonicity": monotonicity_value},
+                    state=finding.state,
+                    severity=finding.severity,
+                    category=finding.category,
+                    evidence=finding.evidence,
                 )
             )
-
-    for table in (period_quantile, spread, quantile_summary, monotonicity):
-        if "_single_group" in table.columns:
-            table.drop_in_place("_single_group")
+        else:
+            findings.append(finding)
     metrics: dict[str, JsonValue] = {
-        "mean_top_bottom_spread": mean_spread,
-        "spearman_monotonicity": first_monotonicity.get("spearman_monotonicity"),
-        "adjacent_order_fraction": first_monotonicity.get("adjacent_order_fraction"),
+        **result.metrics,
         "n_quantiles": quantiles,
-        "n_observations": assigned.height,
-        "signal_rows": signal_rows,
-        "matched_rows_before_policy": matched,
-        "excluded_rows": excluded,
-        "excluded_undersized_groups": undersized_groups,
+        "excluded_undersized_groups": bucketed.evidence.metrics.get("excluded_groups", 0),
     }
+    metrics.pop("n_buckets", None)
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.quantiles",
             method_version=1,
             parameters={
                 "quantiles": quantiles,
-                "by": tuple(key for key in keys if key != "_single_group"),
+                "by": normalized_by,
                 "ascending": ascending,
                 "tie_policy": tie_policy,
                 "small_group_policy": "drop",
+                "group_available_time": group_available_time,
                 "null_policy": null_policy,
-                "signal_input": signal_diagnostics.to_parameters(),
-                "label_input": label_diagnostics.to_parameters(),
+                "signal_input": bucketed.metadata.parameters.get("input"),
+                "label_input": result.metadata.parameters.get("label_input"),
             },
         ),
         metrics=metrics,
         findings=tuple(findings),
         tables={
-            "quantile_returns": frame_records(quantile_summary),
-            "quantile_returns_by_period": frame_records(period_quantile),
-            "spread_by_period": frame_records(spread),
-            "monotonicity": frame_records(monotonicity),
+            "quantile_returns": _quantile_table(result.table("bucket_returns")),
+            "quantile_returns_by_period": _quantile_table(result.table("bucket_returns_by_period")),
+            "spread_by_period": _quantile_table(result.table("bucket_spread_by_period")),
+            "monotonicity": _quantile_table(result.table("bucket_monotonicity")),
+            "data_attrition": result.tables["data_attrition"],
         },
     )
 
@@ -712,12 +972,24 @@ def turnover(
     instrument: str = "instrument",
     signal_value: str = "signal",
     quantiles: int = 5,
+    lags: Sequence[int] = (1,),
     null_policy: Literal["drop", "raise"] = "drop",
 ) -> AnalysisResult:
-    """Measure consecutive-period rank, signal, and tail-membership turnover."""
+    """Measure exact observation-lag rank, signal, and membership turnover."""
 
     if quantiles < 2:
         raise MethodContractError("quantiles must be at least 2")
+    normalized_lags = tuple(lags)
+    if (
+        not normalized_lags
+        or 1 not in normalized_lags
+        or len(set(normalized_lags)) != len(normalized_lags)
+        or any(
+            isinstance(lag, bool) or not isinstance(lag, int) or lag < 1 for lag in normalized_lags
+        )
+    ):
+        raise MethodContractError("lags must contain unique positive integers including 1")
+    normalized_lags = tuple(sorted(normalized_lags))
     frame, diagnostics, excluded = _signal_frame(
         signal,
         time=time,
@@ -733,7 +1005,7 @@ def turnover(
     )
     if periods.height < 2:
         raise DataContractError("turnover requires at least two distinct observation periods")
-    ranked = (
+    full_ranked = (
         frame.join(periods, on="observation_time", how="left")
         .sort(["observation_time", "signal", "instrument"])
         .with_columns(
@@ -752,74 +1024,132 @@ def turnover(
                 + 1
             ).alias("quantile")
         )
-        .sort(["instrument", "_period_index"])
-        .with_columns(
-            pl.col("_period_index").shift(1).over("instrument").alias("_previous_period"),
-            pl.col("rank_fraction").shift(1).over("instrument").alias("_previous_rank"),
-            pl.col("signal").shift(1).over("instrument").alias("_previous_signal"),
-        )
-        .filter(pl.col("_period_index") == pl.col("_previous_period") + 1)
     )
-    if ranked.is_empty():
-        raise DataContractError("no instruments occur in consecutive periods")
-    transitions = (
-        ranked.group_by(["_period_index", "observation_time"], maintain_order=True)
-        .agg(
-            (pl.col("rank_fraction") - pl.col("_previous_rank"))
-            .abs()
-            .mean()
-            .alias("rank_turnover"),
-            pl.corr("signal", "_previous_signal").alias("signal_autocorrelation"),
-            pl.len().alias("n_common_instruments"),
-        )
-        .sort("_period_index")
-    )
-
-    full_ranked = (
-        frame.join(periods, on="observation_time", how="left")
-        .sort(["observation_time", "signal", "instrument"])
-        .with_columns(
-            pl.col("signal").rank(method="ordinal").over("observation_time").alias("_ordinal"),
-            pl.len().over("observation_time").alias("_period_count"),
-        )
-        .with_columns(
-            (
-                ((pl.col("_ordinal") - 1) * quantiles / pl.col("_period_count"))
-                .floor()
-                .cast(pl.Int32)
-                + 1
-            ).alias("quantile")
-        )
-    )
-    tail_sets: dict[int, tuple[set[object], set[object]]] = {}
+    bucket_sets: dict[int, dict[int, set[object]]] = {}
     for group in full_ranked.partition_by("_period_index", maintain_order=True):
         period_index = int(group.get_column("_period_index")[0])
-        bottom = set(group.filter(pl.col("quantile") == 1).get_column("instrument").to_list())
-        top = set(group.filter(pl.col("quantile") == quantiles).get_column("instrument").to_list())
-        tail_sets[period_index] = (bottom, top)
-    membership_rows: list[dict[str, object]] = []
-    for period_index in range(1, periods.height):
-        previous_bottom, previous_top = tail_sets.get(period_index - 1, (set(), set()))
-        current_bottom, current_top = tail_sets.get(period_index, (set(), set()))
-
-        def symmetric_turnover(previous: set[object], current: set[object]) -> float | None:
-            denominator = len(previous) + len(current)
-            return (
-                len(previous.symmetric_difference(current)) / denominator if denominator else None
+        bucket_sets[period_index] = {
+            bucket: set(
+                group.filter(pl.col("quantile") == bucket).get_column("instrument").to_list()
             )
+            for bucket in range(1, quantiles + 1)
+        }
 
-        membership_rows.append(
-            {
-                "_period_index": period_index,
-                "top_membership_turnover": symmetric_turnover(previous_top, current_top),
-                "bottom_membership_turnover": symmetric_turnover(previous_bottom, current_bottom),
-            }
+    def symmetric_turnover(previous: set[object], current: set[object]) -> float | None:
+        denominator = len(previous) + len(current)
+        return len(previous.symmetric_difference(current)) / denominator if denominator else None
+
+    transition_frames: list[pl.DataFrame] = []
+    membership_rows: list[dict[str, object]] = []
+    period_times = {
+        int(row["_period_index"]): row["observation_time"] for row in periods.to_dicts()
+    }
+    for lag in normalized_lags:
+        previous = full_ranked.select(
+            "instrument",
+            (pl.col("_period_index") + lag).alias("_period_index"),
+            pl.col("observation_time").alias("previous_observation_time"),
+            pl.col("rank_fraction").alias("_previous_rank"),
+            pl.col("signal").alias("_previous_signal"),
         )
-    membership = pl.DataFrame(membership_rows)
-    transitions = transitions.join(membership, on="_period_index", how="left").drop("_period_index")
-    mean_rank_turnover = _float_or_none(transitions.get_column("rank_turnover").mean())
+        ranked = full_ranked.join(
+            previous,
+            on=["instrument", "_period_index"],
+            how="inner",
+        )
+        if ranked.is_empty():
+            raise DataContractError(f"no instruments occur at exact turnover lag {lag}")
+        transitions = (
+            ranked.group_by(
+                ["_period_index", "previous_observation_time", "observation_time"],
+                maintain_order=True,
+            )
+            .agg(
+                (pl.col("rank_fraction") - pl.col("_previous_rank"))
+                .abs()
+                .mean()
+                .alias("rank_turnover"),
+                pl.corr("signal", "_previous_signal").alias("signal_autocorrelation"),
+                pl.len().alias("n_common_instruments"),
+            )
+            .with_columns(
+                pl.lit(lag).cast(pl.Int32).alias("lag"),
+            )
+            .sort("_period_index")
+        )
+        transition_frames.append(transitions)
+        for period_index in range(lag, periods.height):
+            for bucket in range(1, quantiles + 1):
+                membership_rows.append(
+                    {
+                        "_period_index": period_index,
+                        "lag": lag,
+                        "previous_observation_time": period_times[period_index - lag],
+                        "observation_time": period_times[period_index],
+                        "bucket": bucket,
+                        "membership_turnover": symmetric_turnover(
+                            bucket_sets.get(period_index - lag, {}).get(bucket, set()),
+                            bucket_sets.get(period_index, {}).get(bucket, set()),
+                        ),
+                    }
+                )
+    transitions_by_lag = pl.concat(transition_frames, how="vertical").sort(["lag", "_period_index"])
+    membership = pl.DataFrame(membership_rows).sort(["lag", "_period_index", "bucket"])
+    tails = membership.group_by(["lag", "_period_index"], maintain_order=True).agg(
+        pl.col("membership_turnover")
+        .filter(pl.col("bucket") == quantiles)
+        .first()
+        .alias("top_membership_turnover"),
+        pl.col("membership_turnover")
+        .filter(pl.col("bucket") == 1)
+        .first()
+        .alias("bottom_membership_turnover"),
+    )
+    transitions_by_lag = transitions_by_lag.join(tails, on=["lag", "_period_index"], how="left")
+    legacy = (
+        transitions_by_lag.filter(pl.col("lag") == 1)
+        .select(
+            "observation_time",
+            "rank_turnover",
+            "signal_autocorrelation",
+            "n_common_instruments",
+            "top_membership_turnover",
+            "bottom_membership_turnover",
+        )
+        .sort("observation_time")
+    )
+    summary = (
+        transitions_by_lag.group_by("lag", maintain_order=True)
+        .agg(
+            pl.col("rank_turnover").mean().alias("mean_rank_turnover"),
+            pl.col("signal_autocorrelation")
+            .drop_nulls()
+            .mean()
+            .alias("mean_signal_autocorrelation"),
+            pl.col("top_membership_turnover")
+            .drop_nulls()
+            .mean()
+            .alias("mean_top_membership_turnover"),
+            pl.col("bottom_membership_turnover")
+            .drop_nulls()
+            .mean()
+            .alias("mean_bottom_membership_turnover"),
+            pl.len().alias("n_transitions"),
+        )
+        .sort("lag")
+    )
+    mean_rank_turnover = _float_or_none(legacy.get_column("rank_turnover").mean())
     mean_autocorrelation = _float_or_none(
-        transitions.get_column("signal_autocorrelation").drop_nulls().mean()
+        legacy.get_column("signal_autocorrelation").drop_nulls().mean()
+    )
+    attrition: tuple[JsonValue, ...] = (
+        attrition_record(
+            "numeric_policy",
+            "null_or_nan_signal",
+            input_rows=diagnostics.rows,
+            retained_rows=frame.height,
+            policy=null_policy,
+        ),
     )
     return AnalysisResult(
         metadata=ResultMetadata(
@@ -829,6 +1159,8 @@ def turnover(
                 "rank_turnover_definition": "mean absolute percentile-rank change",
                 "membership_turnover_definition": "symmetric difference / total membership",
                 "quantiles": quantiles,
+                "lags": normalized_lags,
+                "lag_clock": "global_observation_index",
                 "null_policy": null_policy,
                 "input": diagnostics.to_parameters(),
             },
@@ -836,11 +1168,17 @@ def turnover(
         metrics={
             "mean_rank_turnover": mean_rank_turnover,
             "mean_signal_autocorrelation": mean_autocorrelation,
-            "n_transitions": transitions.height,
+            "n_transitions": legacy.height,
             "n_observations": frame.height,
             "excluded_rows": excluded,
         },
-        tables={"turnover_by_period": frame_records(transitions)},
+        tables={
+            "turnover_by_period": frame_records(legacy),
+            "turnover_by_period_lag": frame_records(transitions_by_lag.drop("_period_index")),
+            "turnover_by_lag": frame_records(summary),
+            "membership_turnover_by_period_lag": frame_records(membership.drop("_period_index")),
+            "data_attrition": attrition,
+        },
     )
 
 
@@ -939,4 +1277,15 @@ def decay(
     )
 
 
-__all__ = ["CorrelationMethod", "decay", "ic", "quantiles", "turnover"]
+__all__ = [
+    "BucketSpec",
+    "CorrelationMethod",
+    "SignalTransformResult",
+    "bucket_returns",
+    "bucketize",
+    "decay",
+    "ic",
+    "neutralize",
+    "quantiles",
+    "turnover",
+]

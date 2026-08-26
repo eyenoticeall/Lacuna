@@ -1,7 +1,7 @@
 # Options-research extension
 
 **Status:** implemented as the separately versioned `lacuna-options` 0.1 package for the Lacuna
-0.6 milestone. Patch `0.1.3` expands compatibility through additive Lacuna core `0.9.x`; it is
+0.6 milestone. Patch `0.1.4` expands compatibility through additive Lacuna core `0.10.x`; it is
 released beside core but is not a core dependency.
 
 The extension provides empirical option-chain normalization and transparent derived coordinates.
@@ -15,7 +15,7 @@ The distribution and import names are distinct:
 ```text
 distribution: lacuna-options
 import:       lacuna_options
-version:      0.1.x (independent of Lacuna core 0.9.x)
+version:      0.1.x (independent of Lacuna core 0.10.x)
 ```
 
 Install both artifacts from the same GitHub Release because the core distribution name on PyPI is
@@ -23,8 +23,8 @@ unrelated to this project:
 
 ```bash
 python -m pip install \
-  ./lacuna-0.9.0-cp311-abi3-<platform>.whl \
-  ./lacuna_options-0.1.3-py3-none-any.whl
+  ./lacuna-0.10.0-cp311-abi3-<platform>.whl \
+  ./lacuna_options-0.1.4-py3-none-any.whl
 ```
 
 The extension supports `lacuna>=0.5,<0.10`. Its `0.1.x` exports and signatures are frozen in
@@ -32,7 +32,7 @@ The extension supports `lacuna>=0.5,<0.10`. Its `0.1.x` exports and signatures a
 advance in lockstep: a later extension patch can improve its own compatible contract without a core
 release, while a future core incompatibility must update the dependency range and migration notes.
 
-`0.1.3` changes only dependency metadata and integration evidence: core `0.9` is additive, the
+`0.1.4` changes only dependency metadata and integration evidence: core `0.10` is additive, the
 extension's source/API contract is unchanged, and real validated-chain evidence continues through
 the required standardized options-profile capability. The patch release is still required because
 an installed distribution's dependency range is part of its compatibility contract.

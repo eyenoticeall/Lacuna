@@ -70,6 +70,7 @@ from lacuna.exceptions import (
 from lacuna.experiment import ExperimentRegistry
 from lacuna.labels import LabelResult
 from lacuna.report import AuditReport
+from lacuna.signal import BucketSpec, SignalTransformResult
 from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
 
@@ -88,6 +89,7 @@ __all__ = [
     "BenchmarkCase",
     "BenchmarkConfig",
     "BenchmarkSuite",
+    "BucketSpec",
     "BundleArtifact",
     "BundleManifest",
     "BundleVerification",
@@ -111,6 +113,7 @@ __all__ = [
     "ResultMetadata",
     "Severity",
     "SignalStudy",
+    "SignalTransformResult",
     "__version__",
     "adapters",
     "audit",

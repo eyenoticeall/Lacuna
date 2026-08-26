@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import json
 from datetime import UTC, datetime
 
@@ -97,3 +98,69 @@ def test_show_prints_plain_markdown(capsys: object) -> None:
     captured = capsys.readouterr()  # type: ignore[attr-defined]
     assert captured.out == report.to_markdown()
     assert "\x1b[" not in captured.out
+
+
+def _signal_evidence(*, table_name: str = "ic_by_period") -> AnalysisResult:
+    return AnalysisResult(
+        metadata=ResultMetadata(
+            method="signal.ic.spearman",
+            created_at=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
+        ),
+        metrics={"mean_ic": 0.2},
+        tables={
+            table_name: (
+                {"observation_time": 1, "horizon": "1D", "ic": 0.1},
+                {"observation_time": 2, "horizon": "1D", "ic": 0.3},
+            )
+        },
+    )
+
+
+def test_named_evidence_lookup_is_immutable_and_rejects_ambiguity() -> None:
+    base = _report()
+    evidence = {"ic": _signal_evidence()}
+    report = AuditReport(base.result, evidence=evidence)
+    evidence.clear()
+
+    assert report.table("ic_by_period", source="ic")[0]["ic"] == 0.1  # type: ignore[index]
+    with pytest.raises(TypeError):
+        report.evidence["other"] = _signal_evidence()  # type: ignore[index]
+
+    ambiguous = AuditReport(
+        base.result,
+        evidence={"first": _signal_evidence(), "second": _signal_evidence()},
+    )
+    with pytest.raises(ReportError, match="ambiguous"):
+        ambiguous.table("ic_by_period")
+
+
+def test_plotly_html_is_deterministic_traced_and_self_contained() -> None:
+    base = _report()
+    report = AuditReport(base.result, evidence={"ic": _signal_evidence()})
+
+    first = report.to_html(renderer="plotly", view="signal")
+    second = report.to_html(renderer="plotly", view="signal")
+
+    assert first == second
+    assert 'id="lacuna-panel-01"' in first
+    assert 'id="lacuna-panel-02"' in first
+    assert 'data-source="ic"' in first
+    assert 'data-table="ic_by_period"' in first
+    assert "all_stored_rows" in first
+    assert '<script src="http://' not in first
+    assert '<script src="https://' not in first
+
+
+def test_plotly_renderer_has_actionable_optional_dependency_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_import = builtins.__import__
+
+    def reject_jinja(name: str, *args: object, **kwargs: object) -> object:
+        if name == "jinja2":
+            raise ImportError("missing for test")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", reject_jinja)
+    with pytest.raises(ReportError, match=r"lacuna\[report\]"):
+        _report().to_html(renderer="plotly")

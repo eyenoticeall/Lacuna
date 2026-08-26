@@ -210,7 +210,7 @@ def test_signal_command_writes_and_cli_verifies_bundle(tmp_path: object, capsys:
     payload = json.loads(verified.out)
     assert payload["integrity_verified"] is True
     assert payload["authenticity_verified"] is False
-    assert payload["artifact_count"] == 5
+    assert payload["artifact_count"] == 11
     assert verified.err == ""
 
 

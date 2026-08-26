@@ -9,9 +9,10 @@ from typing import Literal, TypeAlias
 
 import polars as pl
 
+from lacuna._attrition import attrition_record
 from lacuna._frames import eager_frame, frame_records, validate_panel_schema
 from lacuna.exceptions import DataContractError, MethodContractError
-from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
+from lacuna.types import AnalysisResult, Finding, FindingState, JsonValue, ResultMetadata, Severity
 
 Horizon: TypeAlias = str | int
 PriceAdjustment: TypeAlias = Literal["raw", "split_adjusted", "total_return_adjusted", "unknown"]
@@ -192,6 +193,18 @@ def forward_returns(
     frame = frame.sort([instrument, time])
     label_frames: list[pl.DataFrame] = []
     censored_by_horizon: list[dict[str, object]] = []
+    attrition: list[dict[str, JsonValue]] = [
+        {
+            **attrition_record(
+                "source_numeric_eligibility",
+                "null_or_nan_entry_or_exit_price",
+                input_rows=diagnostics.rows,
+                retained_rows=diagnostics.rows - source_missing_count,
+                policy=missing,
+            ),
+            "horizon": None,
+        }
+    ]
     total_censored = 0
     for name, observations in normalized_horizons:
         if observations < entry_lag:
@@ -259,6 +272,18 @@ def forward_returns(
                 "censored_rows": censored,
             }
         )
+        attrition.append(
+            {
+                **attrition_record(
+                    "horizon_eligibility",
+                    "missing_entry_exit_or_label_boundary",
+                    input_rows=diagnostics.rows,
+                    retained_rows=candidate.height,
+                    policy=missing,
+                ),
+                "horizon": name,
+            }
+        )
 
     labels = pl.concat(label_frames, how="vertical").sort(
         ["horizon", "observation_time", "instrument"]
@@ -323,7 +348,10 @@ def forward_returns(
             "censored_rows": total_censored,
         },
         findings=tuple(findings),
-        tables={"coverage_by_horizon": frame_records(coverage)},
+        tables={
+            "coverage_by_horizon": frame_records(coverage),
+            "data_attrition": tuple(attrition),
+        },
     )
     return LabelResult(_frame=labels, evidence=evidence)
 

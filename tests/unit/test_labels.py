@@ -79,6 +79,14 @@ def test_missing_price_censors_a_horizon_without_collapsing_time() -> None:
     )
     assert result.frame.get_column("observation_time").to_list() == [2]
     assert result.frame.get_column("forward_return").to_list() == pytest.approx([1 / 3])
+    attrition = result.evidence.table("data_attrition")
+    assert [row["stage"] for row in attrition] == [  # type: ignore[union-attr]
+        "source_numeric_eligibility",
+        "horizon_eligibility",
+    ]
+    for row in attrition:  # type: ignore[union-attr]
+        assert row["input_rows"] == row["retained_rows"] + row["excluded_rows"]
+        assert row["excluded_fraction"] == pytest.approx(row["excluded_rows"] / row["input_rows"])
 
 
 def test_missing_price_raise_policy_fails_before_construction() -> None:

@@ -108,7 +108,9 @@ class SignalStudy:
         self,
         *,
         method: Literal["pearson", "spearman"] = "spearman",
+        by: str | Sequence[str] | None = "observation_time",
         min_observations: int = 3,
+        group_available_time: str | None = None,
         use_native: bool = True,
     ) -> AnalysisResult:
         """Delegate to the functional IC implementation."""
@@ -117,27 +119,114 @@ class SignalStudy:
             self._signal,
             self.labels(),
             method=method,
+            by=by,
             signal_time=self._signal_time,
             instrument=self._instrument,
             signal_value=self._signal_value,
             min_observations=min_observations,
+            group_available_time=group_available_time,
             use_native=use_native,
         )
 
-    def quantiles(self, *, quantiles: int | None = None) -> AnalysisResult:
+    def bucketize(
+        self,
+        *,
+        spec: signal_api.BucketSpec | None = None,
+        by: str | Sequence[str] | None = None,
+        available_time: str | None = None,
+        ascending: bool = True,
+        small_group_policy: Literal["raise", "drop"] = "raise",
+    ) -> signal_api.SignalTransformResult:
+        """Create an explicit immutable signal transformation."""
+
+        selected_by: str | Sequence[str] = self._signal_time if by is None else by
+        return signal_api.bucketize(
+            self._signal,
+            spec=spec,
+            by=selected_by,
+            time=self._signal_time,
+            instrument=self._instrument,
+            signal_value=self._signal_value,
+            available_time=available_time,
+            ascending=ascending,
+            small_group_policy=small_group_policy,
+        )
+
+    def bucket_returns(
+        self,
+        bucketed: signal_api.SignalTransformResult,
+        *,
+        by: str | Sequence[str] | None = "observation_time",
+    ) -> AnalysisResult:
+        """Summarize labels for a caller-selected bucket transformation."""
+
+        return signal_api.bucket_returns(
+            bucketed,
+            self.labels(),
+            by=by,
+            instrument=self._instrument,
+        )
+
+    def neutralize(
+        self,
+        *,
+        exposures: Sequence[str],
+        exposure_data: object | None = None,
+        categorical: Sequence[str] = (),
+        by: str | Sequence[str] | None = None,
+        weight: str | None = None,
+        available_time: str | None = None,
+        intercept: bool = True,
+        min_residual_df: int = 2,
+        insufficient_policy: Literal["raise", "drop"] = "raise",
+    ) -> signal_api.SignalTransformResult:
+        """Residualize the study signal using explicitly aligned exposures."""
+
+        selected_by: str | Sequence[str] = self._signal_time if by is None else by
+        return signal_api.neutralize(
+            self._signal,
+            exposures=exposures,
+            exposure_data=exposure_data,
+            categorical=categorical,
+            by=selected_by,
+            signal_time=self._signal_time,
+            exposure_time=self._signal_time,
+            instrument=self._instrument,
+            signal_value=self._signal_value,
+            weight=weight,
+            available_time=available_time,
+            intercept=intercept,
+            min_residual_df=min_residual_df,
+            insufficient_policy=insufficient_policy,
+        )
+
+    def quantiles(
+        self,
+        *,
+        quantiles: int | None = None,
+        by: str | Sequence[str] | None = "observation_time",
+        group_available_time: str | None = None,
+    ) -> AnalysisResult:
         """Delegate to deterministic quantile-return analysis."""
 
         return signal_api.quantiles(
             self._signal,
             self.labels(),
             quantiles=self._quantile_count if quantiles is None else quantiles,
+            by=by,
             signal_time=self._signal_time,
             instrument=self._instrument,
             signal_value=self._signal_value,
+            group_available_time=group_available_time,
         )
 
-    def turnover(self, *, quantiles: int | None = None) -> AnalysisResult:
-        """Measure consecutive-period signal turnover."""
+    def turnover(
+        self,
+        *,
+        quantiles: int | None = None,
+        lags: Sequence[int] = (1,),
+    ) -> AnalysisResult:
+        """Measure exact observation-lag signal turnover."""
 
         return signal_api.turnover(
             self._signal,
@@ -145,6 +234,7 @@ class SignalStudy:
             instrument=self._instrument,
             signal_value=self._signal_value,
             quantiles=self._quantile_count if quantiles is None else quantiles,
+            lags=lags,
         )
 
     def decay(
@@ -175,6 +265,7 @@ class SignalStudy:
         min_observations: int = 3,
         split: SplitResult | AnalysisResult | None = None,
         policies: Mapping[str, JsonValue] | None = None,
+        additional_evidence: Mapping[str, AnalysisResult] | None = None,
         rules: Sequence[AuditRule] | None = None,
         use_native: bool = True,
     ) -> AuditReport:
@@ -219,6 +310,19 @@ class SignalStudy:
                 )
         if split is not None:
             results["split"] = split.evidence if isinstance(split, SplitResult) else split
+        if additional_evidence is not None:
+            collisions = set(results).intersection(additional_evidence)
+            if collisions:
+                raise MethodContractError(
+                    "additional_evidence names collide with study evidence: "
+                    + ", ".join(sorted(collisions))
+                )
+            for name, evidence in additional_evidence.items():
+                if not name or not isinstance(evidence, AnalysisResult):
+                    raise MethodContractError(
+                        "additional_evidence must map non-empty names to AnalysisResult values"
+                    )
+            results.update(additional_evidence)
         effective_policies: dict[str, JsonValue] = {"study_type": "signal"}
         if policies is not None:
             effective_policies.update(policies)
@@ -226,7 +330,7 @@ class SignalStudy:
             AuditContext(results=results, policies=effective_policies),
             rules=rules,
         )
-        return AuditReport(result)
+        return AuditReport(result, evidence=results)
 
 
 __all__ = ["SignalStudy"]

@@ -10,6 +10,28 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   `ReportError`, so `lacuna bundle verify` rejects damaged archives without exposing a Python
   traceback.
 
+## [0.10.0] - 2026-08-26
+
+### Added
+
+- Add immutable `BucketSpec` and `SignalTransformResult` APIs for balanced or tie-preserving
+  quantiles, split-aware quantiles, equal-width buckets, explicit edges, thresholds, and visible
+  exclusion policy.
+- Add availability-aware grouped IC/bucket evidence and float64 weighted least-squares signal
+  neutralization with deterministic categorical encoding and rank/fit diagnostics.
+- Add standardized `data_attrition` tables to labels and touched signal methods, plus exact
+  multi-lag rank, autocorrelation, and all-bucket membership turnover while preserving lag-one
+  outputs.
+- Add immutable named evidence to `AuditReport`, study evidence retention and bundle inclusion, and
+  a deterministic self-contained Plotly renderer over stored evidence through `lacuna[report]`.
+- Add the cumulative `0.10.x` public API contract and make historical signature checks accept only
+  additive optional keyword parameters.
+
+### Changed
+
+- Extend `SignalStudy` with explicit bucket, neutralization, grouping, multi-lag, and caller-evidence
+  delegation while preserving the functional APIs as the analytical source of truth.
+
 ## [0.9.0] - 2026-08-26
 
 ### Added

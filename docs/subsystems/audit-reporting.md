@@ -3,8 +3,9 @@
 **Status:** the v0.1 signal rule protocol, explicit applicability states, versioned scoring,
 `SignalStudy` orchestration, and deterministic JSON/Markdown/basic HTML renderers are implemented.
 v0.7 adds checksummed reproducibility bundles. v0.8 adds separately versioned signal, strategy,
-and options cross-phase profiles with categorical coverage and no universal score. Plotting,
-interactive exploration, and third-party rule loading remain later work.
+and options cross-phase profiles with categorical coverage and no universal score. v0.10 adds an
+immutable named-evidence mapping and an optional evidence-native Plotly renderer. Third-party rule
+loading remains later work.
 
 The audit engine turns analytical evidence into reviewable findings. Reporting renders that evidence. Keeping the two separate prevents presentation choices from changing audit conclusions.
 
@@ -51,6 +52,7 @@ report = study.audit(
 print(report.summary())
 report.to_markdown("lacuna-audit.md")
 report.to_html("lacuna-audit.html")
+report.to_html("lacuna-signal.html", renderer="plotly", view="signal")
 report.to_json("lacuna-audit.json")
 report.bundle("study.lacuna")
 ```
@@ -59,6 +61,30 @@ Lower-level callers can assemble evidence explicitly with `AuditContext` and `ru
 call `lacuna.audit(results=..., policies=...)`. This is useful when the analysis was computed by
 separate jobs. Result names are part of the v0.1 audit contract: `labels`, `ic`, `quantiles`,
 `turnover`, `decay`, `bootstrap`, and `split`.
+
+`SignalStudy.audit(additional_evidence=...)` retains those results in `report.evidence`. The mapping
+is immutable and sorted by source name. `report.table(name)` checks the audit result first and then
+named evidence; if multiple sources contain the same table, callers must use
+`report.table(name, source="ic")`. Direct `AuditReport(result)` construction still has no retained
+analytical evidence, preserving its prior bundle behavior.
+
+## Interactive evidence views
+
+HTML remains `renderer="core"` by default. `renderer="plotly"` is use-site optional through
+`lacuna[report]` and accepts `auto`, `audit`, `signal`, `portfolio`, or `event` views. A missing
+Plotly/Jinja2 installation raises an actionable `ReportError`; importing `lacuna` never imports
+either dependency.
+
+Panels render only rows already present in named `AnalysisResult` tables. Initial views cover IC,
+bucket/quantile returns and spread, turnover/autocorrelation by lag, decay, attrition, and audit
+coverage/findings. Every panel exposes source, table, fields, renderer version, and plotting
+configuration. IDs and ordering are fixed, source-derived text is escaped, JSON remains finite,
+Plotly JavaScript is embedded locally, and no table is sampled. A table over the bounded renderer
+limit is omitted with a visible notice.
+
+`AuditReport.to_json()` remains canonical audit-result schema-v1 JSON and therefore does not merge
+named evidence into the envelope. Study bundles include retained evidence through the existing
+bundle-v1 evidence layout. Renderers never revise findings, thresholds, or metrics.
 
 ## Standardized cross-phase workflow
 

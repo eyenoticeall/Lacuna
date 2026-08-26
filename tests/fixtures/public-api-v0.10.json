@@ -1,0 +1,140 @@
+{
+  "root_exports": [
+    "BucketSpec",
+    "SignalTransformResult"
+  ],
+  "module_exports": {
+    "lacuna.report": [
+      "ReportRenderer",
+      "ReportView",
+      "render_plotly_html"
+    ],
+    "lacuna.signal": [
+      "BucketSpec",
+      "SignalTransformResult",
+      "bucket_returns",
+      "bucketize",
+      "neutralize"
+    ]
+  },
+  "callables": [
+    {
+      "module": "lacuna.signal",
+      "qualname": "BucketSpec",
+      "signature": "(kind, count=None, boundaries=(), tie_policy='balanced', split_at=None, equal_to='upper', out_of_range='raise')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "BucketSpec.quantiles",
+      "signature": "(count=10, *, edges=None, tie_policy='balanced', split_at=None, equal_to='upper')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "BucketSpec.equal_width",
+      "signature": "(count)"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "BucketSpec.edges",
+      "signature": "(edges, *, out_of_range='raise')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "BucketSpec.threshold",
+      "signature": "(value, *, equal_to='upper')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "bucketize",
+      "signature": "(signal, *, spec=None, by='time', time='time', instrument='instrument', signal_value='signal', available_time=None, ascending=True, small_group_policy='raise', null_policy='drop')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "bucket_returns",
+      "signature": "(bucketed, labels, *, by='observation_time', label_time='observation_time', instrument='instrument', label_value='forward_return', null_policy='drop')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "neutralize",
+      "signature": "(signal, *, exposures, exposure_data=None, categorical=(), by='time', signal_time='time', exposure_time='time', instrument='instrument', signal_value='signal', weight=None, available_time=None, intercept=True, min_residual_df=2, insufficient_policy='raise', null_policy='drop')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "ic",
+      "signature": "(signal, labels, *, method='spearman', by='observation_time', signal_time='time', label_time='observation_time', instrument='instrument', signal_value='signal', label_value='forward_return', min_observations=3, group_available_time=None, null_policy='drop', use_native=True)"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "quantiles",
+      "signature": "(signal, labels, *, quantiles=10, by='observation_time', signal_time='time', label_time='observation_time', instrument='instrument', signal_value='signal', label_value='forward_return', ascending=True, tie_policy='balanced', group_available_time=None, null_policy='drop')"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "turnover",
+      "signature": "(signal, *, time='time', instrument='instrument', signal_value='signal', quantiles=5, lags=(1,), null_policy='drop')"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.bucketize",
+      "signature": "(self, *, spec=None, by=None, available_time=None, ascending=True, small_group_policy='raise')"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.bucket_returns",
+      "signature": "(self, bucketed, *, by='observation_time')"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.neutralize",
+      "signature": "(self, *, exposures, exposure_data=None, categorical=(), by=None, weight=None, available_time=None, intercept=True, min_residual_df=2, insufficient_policy='raise')"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.turnover",
+      "signature": "(self, *, quantiles=None, lags=(1,))"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.audit",
+      "signature": "(self, *, bootstrap_resamples=1000, seed=None, min_observations=3, split=None, policies=None, additional_evidence=None, rules=None, use_native=True)"
+    },
+    {
+      "module": "lacuna.report",
+      "qualname": "AuditReport",
+      "signature": "(result, evidence=<factory>)"
+    },
+    {
+      "module": "lacuna.report",
+      "qualname": "AuditReport.table",
+      "signature": "(self, name, source=None)"
+    },
+    {
+      "module": "lacuna.report",
+      "qualname": "AuditReport.to_html",
+      "signature": "(self, path=None, *, renderer='core', view='auto', overwrite=False)"
+    },
+    {
+      "module": "lacuna.report",
+      "qualname": "AuditReport.write",
+      "signature": "(self, path, *, format=None, renderer='core', view='auto', overwrite=False)"
+    },
+    {
+      "module": "lacuna.report",
+      "qualname": "render_plotly_html",
+      "signature": "(report, *, view='auto')"
+    }
+  ],
+  "contract": "lacuna-public-api-v0.10",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6",
+    "lacuna-public-api-v0.7",
+    "lacuna-public-api-v0.8",
+    "lacuna-public-api-v0.9"
+  ],
+  "package_series": "0.10"
+}

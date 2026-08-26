@@ -8,7 +8,7 @@ import pytest
 
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.labels import forward_returns
-from lacuna.signal import decay, ic, quantiles, turnover
+from lacuna.signal import BucketSpec, bucket_returns, bucketize, decay, ic, quantiles, turnover
 
 
 def _panel(periods: int = 4, instruments: int = 6) -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -56,6 +56,33 @@ def test_ic_aligns_by_identity_not_row_order() -> None:
     assert ic(signal, shuffled, use_native=False).metrics["mean_ic"] == pytest.approx(1.0)
 
 
+def test_grouped_ic_retains_groups_but_headline_is_independently_pooled() -> None:
+    signal = pl.DataFrame(
+        {
+            "time": [0] * 6 + [1] * 6,
+            "instrument": [f"asset-{index}" for index in range(6)] * 2,
+            "signal": [-3.0, -2.0, -1.0, 1.0, 2.0, 3.0] * 2,
+            "sector": ["a", "a", "a", "b", "b", "b"] * 2,
+        }
+    )
+    labels = signal.select(
+        pl.col("time").alias("observation_time"),
+        "instrument",
+        pl.when(pl.col("sector") == "a")
+        .then(pl.col("signal"))
+        .otherwise(-pl.col("signal"))
+        .alias("forward_return"),
+    )
+
+    grouped = ic(signal, labels, by=("time", "sector"), use_native=False)
+    pooled = ic(signal, labels, use_native=False)
+
+    assert grouped.metrics["mean_ic"] == pooled.metrics["mean_ic"]
+    assert {row["sector"] for row in grouped.table("ic_by_period")} == {"a", "b"}  # type: ignore[union-attr]
+    assert grouped.table("ic_overall_by_period") == pooled.table("ic_by_period")
+    assert "GROUP_AVAILABILITY_UNKNOWN" in {finding.code for finding in grouped.findings}
+
+
 def test_ic_rejects_duplicate_signal_keys() -> None:
     signal, labels = _panel()
     duplicate = pl.concat([signal, signal.head(1)])
@@ -71,6 +98,37 @@ def test_quantile_returns_spread_and_monotonicity() -> None:
     assert result.metrics["adjacent_order_fraction"] == 1.0
     summary = result.table("quantile_returns")
     assert sum(row["n_observations"] for row in summary) == 24  # type: ignore[union-attr]
+
+
+def test_explicit_bucket_returns_and_grouped_quantiles_preserve_group_columns() -> None:
+    signal, labels = _panel(instruments=6)
+    signal = signal.with_columns(
+        pl.when(pl.col("instrument").is_in(["asset-0", "asset-1", "asset-2"]))
+        .then(pl.lit("a"))
+        .otherwise(pl.lit("b"))
+        .alias("sector")
+    )
+    transformed = bucketize(
+        signal,
+        spec=BucketSpec.quantiles(3),
+        by=("time", "sector"),
+    )
+    explicit = bucket_returns(
+        transformed,
+        labels,
+        by=("observation_time", "sector"),
+    )
+    legacy = quantiles(signal, labels, quantiles=3, by=("time", "sector"))
+
+    assert {row["sector"] for row in explicit.table("bucket_returns_by_period")} == {  # type: ignore[union-attr]
+        "a",
+        "b",
+    }
+    assert {row["sector"] for row in legacy.table("quantile_returns_by_period")} == {  # type: ignore[union-attr]
+        "a",
+        "b",
+    }
+    assert explicit.table("data_attrition")[-1]["excluded_rows"] == 0  # type: ignore[index]
 
 
 def test_quantile_ties_are_deterministic_under_input_shuffle() -> None:
@@ -102,6 +160,45 @@ def test_turnover_known_static_and_reversing_ranks() -> None:
     reversed_result = turnover(reversing, quantiles=2)
     assert float(reversed_result.metrics["mean_rank_turnover"]) > 0.0
     assert float(reversed_result.metrics["mean_signal_autocorrelation"]) < 1.0
+
+
+def test_turnover_multi_lag_uses_exact_global_period_endpoints() -> None:
+    signal, _ = _panel(periods=4, instruments=3)
+    with_gap = signal.filter(~((pl.col("time") == 1) & (pl.col("instrument") == "asset-1")))
+    result = turnover(with_gap, quantiles=2, lags=(1, 2))
+    by_lag = result.table("turnover_by_period_lag")
+
+    lag_two_at_two = next(
+        row
+        for row in by_lag  # type: ignore[union-attr]
+        if row["lag"] == 2 and row["observation_time"] == 2
+    )
+    assert lag_two_at_two["previous_observation_time"] == 0
+    assert lag_two_at_two["n_common_instruments"] == 3
+    assert {row["lag"] for row in result.table("turnover_by_lag")} == {1, 2}  # type: ignore[union-attr]
+    assert len(result.table("membership_turnover_by_period_lag")) == 10  # type: ignore[arg-type]
+    assert result.table("turnover_by_period") == [
+        {
+            key: row[key]
+            for key in (
+                "observation_time",
+                "rank_turnover",
+                "signal_autocorrelation",
+                "n_common_instruments",
+                "top_membership_turnover",
+                "bottom_membership_turnover",
+            )
+        }
+        for row in by_lag  # type: ignore[union-attr]
+        if row["lag"] == 1
+    ]
+
+
+@pytest.mark.parametrize("lags", [(), (2,), (0, 1), (1, 1)])
+def test_turnover_rejects_invalid_lag_contracts(lags: tuple[int, ...]) -> None:
+    signal, _ = _panel(periods=3, instruments=3)
+    with pytest.raises(MethodContractError, match="lags"):
+        turnover(signal, lags=lags)
 
 
 def test_decay_combines_ic_and_spread_by_horizon() -> None:

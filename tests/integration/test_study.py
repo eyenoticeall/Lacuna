@@ -81,6 +81,16 @@ def test_signal_study_runs_an_end_to_end_audit(capsys: object) -> None:
     assert states["PURGED_VALIDATION_SUPPLIED"] == FindingState.PASS
     assert states["TRANSACTION_COST_EVIDENCE"] == FindingState.NOT_APPLICABLE
     assert json.loads(report.to_json())["metadata"]["method"] == "audit.v0_1"
+    assert {
+        "labels",
+        "ic",
+        "quantiles",
+        "turnover",
+        "decay",
+        "bootstrap",
+        "split",
+    }.issubset(report.evidence)
+    assert report.table("ic_by_period", source="ic") == report.evidence["ic"].table("ic_by_period")
 
     report.show()
     output = capsys.readouterr()  # type: ignore[attr-defined]
@@ -112,3 +122,22 @@ def test_study_validates_bootstrap_configuration_before_analysis(
 ) -> None:
     with pytest.raises(MethodContractError):
         _study().audit(bootstrap_resamples=resamples, seed=seed, use_native=False)
+
+
+def test_study_retains_caller_supplied_evidence_and_rejects_name_collisions() -> None:
+    extra = _study().ic(use_native=False)
+    report = _study().audit(
+        bootstrap_resamples=100,
+        seed=3,
+        additional_evidence={"independent_check": extra},
+        use_native=False,
+    )
+    assert report.evidence["independent_check"] is extra
+
+    with pytest.raises(MethodContractError, match="collide"):
+        _study().audit(
+            bootstrap_resamples=100,
+            seed=3,
+            additional_evidence={"ic": extra},
+            use_native=False,
+        )
