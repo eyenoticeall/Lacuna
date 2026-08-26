@@ -220,6 +220,25 @@ def test_verifier_rejects_tampering_extra_members_and_path_traversal(tmp_path: P
         verify_bundle(traversal)
 
 
+def test_verifier_maps_corrupt_member_reads_to_report_error(tmp_path: Path) -> None:
+    corrupted = tmp_path / "corrupted.lacuna"
+    _report().bundle(corrupted)
+    with zipfile.ZipFile(corrupted) as archive:
+        member = archive.getinfo("report/audit.md")
+        content_offset = (
+            member.header_offset + 30 + len(member.filename.encode("utf-8")) + len(member.extra)
+        )
+    with corrupted.open("r+b") as archive_file:
+        archive_file.seek(content_offset)
+        original = archive_file.read(1)
+        assert original
+        archive_file.seek(content_offset)
+        archive_file.write(bytes((original[0] ^ 0xFF,)))
+
+    with pytest.raises(ReportError, match="could not be read safely"):
+        verify_bundle(corrupted)
+
+
 def test_verifier_rejects_non_archives_and_noncanonical_json(tmp_path: Path) -> None:
     invalid = tmp_path / "invalid.lacuna"
     invalid.write_bytes(b"not a zip")

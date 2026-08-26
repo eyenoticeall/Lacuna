@@ -862,7 +862,10 @@ def verify_bundle(path: str | os.PathLike[str]) -> BundleVerification:
         if _MANIFEST_PATH not in names:
             raise ReportError("bundle does not contain manifest.json")
 
-        member_contents = {info.filename: archive.read(info) for info in infos}
+        try:
+            member_contents = {info.filename: archive.read(info) for info in infos}
+        except (OSError, zipfile.BadZipFile) as error:
+            raise ReportError(f"bundle members could not be read safely: {source}") from error
         manifest_payload = _json_object(member_contents[_MANIFEST_PATH], path=_MANIFEST_PATH)
         manifest = _parse_manifest(manifest_payload)
         expected_names = {_MANIFEST_PATH, *(artifact.path for artifact in manifest.artifacts)}

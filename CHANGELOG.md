@@ -4,6 +4,12 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Fixed
+
+- Map corrupt ZIP member reads during reproducibility-bundle verification to a concise
+  `ReportError`, so `lacuna bundle verify` rejects damaged archives without exposing a Python
+  traceback.
+
 ## [0.9.0] - 2026-08-26
 
 ### Added
