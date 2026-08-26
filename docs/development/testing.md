@@ -176,6 +176,24 @@ The v0.6 gate additionally requires:
 - release-set verification for four native core wheels, the universal extension wheel, two source
   distributions, checksums, and provenance.
 
+### Reproducibility-bundle tests
+
+The v0.7 gate additionally requires:
+
+- byte-identical archives for the same immutable report, configuration, environment, and evidence;
+- exact additive `0.7.x` exports/signatures while preserving every `0.1.x` through `0.6.x` fixture;
+- manifest-schema validation for the persisted fixture and a newly written bundle;
+- artifact-set/member size and SHA-256 verification plus report/manifest identity reconciliation;
+- rejection of traversal, Windows drives, backslashes, duplicate/extra members, links, executable
+  modes, compression, comments, noncanonical ZIP/JSON, duplicate JSON keys, tampering, and limit
+  violations;
+- redaction of credential-shaped supplemental keys, URL credentials/query/fragment, and absolute
+  paths without retaining removed values;
+- fail-closed canonical reports and named evidence so their bytes are never silently rewritten;
+- explicit overwrite behavior, conservative evidence names, and `.lacuna` suffix validation;
+- CLI creation/verification and clean-wheel exercise of the packaged manifest schema and verifier;
+- a visible distinction between internal integrity and external authenticity.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

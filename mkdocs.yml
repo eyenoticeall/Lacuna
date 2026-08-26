@@ -31,6 +31,7 @@ nav:
       - Contributing a method: development/contributing-a-method.md
       - Release engineering: development/release.md
       - Implementation roadmap: development/roadmap.md
+      - v1 readiness ledger: development/v1-readiness.md
   - Subsystems:
       - Signals and labels: subsystems/signal-labels.md
       - Financial validation: subsystems/financial-validation.md
@@ -63,6 +64,7 @@ nav:
       - Glossary: reference/glossary.md
       - Public API compatibility: reference/public-api.md
       - Result schema: reference/result-schema.md
+      - Reproducibility bundle: reference/reproducibility-bundle.md
       - Architecture decisions: reference/architecture-decisions.md
 markdown_extensions:
   - admonition

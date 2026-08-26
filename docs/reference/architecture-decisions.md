@@ -18,6 +18,7 @@ This page expands the decision summary in the technical specification into imple
 | ADR-010 | Query engines are optional adapters | Keep core lean, embeddable, and semantically controlled |
 | ADR-011 | Extensions are independently versioned distributions | Optional domains evolve without coupling core SemVer or dependencies |
 | ADR-012 | Plugin discovery never authorizes execution | Installed metadata is safe to enumerate; loading is an explicit trust decision |
+| ADR-013 | Evidence bundles are deterministic data, never code | Portable reports are checksummed, bounded, and verified without extraction or execution |
 
 ## ADR-001 — Python public API
 
@@ -213,6 +214,35 @@ identity, protocol, capabilities, configuration, and dependency declarations.
 
 **Revisit when:** a process-isolated protocol is implemented and threat-modeled. Metadata-only
 discovery and caller-visible authorization remain requirements.
+
+## ADR-013 — Deterministic evidence bundles are data, never code
+
+**Context:** a portable report must preserve enough identity and provenance for review without
+turning archive deserialization into code execution, plugin activation, proprietary-data copying, or
+an unbounded extraction surface. Internal checksums also must not be misrepresented as proof of
+authorship.
+
+**Decision:** `.lacuna` bundle v1 is a deterministic, stored ZIP of canonical JSON and escaped report
+projections. A strict manifest declares every non-executable member, size, media type, role, and
+SHA-256. Creation adds no source data automatically; verification extracts nothing and executes
+nothing.
+
+**Consequences:**
+
+- the archive and manifest have independent published compatibility versions;
+- canonical audit/evidence containing secrets, signed URLs, or machine paths fails closed rather
+  than being silently rewritten;
+- supplemental metadata is redacted with a value-free audit log;
+- archive paths, types, permissions, sizes, encoding, membership, and digests are bounded and
+  validated before success;
+- v1 claims identifiable artifact integrity only, not recomputability, numerical reproduction,
+  bitwise reproduction across executions, or authenticity;
+- arbitrary files, pickle, source datasets, lockfiles, plugins, and executable content require a
+  later separately threat-modeled contract rather than an escape hatch in v1.
+
+**Revisit when:** a reproducer can securely obtain declared inputs, construct an environment,
+execute a versioned invocation, and compare results under a documented tolerance. Preserve the
+non-executing verifier and explicit authenticity boundary.
 
 ## Recording future decisions
 

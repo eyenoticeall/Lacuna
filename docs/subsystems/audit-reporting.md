@@ -2,7 +2,8 @@
 
 **Status:** the v0.1 rule protocol, explicit applicability states, versioned scoring,
 `SignalStudy` orchestration, and deterministic JSON/Markdown/basic HTML renderers are implemented.
-Plotting, interactive exploration, and third-party rules arrive later.
+v0.7 adds checksummed reproducibility bundles over the same immutable report. Cross-phase default
+rules, plotting, interactive exploration, and third-party rules arrive later.
 
 The audit engine turns analytical evidence into reviewable findings. Reporting renders that evidence. Keeping the two separate prevents presentation choices from changing audit conclusions.
 
@@ -50,6 +51,7 @@ print(report.summary())
 report.to_markdown("lacuna-audit.md")
 report.to_html("lacuna-audit.html")
 report.to_json("lacuna-audit.json")
+report.bundle("study.lacuna")
 ```
 
 Lower-level callers can assemble evidence explicitly with `AuditContext` and `run_audit`, or
@@ -234,6 +236,11 @@ Terminal output is a compact view of the same data and uses text labels in addit
 `AuditReport` provides in-memory `to_json()`, `to_markdown()`, and `to_html()` calls. Passing a path
 persists the corresponding format with exclusive creation by default; pass `overwrite=True`
 explicitly to replace a file. `write(path, format=...)` is the format-selecting equivalent.
+
+`AuditReport.bundle(path, ...)` creates the versioned portable evidence boundary. It stores those
+same projections, never recomputes them, and may add named `AnalysisResult` evidence. The archive's
+internal SHA-256 verification is not an authenticity signature. See the
+[bundle v1 reference](../reference/reproducibility-bundle.md).
 
 ## HTML and plots
 

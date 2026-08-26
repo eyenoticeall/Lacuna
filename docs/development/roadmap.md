@@ -17,7 +17,8 @@ such as `0.2.0rc1`.
 | `0.4.x` | Phase 6: point-in-time data correctness and bias detection | Released |
 | `0.5.x` | Phase 7 plus deferred inference: permutation, Sharpe/PSR/DSR, CPCV/PBO, Reality Check/SPA | Released |
 | `0.6.x` | Phase 8: separately optional adapters and extensions | Released |
-| `0.7`–`0.9` | Cross-phase integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
+| `0.7.x` | Portable, deterministic, independently verifiable evidence bundles | Released bundle/schema/API contract and hostile-input gate |
+| `0.8`–`0.9` | Cross-phase audit integration, migration, performance, and real-user hardening | No missing v1 contract or unresolved release blocker |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -201,6 +202,16 @@ After Phase 8, work is driven by cross-phase use rather than unchecked feature c
 
 `0.7`–`0.9` do not promise one feature per minor version. A release needs a coherent compatibility
 milestone, migration story, and complete evidence gate.
+
+The first coherent integration milestone is `0.7`: deterministic `.lacuna` archives over immutable
+reports, configuration/environment summaries, and optional structured evidence. Bundle v1 has a
+published schema, byte-stable writer, strict non-executing verifier, SHA-256 manifest, privacy
+redaction/fail-closed behavior, CLI support, hostile-archive tests, frozen additive API, and
+clean-wheel exercise. It claims identifiable reproducibility only; recomputability and numerical or
+bitwise reproduction across independent executions are not implied.
+
+The current status of every stable-release criterion and the candidate `0.8`/`0.9` boundaries live
+in the [v1 readiness ledger](v1-readiness.md).
 
 ## Historical v0.1 boundary
 

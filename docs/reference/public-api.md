@@ -1,7 +1,7 @@
 # Public API compatibility
 
-Lacuna `0.6` publishes an additive Python API contract even though the project remains pre-1.0.
-The exact new `0.6.x` core surface is frozen while the `0.1.x` through `0.5.x` fixtures remain executable
+Lacuna `0.7` publishes an additive Python API contract even though the project remains pre-1.0.
+The exact new `0.7.x` core surface is frozen while the `0.1.x` through `0.6.x` fixtures remain executable
 compatibility subsets. Users can distinguish supported entry points from implementation details,
 and CI detects accidental removal, export, or signature drift.
 
@@ -16,7 +16,7 @@ study = lc.SignalStudy(...)
 report = study.audit()
 ```
 
-The following modules are part of the supported core contract through `0.6`:
+The following modules are part of the supported core contract through `0.7`:
 
 | Module | Supported purpose |
 | --- | --- |
@@ -31,22 +31,23 @@ The following modules are part of the supported core contract through `0.6`:
 | `lacuna.bias` | Safe as-of joins, future/revision checks, survivorship, membership, universe drift, and dataset contracts |
 | `lacuna.audit` | Rule evaluation and audit assembly |
 | `lacuna.report` | JSON, Markdown, and HTML rendering |
+| `lacuna.bundle` | Deterministic evidence bundles and non-executing integrity verification |
 | `lacuna.adapters` | Physical normalization, DuckDB/sklearn interop, and declared vendor/backtest schemas |
 | `lacuna.plugins` | Metadata-only discovery, selection, protocol negotiation, and explicit trusted activation |
 | `lacuna.benchmark` | Reproducible developer benchmark services |
 
 Names declared by each module's `__all__`, the package-root exports, and the primary callable
 signatures are captured in the versioned files under `tests/fixtures/public-api-v*.json`. Contract
-tests compare the running package with the exact reviewed `0.6` additions. Separate tests require
-every `v0.1` through `v0.5` root/module export and primary signature to remain available.
+tests compare the running package with the exact reviewed `0.7` additions. Separate tests require
+every `v0.1` through `v0.6` root/module export and primary signature to remain available.
 
 `lacuna-options` is a separate distribution and import package. Its initial exact exports and
 signatures live in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; that contract
-follows the extension's `0.1.x` version, not core's `0.6.x` version.
+follows the extension's `0.1.x` version, not core's `0.7.x` version.
 
 ## Compatibility promise
 
-Within the respective core `0.6.x` and extension `0.1.x` release lines:
+Within the respective core `0.7.x` and extension `0.1.x` release lines:
 
 - exported names are not removed or renamed without a deprecation path;
 - required parameters are not added to an existing call;

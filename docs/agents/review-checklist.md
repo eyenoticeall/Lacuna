@@ -72,7 +72,9 @@ Review Lacuna changes in risk order. A clean style check cannot compensate for t
 - [ ] Canonical parameters and fingerprints include all result-affecting state.
 - [ ] Cache keys cannot reuse results across method/data/code/config/RNG changes.
 - [ ] Completed records are append-only or migrated with provenance.
-- [ ] Bundles validate paths and digests and avoid proprietary data by default.
+- [ ] Bundles validate canonical archive encoding, bounded paths/types/sizes/membership, JSON, and
+      digests; they avoid proprietary data and executable content by default.
+- [ ] Bundle verification is described as integrity, not authenticity or proven recomputation.
 - [ ] Secrets, tokens, signed URLs, environment values, and table contents are not logged.
 - [ ] Plugins require explicit activation and are identified in provenance.
 - [ ] Plugin discovery reads metadata only; serialized results/configuration cannot trigger loading.

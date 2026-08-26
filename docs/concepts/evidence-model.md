@@ -80,6 +80,12 @@ The published v0.1 envelope is documented in
 [Result schema compatibility](../reference/result-schema.md) and validated against a committed
 representative fixture.
 
+The v0.7 `.lacuna` boundary packages that unchanged result with deterministic report projections,
+structured runtime context, optional named evidence, and a checksummed versioned manifest. Bundle
+integrity and result meaning remain separate: `bundle_version` selects the archive contract,
+`schema_version` selects the result envelope, and `method_version` selects analytical semantics.
+See [Reproducibility bundle v1](../reference/reproducibility-bundle.md).
+
 ## Findings lifecycle
 
 An audit rule follows a deterministic lifecycle:

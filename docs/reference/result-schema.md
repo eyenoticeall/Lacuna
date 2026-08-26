@@ -58,3 +58,16 @@ Draft202012Validator(schema, format_checker=FormatChecker()).validate(payload)
 The committed `tests/fixtures/audit-result-v1.json` and `audit-report-v1.md` fixtures catch accidental
 serialization and presentation changes. Intentional compatibility changes update the schema,
 fixtures, changelog, and migration guidance together.
+
+## Bundle manifest schema
+
+The result schema and bundle schema have independent version selectors. `schema_version="1"`
+describes an `AnalysisResult`; `bundle_version=1` describes the surrounding `.lacuna` archive and
+artifact manifest. Bundle v1 is published at
+`schemas/lacuna-bundle-manifest-v1.schema.json` and installed as
+`lacuna.schemas.bundle_manifest_v1_text()`.
+
+A new bundle layout does not silently change the meaning of an embedded result, and a future result
+schema does not automatically require another ZIP layout. Consumers validate both boundaries and
+reject either unsupported version. See the
+[reproducibility-bundle reference](reproducibility-bundle.md) for artifact and trust semantics.

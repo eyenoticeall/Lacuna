@@ -71,13 +71,18 @@ assert lacuna.__version__ == _native.version()
 ```
 
 It then runs a minimal native kernel, imports every public package, checks `py.typed` and stubs,
-exercises experiment/multiplicity and regime APIs, values a two-point cost-stress surface, and
-exercises the CLI `doctor` command.
+exercises experiment/multiplicity and regime APIs, values a two-point cost-stress surface, creates
+and verifies a `.lacuna` bundle, and exercises the CLI `doctor` command.
 
 The canonical audit schema is available both as the repository publication artifact at
 `schemas/audit-result-v1.schema.json` and as the installed
 `lacuna.schemas/audit-result-v1.schema.json` resource. Schema tests require these copies to be
 byte-for-byte identical.
+
+The bundle-manifest schema has the same two-surface contract at
+`schemas/lacuna-bundle-manifest-v1.schema.json` and the installed
+`lacuna.schemas/lacuna-bundle-manifest-v1.schema.json`. Release inspection requires both the bundle
+implementation and packaged schema in every core wheel/source distribution.
 
 The options extension has a second installed-artifact smoke test. It verifies its distribution and
 source versions, typed marker, chain validation/derived coordinates, delta buckets, and empirical

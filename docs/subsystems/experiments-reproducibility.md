@@ -2,8 +2,9 @@
 
 **Status:** v0.2 implements canonical/versioned identities, append-only local SQLite attempts,
 immutable corrections, complete selection lineage, registry snapshots, and basic multiplicity
-correction. Environment capture, reproducibility bundles, distributed registries, and remote
-artifact stores remain later work.
+correction. v0.7 adds deterministic identifiable-level reproducibility bundles with environment
+summaries and independent integrity verification. Distributed registries, remote artifact stores,
+and verified recomputation remain later work.
 
 An experiment registry is the memory of the research process. It records all evaluated variants, not only the winner, so selection bias and multiple testing can be measured instead of guessed.
 
@@ -112,6 +113,16 @@ Do not cache mutable Python objects by identity or reuse cached artifacts when a
 
 ## Reproducibility bundle
 
+The implemented v0.7 boundary is `AuditReport.bundle(path, ...)`, the equivalent
+`lacuna.create_bundle(report, path, ...)`, and `lacuna.verify_bundle(path)`. Bundle v1 includes the
+canonical audit, Markdown/HTML projections, resolved configuration, an environment summary, and
+optional `AnalysisResult` evidence/provenance/invocation metadata. It publishes a JSON Schema and
+strictly verifies canonical paths, file types, JSON, sizes, artifact-set/member SHA-256, and archive
+membership without extraction or execution.
+
+See the [bundle v1 reference](../reference/reproducibility-bundle.md) for the exact layout, API,
+limits, privacy rules, determinism scope, and compatibility behavior.
+
 A bundle manifest should identify:
 
 - the canonical report and result artifacts;
@@ -133,6 +144,10 @@ Reproduction has levels:
 4. **bitwise reproducible** — bytes match, where supported.
 
 Reports must claim only the level verified.
+
+Bundle v1 claims only level 1. A checksummed archive establishes identity and corruption detection;
+it does not make inaccessible data accessible, run a computation, compare numerical tolerances, or
+authenticate the author. Higher-level claims remain future work.
 
 ## Concurrency and remote execution
 

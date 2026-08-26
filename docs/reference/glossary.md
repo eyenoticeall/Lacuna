@@ -198,6 +198,15 @@ Terms in this glossary are normative where they describe Lacuna data and evidenc
 **Fingerprint**
 : Versioned digest of a canonical identity descriptor. It detects changed modeled inputs but cannot prove equivalence of unrecorded state.
 
+**Reproducibility bundle**
+: Versioned, non-executable `.lacuna` archive containing a canonical audit, report projections,
+  structured context/evidence, and a checksummed manifest. Bundle v1 verifies identifiable artifact
+  integrity, not authorship or successful recomputation.
+
+**Artifact integrity**
+: Evidence that bytes match the sizes and cryptographic digests declared by a manifest. Internal
+  integrity does not authenticate who created the manifest.
+
 **Numerical reproducibility**
 : Ability to recompute outputs within declared method-specific tolerances.
 

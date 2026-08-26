@@ -14,6 +14,8 @@ This handbook translates Lacuna's product specification into engineering rules. 
 | CI or required checks | [Continuous integration](continuous-integration.md), [Testing](testing.md) |
 | Release or persisted schema | [Release engineering](release.md), [Results and evidence](../concepts/evidence-model.md) |
 | Roadmap work | [Implementation roadmap](roadmap.md), relevant [subsystem guide](../subsystems/signal-labels.md) |
+| Bundle or portable evidence | [Reproducibility bundle](../reference/reproducibility-bundle.md), [Experiments](../subsystems/experiments-reproducibility.md) |
+| Stable-release claim | [v1 readiness ledger](v1-readiness.md), [Implementation roadmap](roadmap.md) |
 
 Automation and coding agents must also follow the repository-root `AGENTS.md` and the [agent handbook](../agents/index.md).
 

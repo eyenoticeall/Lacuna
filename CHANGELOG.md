@@ -4,6 +4,23 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Added
+
+- Add deterministic `.lacuna` reproducibility bundles containing the canonical audit,
+  Markdown/HTML projections, resolved configuration/environment summaries, and optional structured
+  evidence, provenance, and invocation metadata.
+- Add a published bundle-manifest v1 JSON Schema, frozen additive `0.7.x` API fixture, SHA-256
+  artifact-set/member verification, and Python plus CLI creation/verification workflows.
+- Add bounded hostile-archive validation, supplemental secret/URL/path redaction, fail-closed
+  canonical evidence checks, and explicit integrity-versus-authenticity semantics.
+
+### Changed
+
+- Extend clean-wheel smoke and release archive inspection to require the bundle module, installed
+  manifest schema, and an end-to-end bundle create/verify path.
+- Publish the reproducibility-bundle contract, v1-readiness ledger, architectural trust decision,
+  migration boundary, and `0.8`/`0.9` candidate hardening scopes.
+
 ## [0.6.0] - 2026-08-26
 
 ### Added

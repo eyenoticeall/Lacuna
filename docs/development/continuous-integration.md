@@ -41,7 +41,7 @@ a successful branch-protection check.
 | `Interoperability` | pandas, Arrow, Polars, NumPy, lazy/eager, and SciPy-reference comparisons with optional extras installed |
 | `Optional extensions` | Locked workspace install; extension Ruff/mypy; branch-aware options tests and independent API contract |
 | `Documentation` | Strict MkDocs build with the rendered handbook retained for inspection |
-| `Package` | Build core sdist/wheel plus options wheel/sdist, install all wheels into a clean environment, then exercise both distributions, typing resources, schema, CLI, public APIs, adapters/plugins, and native kernels |
+| `Package` | Build core sdist/wheel plus options wheel/sdist, install all wheels into a clean environment, then exercise both distributions, typing resources, result/bundle schemas, CLI, bundles, public APIs, adapters/plugins, and native kernels |
 | `CI gate` | Stable aggregate result intended for branch protection |
 
 Every job has a bounded timeout. The Python matrix uses `fail-fast: false` so one compatibility
