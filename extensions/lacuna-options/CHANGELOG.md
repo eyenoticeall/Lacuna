@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.2] - 2026-08-26
+
+### Changed
+
+- Expand the compatible core range to `lacuna>=0.5,<0.9` after the additive Lacuna `0.8`
+  standardized-audit release recognized real options evidence under the required options-profile
+  capability and passed the unchanged extension API, property, coverage, and joint-install gates.
+
 ## [0.1.1] - 2026-08-26
 
 ### Changed

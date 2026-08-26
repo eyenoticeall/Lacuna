@@ -7,7 +7,8 @@
     {"module": "lacuna.audit_profiles", "qualname": "standard_audit", "signature": "(*, results=None, policies=None, scope='strategy', profile=None)"},
     {"module": "lacuna.audit_profiles", "qualname": "standard_profile", "signature": "(scope='strategy')"},
     {"module": "lacuna", "qualname": "AnalysisResult.from_dict", "signature": "(value)"},
-    {"module": "lacuna", "qualname": "AnalysisResult.from_json", "signature": "(value)"}
+    {"module": "lacuna", "qualname": "AnalysisResult.from_json", "signature": "(value)"},
+    {"module": "lacuna.schemas", "qualname": "standard_audit_profile_v1_text", "signature": "()"}
   ],
   "contract": "lacuna-public-api-v0.8",
   "inherited_contracts": [
@@ -28,8 +29,12 @@
       "run_standard_audit",
       "standard_audit",
       "standard_profile"
+    ],
+    "lacuna.schemas": [
+      "standard_audit_profile_v1_text"
     ]
   },
+  "package_series": "0.8",
   "root_exports": [
     "AuditProfile",
     "AuditScope",

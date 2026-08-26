@@ -72,6 +72,7 @@ def test_new_public_call_signatures_match_the_v0_8_contract() -> None:
 
 
 def test_v0_8_contract_declares_its_compatibility_chain() -> None:
+    assert _contract()["package_series"] == "0.8"
     assert _contract()["inherited_contracts"] == [
         "lacuna-public-api-v0.1",
         "lacuna-public-api-v0.2",

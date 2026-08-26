@@ -44,7 +44,7 @@ every `v0.1` through `v0.7` root/module export and primary signature to remain a
 
 `lacuna-options` is a separate distribution and import package. Its initial exact exports and
 signatures live in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; that contract
-follows the extension's `0.1.x` version, not core's `0.7.x` version.
+follows the extension's `0.1.x` version, not core's `0.8.x` version.
 
 ## Compatibility promise
 

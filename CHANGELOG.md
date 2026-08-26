@@ -4,6 +4,33 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.8.0] - 2026-08-26
+
+### Added
+
+- Add versioned standardized audit profiles for signal, strategy, and options research scopes over
+  every released analytical, adapter, plugin, and extension method family.
+- Add explicit required, optional, and not-applicable capability coverage; category, requirement,
+  inventory, and domain-finding evidence tables; and unchanged propagation of source findings.
+- Add a published standardized-audit profile v1 JSON Schema, frozen strategy/profile and additive
+  `0.8.x` public API fixtures, plus real options-extension profile integration.
+- Add strict `AnalysisResult.from_dict(...)` and `from_json(...)` readers with duplicate-key,
+  non-finite, schema, field, enum, timestamp, and version rejection.
+- Add `lacuna audit --scope ... --evidence NAME=PATH` with bounded named evidence, deterministic
+  bundle output, safe overwrite behavior, and existing finding-based exit policies.
+- Add an executable vendor/backtester-to-audit example and installed-wheel standardized-audit,
+  strict-reader, schema-resource, and bundle coverage.
+
+### Changed
+
+- Render standardized reports as categorical evidence assessments with required/optional coverage
+  and no universal cross-phase strategy-quality score; the frozen v0.1 signal score is unchanged.
+- Advance `lacuna-options` to `0.1.2` only to widen its compatible core range to
+  `lacuna>=0.5,<0.9`; its independent `0.1.x` public API remains unchanged.
+- Publish the standardized-audit reference, ADR-014, profile-specific agent review workflow, and an
+  updated v1 ledger that leaves migration/operational hardening and independent real-user evidence
+  as the remaining pre-v1 work.
+
 ## [0.7.0] - 2026-08-26
 
 ### Added

@@ -194,6 +194,26 @@ The v0.7 gate additionally requires:
 - CLI creation/verification and clean-wheel exercise of the packaged manifest schema and verifier;
 - a visible distinction between internal integrity and external authenticity.
 
+### Standardized-audit tests
+
+The v0.8 gate additionally requires:
+
+- exact additive `0.8.x` exports/signatures while preserving every `0.1.x` through `0.7.x` fixture;
+- schema validation and a frozen strategy fixture for the public/packaged profile definition;
+- exact-one capability mapping for every released result method family;
+- required, optional, not-applicable, inapplicable-but-supplied, unrecognized, and overlapping
+  method cases for each profile boundary;
+- categorical/category coverage without `robustness_score` and unchanged propagation of source
+  state, severity, category, message, method version, finding code, and evidence;
+- order-independent normalized output plus deterministic domain-finding identities;
+- duplicate-name, bounded-file, duplicate-key, non-finite, unsupported-schema, field, enum,
+  timestamp, and version rejection in the strict JSON/CLI boundary;
+- escaped categorical Markdown/HTML, finding-based exit codes, overwrite behavior, and named bundle
+  evidence;
+- executable vendor/backtester and real options-extension integration;
+- clean-wheel exercise of standardized audit, strict result round-trip, the installed profile
+  schema, and release archive resource inspection.
+
 ### Fuzzing
 
 Fuzz Rust interval logic, schema conversion, Arrow buffer handling, and parsers. Seed corpora include empty arrays, maximum offsets, malformed intervals, all-null buffers, dictionaries, and extreme finite floats.

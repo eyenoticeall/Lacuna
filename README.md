@@ -24,14 +24,15 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.7** adds deterministic, checksummed `.lacuna` reproducibility bundles with a published
-> manifest schema, privacy redaction, hostile-archive defenses, and independent non-executing
-> verification. The additive core `0.7.x` contract preserves every earlier compatibility fixture;
-> `lacuna-options` `0.1.1` keeps the same API while expanding compatibility through core `0.7.x`.
+> Lacuna **v0.8** adds standardized signal, strategy, and options audit profiles across every
+> released evidence family, with explicit categorical coverage, unchanged domain findings, strict
+> result JSON ingestion, and no misleading universal score. The additive core `0.8.x` contract
+> preserves every earlier compatibility fixture; `lacuna-options` `0.1.2` keeps the same API while
+> expanding compatibility through core `0.8.x`.
 > Lacuna remains pre-1.0 software; later minor versions may evolve through documented migrations.
 
 > [!NOTE]
-> [`v0.7.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.7.0)
+> [`v0.8.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.8.0)
 > as checksummed, provenance-attested core and options wheels/source distributions. The PyPI
 > distribution name `lacuna` belongs to an unrelated project, so do not install that package
 > expecting this software.
@@ -78,7 +79,7 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 | Labels | Explicit observation/entry/exit timing, trading-observation horizons, censoring and adjustment evidence |
 | Signal diagnostics | Pearson/Spearman IC, IC time series, balanced quantiles, spreads, monotonicity, turnover, and decay |
 | Financial validation | Walk-forward, purged K-fold/CPCV paths, dependent and joint bootstrap, permutation, Sharpe/PSR/DSR, CSCV/PBO, Reality Check, and SPA |
-| Audit and reports | Versioned rules, explicit unknown/not-applicable states, evidence coverage, JSON, Markdown, and self-contained HTML |
+| Audit and reports | Frozen signal rules plus standardized signal/strategy/options profiles, categorical coverage, unchanged source findings, JSON, Markdown, and self-contained HTML |
 | Reproducibility | Deterministic `.lacuna` archives, published manifest schema, privacy redaction, SHA-256 integrity, and strict non-executing verification |
 | Native core | Rust grouped-rank IC, bootstrap-mean reduction, and half-open interval purging with Python references |
 | Data boundary | Polars eager/lazy, NumPy, optional pandas, and Arrow-compatible inputs |
