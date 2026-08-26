@@ -34,6 +34,11 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   item now has released or release-gated evidence; `1.0.0` remains blocked by the explicitly
   external requirement for real users applying Lacuna to independent research stacks.
 
+### Fixed
+
+- Pin repository JSON artifacts to LF checkouts so persisted-fixture SHA-256 and Git blob identities
+  remain byte-stable on Windows as well as Linux and macOS.
+
 ## [0.8.0] - 2026-08-26
 
 ### Added

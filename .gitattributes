@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Persisted JSON identities are byte-level release contracts on every checkout platform.
+*.json text eol=lf
