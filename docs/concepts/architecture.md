@@ -7,8 +7,9 @@ This page is the shortest complete statement of Lacuna's architecture. It is a c
 Lacuna documentation uses three status labels:
 
 - **Implemented** — present in the repository and covered by executable checks.
-- **v0.1 contract** — the next stable design target; code may not exist yet.
-- **Later** — intentionally outside v0.1 and not a reason to generalize today's implementation.
+- **Milestone contract** — the next declared minor-version target; code may not exist yet.
+- **Later** — intentionally outside the current milestone and not a reason to generalize today's
+  implementation.
 
 Never describe a target API as implemented. Pre-release code can change, but its current behavior must still be documented accurately.
 
@@ -121,7 +122,8 @@ The target Python packages have narrow responsibilities:
 
 | Package | Owns |
 |---|---|
-| `signal` | IC, quantiles, decay, turnover, neutralization |
+| `signal` | IC, buckets, decay, turnover, neutralization, diagnostic projections |
+| `events` | availability-anchored windows, event-path coverage, clustered response inference |
 | `labels` | forward returns, event intervals, execution timing |
 | `cv` | temporal splits, purging, embargo, and CPCV path reconstruction |
 | `validation` | resampling, permutation, Sharpe/PBO, Reality Check/SPA, multiple testing, stability |
@@ -141,13 +143,18 @@ Do not create every package as an empty placeholder. Add a package when its firs
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
 v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
 milestone, the v0.6 optional-integration milestone, the v0.7 portable-evidence milestone, and the
-v0.8 standardized-audit milestone:
+v0.8 standardized-audit, v0.9 operational-hardening, v0.10 factor-diagnostic, and v0.11
+decay/projection/event milestones:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
 - immutable result, finding, and provenance models;
 - Polars-first normalization for Polars, pandas, Arrow-compatible, mapping, and NumPy inputs;
 - explicit forward-return labels and Pearson/Spearman IC, quantile, turnover, and decay diagnostics;
+- explicit group-aware buckets and neutralization, reconciled attrition, multi-lag stability, and
+  evidence-native optional Plotly views;
+- validated positive exponential decay inference, explicit non-compounding portfolio projection,
+  and availability-anchored event paths with clustered complete-path response bands;
 - walk-forward folds, half-open interval purging, observation embargo, and four bootstrap schemes;
 - native grouped-rank IC, bootstrap-mean, and interval-purge kernels with reference paths;
 - deterministic audit rules, evidence scoring, JSON/Markdown/basic HTML, and `SignalStudy`;
@@ -178,9 +185,10 @@ v0.8 standardized-audit milestone:
 - strict current-schema result JSON ingestion plus file-oriented standardized-audit CLI and
   vendor/backtester/options-to-audit integration paths.
 
-DataFusion, framework-specific adapters, automatic execution planning, model-based option pricing/
+DataFusion, framework-specific adapters, generic factor-panel ingestion, automatic execution
+planning, model-based option pricing/
 calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
-through documented migrations; the published `0.1.x` through `0.8.x` contracts govern their
+through documented migrations; the published `0.1.x` through `0.11.x` contracts govern their
 respective release lines.
 
 ## Detailed guides

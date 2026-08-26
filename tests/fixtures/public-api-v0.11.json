@@ -1,0 +1,75 @@
+{
+  "callables": [
+    {
+      "module": "lacuna.signal",
+      "qualname": "PortfolioProjectionResult",
+      "signature": "(_frame, evidence)"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "fit_decay",
+      "signature": "(decay_result, *, metric='mean_ic', expected_direction='positive', model='exponential', confidence=0.95, resamples=2000, expected_block_length=None, seed=None, minimum_r_squared=0.5)"
+    },
+    {
+      "module": "lacuna.signal",
+      "qualname": "portfolio_projection",
+      "signature": "(bucketed, labels, *, horizon, long_buckets, short_buckets, weighting='equal', gross_exposure=1.0, net_exposure=0.0, group_neutral=None, incomplete_group_policy='raise')"
+    },
+    {
+      "module": "lacuna.events",
+      "qualname": "EventWindowResult",
+      "signature": "(_frame, evidence)"
+    },
+    {
+      "module": "lacuna.events",
+      "qualname": "event_windows",
+      "signature": "(events, prices, *, event_id='event_id', instrument='instrument', event_time='event_time', available_time='available_time', price_time='time', price='close', anchor='available_time', before=5, after=10, alignment='next_observation', overlap_policy='raise', price_adjustment='unknown')"
+    },
+    {
+      "module": "lacuna.events",
+      "qualname": "event_response",
+      "signature": "(windows, *, confidence=0.95, resamples=2000, expected_block_length=None, seed=None, min_clusters=20)"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.fit_decay",
+      "signature": "(self, *, metric='mean_ic', expected_direction='positive', confidence=0.95, resamples=2000, expected_block_length=None, seed=None, minimum_r_squared=0.5, min_observations=3, quantiles=None, use_native=True)"
+    },
+    {
+      "module": "lacuna",
+      "qualname": "SignalStudy.portfolio_projection",
+      "signature": "(self, bucketed, *, horizon, long_buckets, short_buckets, weighting='equal', gross_exposure=1.0, net_exposure=0.0, group_neutral=None, incomplete_group_policy='raise')"
+    }
+  ],
+  "contract": "lacuna-public-api-v0.11",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6",
+    "lacuna-public-api-v0.7",
+    "lacuna-public-api-v0.8",
+    "lacuna-public-api-v0.9",
+    "lacuna-public-api-v0.10"
+  ],
+  "module_exports": {
+    "lacuna.events": [
+      "EventWindowResult",
+      "event_response",
+      "event_windows"
+    ],
+    "lacuna.signal": [
+      "PortfolioProjectionResult",
+      "fit_decay",
+      "portfolio_projection"
+    ]
+  },
+  "package_series": "0.11",
+  "root_exports": [
+    "EventWindowResult",
+    "PortfolioProjectionResult",
+    "events"
+  ]
+}

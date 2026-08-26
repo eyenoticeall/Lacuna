@@ -12,6 +12,7 @@ import numpy.typing as npt
 import polars as pl
 
 from lacuna._attrition import attrition_record
+from lacuna._decay import fit_decay
 from lacuna._frames import (
     FrameDiagnostics,
     eager_frame,
@@ -23,6 +24,7 @@ from lacuna._frames import (
     validate_label_intervals,
     validate_panel_schema,
 )
+from lacuna._portfolio import PortfolioProjectionResult, portfolio_projection
 from lacuna._signal_transform import (
     BucketSpec,
     SignalTransformResult,
@@ -1270,7 +1272,11 @@ def decay(
             "n_observations": ic_result.metrics["n_observations"],
         },
         findings=tuple((*ic_result.findings, *quantile_result.findings)),
-        tables={"ic_decay": frame_records(decay_table)},
+        tables={
+            "ic_decay": frame_records(decay_table),
+            "ic_by_period_horizon": ic_result.tables["ic_by_period"],
+            "spread_by_period_horizon": quantile_result.tables["spread_by_period"],
+        },
         warnings=(
             "A half-life is not estimated unless a validated identifiable decay model is supplied.",
         ),
@@ -1280,12 +1286,15 @@ def decay(
 __all__ = [
     "BucketSpec",
     "CorrelationMethod",
+    "PortfolioProjectionResult",
     "SignalTransformResult",
     "bucket_returns",
     "bucketize",
     "decay",
+    "fit_decay",
     "ic",
     "neutralize",
+    "portfolio_projection",
     "quantiles",
     "turnover",
 ]

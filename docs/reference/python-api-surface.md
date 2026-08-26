@@ -1,6 +1,6 @@
 # Python API surface
 
-This is the complete import inventory for Lacuna core `0.10.x`. It answers where a supported name
+This is the complete import inventory for Lacuna core `0.11.x`. It answers where a supported name
 lives and routes each module to the document that defines its semantics. Callable signatures are
 frozen by the cumulative `tests/fixtures/public-api-v0.*.json` contracts; formulas, temporal rules,
 failure modes, and result interpretation live in the linked design and methodology pages.
@@ -45,12 +45,13 @@ Exports: `BUNDLE_FORMAT`, `BUNDLE_VERSION`, `DIAGNOSTIC_VERSION`, `AnalysisResul
 `ApplicabilityState`, `AuditContext`, `AuditProfile`, `AuditReport`, `AuditRule`, `AuditScope`,
 `BenchmarkCase`, `BenchmarkConfig`, `BenchmarkSuite`, `BucketSpec`, `BundleArtifact`, `BundleManifest`,
 `BundleVerification`, `Config`, `ConfigurationError`, `DataContractError`, `DiagnosticCheck`,
-`DiagnosticState`, `EvidenceDisposition`, `EvidenceRequirement`, `ExperimentRegistry`, `Finding`,
+`DiagnosticState`, `EventWindowResult`, `EvidenceDisposition`, `EvidenceRequirement`,
+`ExperimentRegistry`, `Finding`,
 `FindingState`, `InstallationDiagnostics`, `LabelResult`, `LacunaError`, `MethodContractError`,
-`NativeExtensionError`, `PluginError`, `ReportError`, `ResultMetadata`, `Severity`, `SignalStudy`,
+`NativeExtensionError`, `PluginError`, `PortfolioProjectionResult`, `ReportError`, `ResultMetadata`, `Severity`, `SignalStudy`,
 `SignalTransformResult`, `__version__`, `adapters`, `audit`, `benchmark_config_for_tier`, `bias`, `bundle`, `config`,
 `configure`, `costs`, `create_bundle`, `cv`, `default_rules`, `diagnose_installation`, `diagnostics`,
-`experiment`, `get_config`, `labels`, `plugins`, `regime`, `robustness`, `run_audit`,
+`events`, `experiment`, `get_config`, `labels`, `plugins`, `regime`, `robustness`, `run_audit`,
 `run_benchmarks`, `run_standard_audit`, `signal`, `standard_audit`, `standard_profile`, `validation`,
 `verify_bundle`.
 
@@ -149,6 +150,14 @@ lineage. Credential-shaped fields are rejected from canonical records. See
 Exports: `CANONICALIZATION_VERSION`, `REGISTRY_SCHEMA_VERSION`, `AttemptRecord`, `AttemptStatus`,
 `ExperimentRegistry`, `SelectionRecord`, `canonical_json`, `fingerprint`.
 
+## `lacuna.events`
+
+Aligns event paths to availability by default, records censoring and overlap clusters, and computes
+complete-path stationary-bootstrap response bands over ordered anchor-time clusters. It does not
+infer an abnormal-return model. See [Event studies](../subsystems/event-studies.md).
+
+Exports: `EventWindowResult`, `event_response`, `event_windows`.
+
 ## `lacuna.labels`
 
 Constructs explicit forward-return labels with observation-count horizons, entry timing, adjustment,
@@ -202,13 +211,14 @@ Exports: `audit_result_v1_text`, `bundle_manifest_v1_text`,
 
 ## `lacuna.signal`
 
-Constructs explicit immutable buckets and neutralized signals, then computes grouped
-Pearson/Spearman information coefficient, bucket/quantile evidence, multi-lag turnover, and
-multi-horizon decay over explicit label contracts. See
+Constructs explicit immutable buckets, neutralized signals, and diagnostic portfolio cohorts, then
+computes grouped Pearson/Spearman information coefficient, bucket/quantile evidence, multi-lag
+turnover, descriptive decay, and validated half-life inference over explicit label contracts. See
 [Signals and labels](../subsystems/signal-labels.md).
 
-Exports: `BucketSpec`, `CorrelationMethod`, `SignalTransformResult`, `bucket_returns`, `bucketize`,
-`decay`, `ic`, `neutralize`, `quantiles`, `turnover`.
+Exports: `BucketSpec`, `CorrelationMethod`, `PortfolioProjectionResult`, `SignalTransformResult`,
+`bucket_returns`, `bucketize`, `decay`, `fit_decay`, `ic`, `neutralize`, `portfolio_projection`,
+`quantiles`, `turnover`.
 
 ## `lacuna.validation`
 

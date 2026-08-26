@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5] - 2026-08-26
+
+### Changed
+
+- Expand the compatible core range to `lacuna>=0.5,<0.12` after the additive Lacuna `0.11`
+  decay, diagnostic-projection, and event-study milestone passed the unchanged extension API,
+  property, packaging, and joint-install gates.
+
 ## [0.1.4] - 2026-08-26
 
 ### Changed

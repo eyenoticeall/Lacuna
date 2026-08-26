@@ -1,7 +1,7 @@
 {
   "format": "lacuna.public-reference-coverage",
   "manifest_version": 1,
-  "package_series": "0.10",
+  "package_series": "0.11",
   "root": {
     "module": "lacuna",
     "reference": "docs/reference/python-api-surface.md",
@@ -30,6 +30,7 @@
       "DataContractError",
       "DiagnosticCheck",
       "DiagnosticState",
+      "EventWindowResult",
       "EvidenceDisposition",
       "EvidenceRequirement",
       "ExperimentRegistry",
@@ -41,6 +42,7 @@
       "MethodContractError",
       "NativeExtensionError",
       "PluginError",
+      "PortfolioProjectionResult",
       "ReportError",
       "ResultMetadata",
       "Severity",
@@ -60,6 +62,7 @@
       "default_rules",
       "diagnose_installation",
       "diagnostics",
+      "events",
       "experiment",
       "get_config",
       "labels",
@@ -235,6 +238,12 @@
       ]
     },
     {
+      "module": "lacuna.events",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/event-studies.md",
+      "exports": ["EventWindowResult", "event_response", "event_windows"]
+    },
+    {
       "module": "lacuna.experiment",
       "reference": "docs/reference/python-api-surface.md",
       "design": "docs/subsystems/experiments-reproducibility.md",
@@ -328,12 +337,15 @@
       "exports": [
         "BucketSpec",
         "CorrelationMethod",
+        "PortfolioProjectionResult",
         "SignalTransformResult",
         "bucket_returns",
         "bucketize",
         "decay",
+        "fit_decay",
         "ic",
         "neutralize",
+        "portfolio_projection",
         "quantiles",
         "turnover"
       ]

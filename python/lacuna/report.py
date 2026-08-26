@@ -619,6 +619,13 @@ def render_plotly_html(report: AuditReport, *, view: ReportView = "auto") -> str
             "line",
         ),
         (
+            "Validated decay fit",
+            "decay_fit",
+            "horizon_observations",
+            ("direction_adjusted_mean", "fitted_value"),
+            "line",
+        ),
+        (
             "Data attrition",
             "data_attrition",
             "stage",
@@ -636,7 +643,13 @@ def render_plotly_html(report: AuditReport, *, view: ReportView = "auto") -> str
             "Event response",
             "event_response",
             "offset",
-            ("mean_response", "lower", "upper"),
+            (
+                "mean_response",
+                "pointwise_lower",
+                "pointwise_upper",
+                "simultaneous_lower",
+                "simultaneous_upper",
+            ),
             "line",
         ),
     )

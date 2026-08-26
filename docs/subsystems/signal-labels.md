@@ -1,8 +1,8 @@
 # Signal analytics and forward labels
 
-**Status:** v0.10 adds explicit group-aware bucket transformations, weighted least-squares
-neutralization, standardized attrition ledgers, and exact multi-lag turnover to the v0.1 label and
-signal foundation. Weighted IC and validated half-life inference remain later work.
+**Status:** v0.11 adds validated half-life inference and explicit one-horizon diagnostic portfolio
+projections to the v0.10 transformation, attrition, grouping, and stability foundation. Weighted IC
+and weighted bucketing remain later work.
 
 This subsystem answers: does a cross-sectional feature contain predictive information under explicit earning and execution assumptions?
 
@@ -259,9 +259,35 @@ Portfolio-weight turnover is separate because a signal study does not contain po
 
 ## Decay
 
-Decay evaluates IC, spread, and relevant turnover across the same set of explicit horizons. The source table contains one row per horizon and group/summary statistic.
+`decay()` evaluates IC and spread across the same explicit horizons and retains jointly aligned
+period/horizon rows. `fit_decay()` fits the direction-adjusted positive model
+`amplitude × exp(-horizon / tau)` and reports half-life `tau × log(2)` in trading observations.
 
-A half-life estimate is emitted only when the decay curve and model assumptions make it identifiable. Failed or non-monotonic fits carry a reason rather than an arbitrary number.
+A half-life estimate requires four positive horizons, twenty common periods, positive adjusted
+means, convergence away from the upper bound, a finite stationary-block-bootstrap interval, and the
+configured minimum `R²`. Failure returns `null` fields and a `WARN` or `UNKNOWN` finding. SciPy is
+loaded only at the call site through `lacuna[statistics]`; optimizer, bounds, dependency version,
+root entropy, substream derivation, and joint resampling policy are provenance.
+
+## Diagnostic portfolio projection
+
+`portfolio_projection()` accepts only an explicit bucket transformation and exactly one label
+horizon. Callers select long/short buckets, equal/rank/absolute-signal weighting, gross/net
+exposure, and optional joint group neutrality.
+
+Leg magnitudes are `(gross + net) / 2` and `(gross - net) / 2`. Consequently, gross one and net zero
+means `+0.5` long and `-0.5` short. Each output row stores observation, entry, label end, instrument,
+horizon, bucket, leg, target weight, forward return, and arithmetic contribution. Evidence stores
+exposure reconciliation, cohort return, coverage, concentration, implied one-way target turnover,
+and attrition.
+
+Group neutrality allocates each leg equally across eligible joint groups, then applies the selected
+within-group weights. One-sided groups raise by default; explicit dropping renormalizes both legs
+and records exclusions.
+
+Per ADR-015, this is not a backtester. It does not compound returns, carry cash, resolve overlapping
+cohorts, simulate orders/fills, infer execution, or apply costs. Its explicit weights can feed
+Lacuna cost/capacity analysis or another backtester.
 
 ## Neutralization
 
@@ -312,6 +338,10 @@ Polars should own alignment, projection, and ordinary grouping unless benchmarks
   weights.
 - Time-varying group classifications with verified, unknown, and future availability.
 - Exact reconciliation for every `data_attrition` row.
+- Known exponential recovery, sign reversal, flat/zero and upper-bound decay failures, and
+  deterministic joint-period resampling.
+- Exact portfolio gross/net/leg and contribution identities, the gross-one regression case,
+  one-sided group policy, concentration, turnover, and permutation invariance.
 - No same-close entry under `signal_time="close"`, `entry="next_open"`.
 - Calendar, missing-bar, delisting, and last-horizon censoring.
 - Eager/lazy and adapter equivalence.
@@ -322,6 +352,7 @@ Polars should own alignment, projection, and ordinary grouping unless benchmarks
 
 The current boundary includes forward returns, grouped Pearson/Spearman IC, explicit buckets,
 quantile compatibility, spread, monotonicity, multi-lag turnover, neutralization, and descriptive
-decay. Weighted IC, weighted bucketing, decay inference, portfolio projections, and event studies
-require their separately versioned contracts. A native transformation kernel is not justified
-without profiling, a reference path, and differential evidence.
+decay, validated half-life inference, and explicit diagnostic portfolio projections. Weighted IC,
+weighted bucketing, abnormal-return event models, and cumulative portfolio simulation remain out of
+scope. A native transformation kernel is not justified without profiling, a reference path, and
+differential evidence.

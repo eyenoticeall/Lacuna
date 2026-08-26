@@ -7,6 +7,7 @@ from lacuna import (
     costs,
     cv,
     diagnostics,
+    events,
     experiment,
     labels,
     plugins,
@@ -58,6 +59,7 @@ from lacuna.diagnostics import (
     InstallationDiagnostics,
     diagnose_installation,
 )
+from lacuna.events import EventWindowResult
 from lacuna.exceptions import (
     ConfigurationError,
     DataContractError,
@@ -70,7 +72,7 @@ from lacuna.exceptions import (
 from lacuna.experiment import ExperimentRegistry
 from lacuna.labels import LabelResult
 from lacuna.report import AuditReport
-from lacuna.signal import BucketSpec, SignalTransformResult
+from lacuna.signal import BucketSpec, PortfolioProjectionResult, SignalTransformResult
 from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
 
@@ -98,6 +100,7 @@ __all__ = [
     "DataContractError",
     "DiagnosticCheck",
     "DiagnosticState",
+    "EventWindowResult",
     "EvidenceDisposition",
     "EvidenceRequirement",
     "ExperimentRegistry",
@@ -109,6 +112,7 @@ __all__ = [
     "MethodContractError",
     "NativeExtensionError",
     "PluginError",
+    "PortfolioProjectionResult",
     "ReportError",
     "ResultMetadata",
     "Severity",
@@ -128,6 +132,7 @@ __all__ = [
     "default_rules",
     "diagnose_installation",
     "diagnostics",
+    "events",
     "experiment",
     "get_config",
     "labels",

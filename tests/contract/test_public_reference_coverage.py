@@ -70,7 +70,7 @@ def test_manifest_identity_and_cumulative_contract_chain() -> None:
     }
     assert manifest["format"] == "lacuna.public-reference-coverage"
     assert manifest["manifest_version"] == 1
-    assert manifest["package_series"] == "0.10"
+    assert manifest["package_series"] == "0.11"
 
     root = _record(manifest["root"])
     root_exports = root["exports"]

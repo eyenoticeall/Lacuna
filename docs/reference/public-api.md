@@ -1,7 +1,7 @@
 # Public API compatibility
 
-Lacuna `0.9` publishes an additive Python API contract even though the project remains pre-1.0.
-The exact new `0.9.x` core surface is frozen while the `0.1.x` through `0.8.x` fixtures remain executable
+Lacuna `0.11` publishes an additive Python API contract even though the project remains pre-1.0.
+The exact new `0.11.x` core surface is frozen while the `0.1.x` through `0.10.x` fixtures remain executable
 compatibility subsets. Users can distinguish supported entry points from implementation details,
 and CI detects accidental removal, export, or signature drift.
 
@@ -16,12 +16,13 @@ study = lc.SignalStudy(...)
 report = study.audit()
 ```
 
-The following modules are part of the supported core contract through `0.9`:
+The following modules are part of the supported core contract through `0.11`:
 
 | Module | Supported purpose |
 | --- | --- |
 | `lacuna.labels` | Forward-return labels and `LabelResult` |
-| `lacuna.signal` | IC, quantiles, turnover, and decay |
+| `lacuna.signal` | IC, buckets, neutralization, turnover, decay inference, and diagnostic projection |
+| `lacuna.events` | Availability-anchored event paths and clustered response inference |
 | `lacuna.cv` | Walk-forward, purged K-fold, and CPCV split/path evidence |
 | `lacuna.validation` | Bootstrap/permutation, Sharpe/PBO, Reality Check/SPA, parameter surfaces, and multiplicity correction |
 | `lacuna.experiment` | Canonical fingerprints and append-only experiment/selection lineage |
@@ -31,7 +32,7 @@ The following modules are part of the supported core contract through `0.9`:
 | `lacuna.bias` | Safe as-of joins, future/revision checks, survivorship, membership, universe drift, and dataset contracts |
 | `lacuna.audit` | Rule evaluation and audit assembly |
 | `lacuna.audit_profiles` | Versioned cross-phase profiles, categorical coverage, and source-finding propagation |
-| `lacuna.report` | JSON, Markdown, and HTML rendering |
+| `lacuna.report` | JSON, Markdown, core HTML, and optional evidence-native Plotly rendering |
 | `lacuna.bundle` | Deterministic evidence bundles, strict standalone manifest reads, and non-executing integrity verification |
 | `lacuna.adapters` | Physical normalization, DuckDB/sklearn interop, and declared vendor/backtest schemas |
 | `lacuna.plugins` | Metadata-only discovery, selection, protocol negotiation, and explicit trusted activation |
@@ -41,8 +42,8 @@ The following modules are part of the supported core contract through `0.9`:
 
 Names declared by each module's `__all__`, the package-root exports, and the primary callable
 signatures are captured in the versioned files under `tests/fixtures/public-api-v*.json`. Contract
-tests compare the running package with the exact reviewed `0.9` additions. Separate tests require
-every `v0.1` through `v0.8` root/module export and primary signature to remain available.
+tests compare the running package with the exact reviewed `0.11` additions. Separate tests require
+every `v0.1` through `v0.10` root/module export and compatible primary signature to remain available.
 
 The [complete Python API surface](python-api-surface.md) lists every root and supported-module
 export with its semantic documentation route. Its
@@ -51,11 +52,11 @@ the cumulative fixtures, so compatibility coverage and reference coverage cannot
 
 `lacuna-options` is a separate distribution and import package. Its initial exact exports and
 signatures live in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; that contract
-follows the extension's `0.1.x` version, not core's `0.9.x` version.
+follows the extension's `0.1.x` version, not core's `0.11.x` version.
 
 ## Compatibility promise
 
-Within the respective core `0.9.x` and extension `0.1.x` release lines:
+Within the respective core `0.11.x` and extension `0.1.x` release lines:
 
 - exported names are not removed or renamed without a deprecation path;
 - required parameters are not added to an existing call;

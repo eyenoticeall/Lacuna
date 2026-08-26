@@ -10,6 +10,28 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   `ReportError`, so `lacuna bundle verify` rejects damaged archives without exposing a Python
   traceback.
 
+## [0.11.0] - 2026-08-26
+
+### Added
+
+- Add `fit_decay()` with positive constrained exponential fitting, joint-period stationary block
+  bootstrap, explicit identifiability gates, deterministic RNG provenance, and use-site optional
+  SciPy through `lacuna[statistics]`.
+- Add immutable `PortfolioProjectionResult` and explicit gross/net, leg, weighting, group-neutral,
+  contribution, concentration, coverage, attrition, and target-turnover evidence without portfolio
+  compounding or execution simulation.
+- Add `lacuna.events` with availability-default event anchors, next-observation alignment, window
+  censoring and overlap evidence, and complete-path anchor-cluster stationary-bootstrap pointwise
+  and simultaneous response bands.
+- Add ADR-015, the event-study subsystem contract, the shared v0.11 methodology, and the cumulative
+  `0.11.x` public API fixture.
+
+### Changed
+
+- Retain jointly aligned period/horizon IC and spread tables in descriptive decay evidence so
+  inference resamples each period across all horizons without recomputation.
+- Extend interactive reports with stored decay-fit, portfolio-cohort, and event-response panels.
+
 ## [0.10.0] - 2026-08-26
 
 ### Added

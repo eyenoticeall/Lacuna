@@ -257,6 +257,65 @@ class SignalStudy:
             use_native=use_native,
         )
 
+    def fit_decay(
+        self,
+        *,
+        metric: str = "mean_ic",
+        expected_direction: Literal["positive", "negative"] = "positive",
+        confidence: float = 0.95,
+        resamples: int = 2_000,
+        expected_block_length: float | None = None,
+        seed: int | None = None,
+        minimum_r_squared: float = 0.5,
+        min_observations: int = 3,
+        quantiles: int | None = None,
+        use_native: bool = True,
+    ) -> AnalysisResult:
+        """Fit validated decay inference over this study's retained horizon rows."""
+
+        return signal_api.fit_decay(
+            self.decay(
+                min_observations=min_observations,
+                quantiles=quantiles,
+                use_native=use_native,
+            ),
+            metric=metric,
+            expected_direction=expected_direction,
+            confidence=confidence,
+            resamples=resamples,
+            expected_block_length=expected_block_length,
+            seed=seed,
+            minimum_r_squared=minimum_r_squared,
+        )
+
+    def portfolio_projection(
+        self,
+        bucketed: signal_api.SignalTransformResult,
+        *,
+        horizon: str,
+        long_buckets: Sequence[int],
+        short_buckets: Sequence[int],
+        weighting: Literal["equal", "rank", "absolute_signal"] = "equal",
+        gross_exposure: float = 1.0,
+        net_exposure: float = 0.0,
+        group_neutral: str | Sequence[str] | None = None,
+        incomplete_group_policy: Literal["raise", "drop"] = "raise",
+    ) -> signal_api.PortfolioProjectionResult:
+        """Project explicit bucket selections into independent diagnostic cohorts."""
+
+        return signal_api.portfolio_projection(
+            bucketed,
+            self.labels(),
+            horizon=horizon,
+            long_buckets=long_buckets,
+            short_buckets=short_buckets,
+            weighting=weighting,
+            gross_exposure=gross_exposure,
+            net_exposure=net_exposure,
+            group_neutral=group_neutral,
+            incomplete_group_policy=incomplete_group_policy,
+        )
+
     def audit(
         self,
         *,

@@ -10,7 +10,7 @@ VERIFIER = ROOT / ".github/scripts/verify_release.py"
 
 def test_release_source_contract_accepts_the_declared_release() -> None:
     subprocess.run(
-        [sys.executable, str(VERIFIER), "source", "--tag", "v0.10.0"],
+        [sys.executable, str(VERIFIER), "source", "--tag", "v0.11.0"],
         cwd=ROOT,
         check=True,
     )
@@ -18,7 +18,7 @@ def test_release_source_contract_accepts_the_declared_release() -> None:
 
 def test_release_source_contract_rejects_a_mismatched_tag() -> None:
     result = subprocess.run(
-        [sys.executable, str(VERIFIER), "source", "--tag", "v0.10.1"],
+        [sys.executable, str(VERIFIER), "source", "--tag", "v0.11.1"],
         cwd=ROOT,
         check=False,
         capture_output=True,

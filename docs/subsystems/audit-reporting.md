@@ -5,7 +5,8 @@
 v0.7 adds checksummed reproducibility bundles. v0.8 adds separately versioned signal, strategy,
 and options cross-phase profiles with categorical coverage and no universal score. v0.10 adds an
 immutable named-evidence mapping and an optional evidence-native Plotly renderer. Third-party rule
-loading remains later work.
+loading remains later work. v0.11 extends stored-row views to validated decay fits, diagnostic
+portfolio cohorts, and event response bands.
 
 The audit engine turns analytical evidence into reviewable findings. Reporting renders that evidence. Keeping the two separate prevents presentation choices from changing audit conclusions.
 

@@ -24,10 +24,10 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.10** adds explicit group-aware signal transformations, attrition evidence, multi-lag
-> stability diagnostics, and an opt-in interactive renderer over retained evidence. These additions
-> preserve the core renderer, audit-result schema, and the boundary between diagnostics and
-> backtesting. `v0.9.0` remains the latest published GitHub release while the v0.10 release gates run.
+> Lacuna **v0.11** adds validated decay half-life inference, explicit non-compounding diagnostic
+> portfolio projections, and availability-anchored event studies with clustered complete-path
+> uncertainty. These additions preserve the audit schema and the boundary between diagnostics and
+> backtesting. `v0.9.0` remains the latest published GitHub release while later release gates run.
 > Lacuna remains pre-1.0 software; later minor versions may evolve through documented migrations.
 
 > [!NOTE]
