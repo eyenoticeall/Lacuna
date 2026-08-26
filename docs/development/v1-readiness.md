@@ -66,4 +66,3 @@ enter merely because `0.9` is the last pre-v1 minor.
 tests may close internal rows; they cannot close the independent-use row. The earlier maintainer
 waiver that permitted the initial public release does not silently waive the technical
 specification's v1 definition.
-

@@ -159,4 +159,3 @@ rather than as audit findings.
 
 Integrity verification says nothing about methodological correctness. Consumers must still inspect
 the report's findings, evidence coverage, method versions, unknown checks, and input identities.
-
