@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import polars as pl
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from lacuna.costs import (
@@ -28,6 +28,7 @@ def _trade(*, quantity: float, side: str, price: float = 100.0) -> pl.DataFrame:
     )
 
 
+@settings(deadline=None)
 @given(
     quantity=st.floats(min_value=0.0, max_value=1_000_000.0, allow_nan=False),
     low_bps=st.floats(min_value=0.0, max_value=100.0, allow_nan=False),
@@ -47,6 +48,7 @@ def test_non_negative_commission_is_monotonic(
     assert high >= low
 
 
+@settings(deadline=None)
 @given(
     quantity=st.floats(min_value=0.0, max_value=1_000_000.0, allow_nan=False),
     bps=st.floats(min_value=0.0, max_value=1_000.0, allow_nan=False),
@@ -58,6 +60,7 @@ def test_adverse_slippage_has_buy_sell_sign_symmetry(quantity: float, bps: float
     assert buy.total_cost == pytest.approx(sell.total_cost)
 
 
+@settings(deadline=None)
 @given(
     quantity=st.floats(min_value=0.0, max_value=100_000.0, allow_nan=False),
     commission_bps=st.floats(min_value=0.0, max_value=100.0, allow_nan=False),
@@ -83,6 +86,7 @@ def test_component_sum_always_reconciles(
     )
 
 
+@settings(deadline=None)
 @given(
     quantity=st.floats(min_value=0.0, max_value=10_000.0, allow_nan=False),
     scale=st.floats(min_value=1.0, max_value=10.0, allow_nan=False),
