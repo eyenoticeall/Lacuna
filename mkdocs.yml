@@ -35,6 +35,7 @@ nav:
       - v1 readiness ledger: development/v1-readiness.md
   - Subsystems:
       - Signals and labels: subsystems/signal-labels.md
+      - Event studies: subsystems/event-studies.md
       - Financial validation: subsystems/financial-validation.md
       - Robustness: subsystems/robustness.md
       - Costs and capacity: subsystems/costs-capacity.md
@@ -48,6 +49,7 @@ nav:
       - Forward-return labels: methodology/forward-returns.md
       - Information coefficient: methodology/information-coefficient.md
       - Quantiles, turnover, and decay: methodology/quantiles-turnover-decay.md
+      - Decay, projections, and events: methodology/decay-portfolio-events.md
       - Temporal validation: methodology/temporal-validation.md
       - Bootstrap inference: methodology/bootstrap.md
       - Advanced inference: methodology/advanced-inference.md

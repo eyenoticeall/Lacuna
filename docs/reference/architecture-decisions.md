@@ -270,6 +270,47 @@ or evidence reinterpretation. The standardized profile has no universal score mo
 It must remain optional, publish its estimand/weights/calibration, show coverage separately, and
 must not replace categorical evidence or source findings.
 
+## ADR-015 — Diagnostic portfolio projections are not a backtester
+
+**Status:** accepted on 2026-08-26.
+
+**Context:** signal researchers need inspectable long/short weights, cohort returns, exposure
+reconciliation, concentration, and implied target-weight turnover. Hiding those calculations behind
+quantile-return plots makes weighting assumptions difficult to review. Conversely, compounding
+cohorts, resolving overlapping holdings, carrying cash, or simulating fills would reverse ADR-005
+and duplicate execution engines.
+
+**Decision:** Lacuna may construct an immutable one-horizon diagnostic portfolio projection only
+from an explicit `SignalTransformResult` produced by `bucketize()`. The projection owns target
+weights and arithmetic forward-return contributions for independent observation cohorts. It does
+not own a portfolio state machine or execution model.
+
+**Consequences:**
+
+- callers choose long/short buckets, horizon, weighting, gross/net exposure, and group policy;
+- a market-neutral gross-one projection allocates `+0.5` long and `-0.5` short, not 200% gross;
+- weights, exposure reconciliation, cohort contributions, coverage, concentration, turnover, and
+  attrition are stored as evidence;
+- returns are not compounded and overlapping cohorts are not consolidated;
+- cash, financing, borrow, orders, fills, execution timing, costs, capacity, and realized holdings
+  are neither inferred nor simulated;
+- explicit projection weights can be passed to Lacuna cost/capacity methods or an external
+  backtester, preserving dependency direction;
+- the public type name includes `Projection` rather than `Portfolio` or `Backtest` alone to avoid a
+  stronger behavioral claim.
+
+**Rejected alternatives:** adding a cumulative-return helper would introduce an implicit overlap
+and cash policy; accepting raw signals would silently choose buckets; treating each leg as unit
+exposure would make the nominal gross setting misleading.
+
+**Validation:** exact gross/net/leg reconciliation, permutation invariance, one-sided group policy,
+contribution identities, temporal label alignment, and an explicit regression for the 200%-gross
+interpretation error are release gates.
+
+**Revisit when:** a separately scoped backtesting package is proposed with explicit state,
+execution, accounting, and cost contracts. It must consume Lacuna evidence without moving those
+responsibilities into `lacuna.signal`.
+
 ## Recording future decisions
 
 Add a new decision when a change is hard to reverse, affects several packages, changes a trust boundary, or alters public methodology/compatibility. Include:
