@@ -1,0 +1,158 @@
+{
+  "coverage_rule_version": 1,
+  "profile_id": "standard.strategy",
+  "profile_version": 1,
+  "requirements": [
+    {
+      "accepted_methods": [
+        "labels.*",
+        "signal.*"
+      ],
+      "capability": "signal_diagnostics",
+      "category": "statistical_validity",
+      "disposition": "optional",
+      "missing_severity": "high",
+      "title": "Signal and label diagnostics"
+    },
+    {
+      "accepted_methods": [
+        "cv.*"
+      ],
+      "capability": "temporal_validation",
+      "category": "temporal_integrity",
+      "disposition": "required",
+      "missing_severity": "critical",
+      "title": "Temporal cross-validation"
+    },
+    {
+      "accepted_methods": [
+        "validation.bootstrap.*",
+        "validation.permutation.*"
+      ],
+      "capability": "resampling_inference",
+      "category": "statistical_validity",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Resampling and permutation inference"
+    },
+    {
+      "accepted_methods": [
+        "validation.sharpe_inference",
+        "validation.probability_of_backtest_overfitting",
+        "validation.joint_stationary_bootstrap",
+        "validation.white_reality_check",
+        "validation.hansen_spa"
+      ],
+      "capability": "advanced_inference",
+      "category": "statistical_validity",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Selection-aware advanced inference"
+    },
+    {
+      "accepted_methods": [
+        "experiment.*",
+        "validation.multiple_testing.*"
+      ],
+      "capability": "experiment_integrity",
+      "category": "experiment_integrity",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Experiment history and multiplicity"
+    },
+    {
+      "accepted_methods": [
+        "validation.parameter_surface",
+        "robustness.continuous_perturbation"
+      ],
+      "capability": "parameter_robustness",
+      "category": "robustness",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Parameter robustness"
+    },
+    {
+      "accepted_methods": [
+        "robustness.subperiod_analysis"
+      ],
+      "capability": "temporal_robustness",
+      "category": "robustness",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Subperiod robustness"
+    },
+    {
+      "accepted_methods": [
+        "robustness.universe_perturbation"
+      ],
+      "capability": "universe_robustness",
+      "category": "robustness",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Universe robustness"
+    },
+    {
+      "accepted_methods": [
+        "regime.*"
+      ],
+      "capability": "regime_robustness",
+      "category": "robustness",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Regime robustness"
+    },
+    {
+      "accepted_methods": [
+        "costs.*"
+      ],
+      "capability": "execution_realism",
+      "category": "costs_capacity",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Costs, liquidity, and capacity"
+    },
+    {
+      "accepted_methods": [
+        "bias.*"
+      ],
+      "capability": "data_correctness",
+      "category": "data_integrity",
+      "disposition": "required",
+      "missing_severity": "critical",
+      "title": "Point-in-time data and bias controls"
+    },
+    {
+      "accepted_methods": [
+        "adapters.*"
+      ],
+      "capability": "adapter_provenance",
+      "category": "operational",
+      "disposition": "optional",
+      "missing_severity": "medium",
+      "title": "Vendor and backtester adapter provenance"
+    },
+    {
+      "accepted_methods": [
+        "plugins.*"
+      ],
+      "capability": "plugin_provenance",
+      "category": "operational",
+      "disposition": "optional",
+      "missing_severity": "medium",
+      "title": "Explicit plugin activation provenance"
+    },
+    {
+      "accepted_methods": [
+        "options.*"
+      ],
+      "capability": "options_evidence",
+      "category": "statistical_validity",
+      "disposition": "not_applicable",
+      "missing_severity": "high",
+      "title": "Options-extension evidence"
+    }
+  ],
+  "schema_version": "1",
+  "scope": "strategy",
+  "scoring_model": null
+}

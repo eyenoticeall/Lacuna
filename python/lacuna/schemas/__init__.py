@@ -21,4 +21,18 @@ def bundle_manifest_v1_text() -> str:
     )
 
 
-__all__ = ["audit_result_v1_text", "bundle_manifest_v1_text"]
+def standard_audit_profile_v1_text() -> str:
+    """Return the published standardized-audit profile v1 JSON Schema text."""
+
+    return (
+        files(__package__)
+        .joinpath("standard-audit-profile-v1.schema.json")
+        .read_text(encoding="utf-8")
+    )
+
+
+__all__ = [
+    "audit_result_v1_text",
+    "bundle_manifest_v1_text",
+    "standard_audit_profile_v1_text",
+]

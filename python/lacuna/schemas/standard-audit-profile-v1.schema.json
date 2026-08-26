@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lacuna.dev/schemas/standard-audit-profile-v1.schema.json",
+  "title": "Lacuna standardized audit profile v1",
+  "description": "Portable capability and applicability contract for a Lacuna standardized audit profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile_id",
+    "profile_version",
+    "scope",
+    "scoring_model",
+    "coverage_rule_version",
+    "requirements"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1"
+    },
+    "profile_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "profile_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "scope": {
+      "enum": ["signal", "strategy", "options"]
+    },
+    "scoring_model": {
+      "type": "null"
+    },
+    "coverage_rule_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/requirement"
+      }
+    }
+  },
+  "$defs": {
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability",
+        "title",
+        "category",
+        "disposition",
+        "accepted_methods",
+        "missing_severity"
+      ],
+      "properties": {
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "enum": ["required", "optional", "not_applicable"]
+        },
+        "accepted_methods": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.]+\\*?$"
+          }
+        },
+        "missing_severity": {
+          "enum": ["info", "low", "medium", "high", "critical"]
+        }
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 
 import polars as pl
 import pytest
+from lacuna import standard_audit
 from lacuna.exceptions import DataContractError, MethodContractError
 
 from lacuna_options import OptionChain, delta_buckets, empirical_residual, validate_chain
@@ -46,6 +47,18 @@ def test_validate_chain_derives_mid_forward_and_log_moneyness() -> None:
         [math.log(100.0 / expected_forward), math.log(90.0 / expected_forward)]
     )
     assert result.evidence.metadata.parameters["mid_computed"] is True
+
+
+def test_validated_chain_enters_the_options_standardized_audit_profile() -> None:
+    chain = validate_chain(_chain_records())
+
+    report = standard_audit(results={"chain": chain.evidence}, scope="options")
+    requirement_rows = report.table("evidence_requirements")
+    assert isinstance(requirement_rows, list)
+    options_row = next(row for row in requirement_rows if row["capability"] == "options_evidence")
+    assert options_row["disposition"] == "required"
+    assert options_row["present"] is True
+    assert report.metrics["recognized_result_count"] == 1
 
 
 def test_validate_chain_supports_explicit_mapping_and_timezone_preservation() -> None:

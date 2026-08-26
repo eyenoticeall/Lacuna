@@ -101,6 +101,29 @@ class AuditProfile:
             raise ValueError("profile capability identifiers must be unique")
         object.__setattr__(self, "requirements", tuple(self.requirements))
 
+    def to_dict(self) -> dict[str, object]:
+        """Return the profile's portable schema-v1 representation."""
+
+        return {
+            "schema_version": "1",
+            "profile_id": self.profile_id,
+            "profile_version": self.profile_version,
+            "scope": self.scope.value,
+            "scoring_model": None,
+            "coverage_rule_version": 1,
+            "requirements": [
+                {
+                    "capability": requirement.capability_id,
+                    "title": requirement.title,
+                    "category": requirement.category,
+                    "disposition": requirement.disposition.value,
+                    "accepted_methods": list(requirement.methods),
+                    "missing_severity": requirement.severity.value,
+                }
+                for requirement in self.requirements
+            ],
+        }
+
 
 _BASE_REQUIREMENTS: tuple[tuple[str, str, str, tuple[str, ...], Severity], ...] = (
     (
@@ -270,7 +293,7 @@ _DISPOSITIONS: Mapping[AuditScope, Mapping[str, EvidenceDisposition]] = MappingP
 )
 
 
-def standard_profile(scope: AuditScope | str = AuditScope.STRATEGY) -> AuditProfile:
+def standard_profile(scope: AuditScope | str = "strategy") -> AuditProfile:
     """Return the built-in standardized profile for one research scope."""
 
     try:
@@ -441,7 +464,7 @@ def _category_coverage(
 def run_standard_audit(
     context: AuditContext,
     *,
-    scope: AuditScope | str = AuditScope.STRATEGY,
+    scope: AuditScope | str = "strategy",
     profile: AuditProfile | None = None,
 ) -> AnalysisResult:
     """Assemble a categorical cross-phase audit without a universal quality score."""
@@ -595,6 +618,7 @@ def run_standard_audit(
             parameters={
                 "profile_id": selected_profile.profile_id,
                 "profile_version": selected_profile.profile_version,
+                "profile_schema_version": "1",
                 "scope": selected_profile.scope.value,
                 "score_model": None,
                 "coverage_rule_version": 1,
@@ -642,7 +666,7 @@ def standard_audit(
     *,
     results: Mapping[str, AnalysisResult] | None = None,
     policies: Mapping[str, JsonValue] | None = None,
-    scope: AuditScope | str = AuditScope.STRATEGY,
+    scope: AuditScope | str = "strategy",
     profile: AuditProfile | None = None,
 ) -> AuditReport:
     """Run a versioned cross-phase profile and return a renderable report."""

@@ -14,7 +14,11 @@ import numpy as np
 
 import lacuna
 from lacuna import _native
-from lacuna.schemas import audit_result_v1_text, bundle_manifest_v1_text
+from lacuna.schemas import (
+    audit_result_v1_text,
+    bundle_manifest_v1_text,
+    standard_audit_profile_v1_text,
+)
 
 PUBLIC_MODULES = (
     "lacuna.adapters",
@@ -270,6 +274,11 @@ bundle_schema = json.loads(bundle_manifest_v1_text())
 require(
     bundle_schema.get("title") == "Lacuna reproducibility bundle manifest v1",
     "wheel is missing the bundle schema",
+)
+profile_schema = json.loads(standard_audit_profile_v1_text())
+require(
+    profile_schema.get("title") == "Lacuna standardized audit profile v1",
+    "wheel is missing the standardized audit profile schema",
 )
 
 print(

@@ -1,0 +1,42 @@
+{
+  "callables": [
+    {"module": "lacuna.audit_profiles", "qualname": "AuditProfile", "signature": "(profile_id, profile_version, scope, requirements=<factory>)"},
+    {"module": "lacuna.audit_profiles", "qualname": "AuditProfile.to_dict", "signature": "(self)"},
+    {"module": "lacuna.audit_profiles", "qualname": "EvidenceRequirement", "signature": "(capability_id, title, category, methods, disposition, severity=<Severity.HIGH: 'high'>)"},
+    {"module": "lacuna.audit_profiles", "qualname": "run_standard_audit", "signature": "(context, *, scope='strategy', profile=None)"},
+    {"module": "lacuna.audit_profiles", "qualname": "standard_audit", "signature": "(*, results=None, policies=None, scope='strategy', profile=None)"},
+    {"module": "lacuna.audit_profiles", "qualname": "standard_profile", "signature": "(scope='strategy')"},
+    {"module": "lacuna", "qualname": "AnalysisResult.from_dict", "signature": "(value)"},
+    {"module": "lacuna", "qualname": "AnalysisResult.from_json", "signature": "(value)"}
+  ],
+  "contract": "lacuna-public-api-v0.8",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6",
+    "lacuna-public-api-v0.7"
+  ],
+  "module_exports": {
+    "lacuna.audit_profiles": [
+      "AuditProfile",
+      "AuditScope",
+      "EvidenceDisposition",
+      "EvidenceRequirement",
+      "run_standard_audit",
+      "standard_audit",
+      "standard_profile"
+    ]
+  },
+  "root_exports": [
+    "AuditProfile",
+    "AuditScope",
+    "EvidenceDisposition",
+    "EvidenceRequirement",
+    "run_standard_audit",
+    "standard_audit",
+    "standard_profile"
+  ]
+}
