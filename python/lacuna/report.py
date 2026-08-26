@@ -530,8 +530,8 @@ def render_plotly_html(report: AuditReport, *, view: ReportView = "auto") -> str
         raise ReportError("report view must be auto, audit, signal, portfolio, or event")
     try:
         import jinja2
-        import plotly.graph_objects as go  # type: ignore[import-untyped]
-        import plotly.io as pio  # type: ignore[import-untyped]
+        import plotly.graph_objects as go
+        import plotly.io as pio
     except ImportError as error:
         raise ReportError(
             "the Plotly renderer requires the 'report' extra; install lacuna[report]"
@@ -797,7 +797,7 @@ Source <code>{{ panel.source }}</code> · Table <code>{{ panel.table }}</code>
 {% endfor %}
 </main></body></html>"""
     )
-    rendered = template.render(
+    rendered: str = template.render(
         view=selected_view,
         notices=notices,
         panels=rendered_panels,

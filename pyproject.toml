@@ -121,6 +121,10 @@ files = ["python/lacuna"]
 module = ["numpy", "numpy.*"]
 follow_imports = "skip"
 
+[[tool.mypy.overrides]]
+module = ["jinja2", "plotly", "plotly.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 addopts = "-ra --strict-config --strict-markers"
 testpaths = ["tests"]
