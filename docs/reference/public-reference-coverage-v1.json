@@ -1,0 +1,349 @@
+{
+  "format": "lacuna.public-reference-coverage",
+  "manifest_version": 1,
+  "package_series": "0.9",
+  "root": {
+    "module": "lacuna",
+    "reference": "docs/reference/python-api-surface.md",
+    "design": "docs/development/python-api.md",
+    "exports": [
+      "BUNDLE_FORMAT",
+      "BUNDLE_VERSION",
+      "DIAGNOSTIC_VERSION",
+      "AnalysisResult",
+      "Applicability",
+      "ApplicabilityState",
+      "AuditContext",
+      "AuditProfile",
+      "AuditReport",
+      "AuditRule",
+      "AuditScope",
+      "BenchmarkCase",
+      "BenchmarkConfig",
+      "BenchmarkSuite",
+      "BundleArtifact",
+      "BundleManifest",
+      "BundleVerification",
+      "Config",
+      "ConfigurationError",
+      "DataContractError",
+      "DiagnosticCheck",
+      "DiagnosticState",
+      "EvidenceDisposition",
+      "EvidenceRequirement",
+      "ExperimentRegistry",
+      "Finding",
+      "FindingState",
+      "InstallationDiagnostics",
+      "LabelResult",
+      "LacunaError",
+      "MethodContractError",
+      "NativeExtensionError",
+      "PluginError",
+      "ReportError",
+      "ResultMetadata",
+      "Severity",
+      "SignalStudy",
+      "__version__",
+      "adapters",
+      "audit",
+      "benchmark_config_for_tier",
+      "bias",
+      "bundle",
+      "config",
+      "configure",
+      "costs",
+      "create_bundle",
+      "cv",
+      "default_rules",
+      "diagnose_installation",
+      "diagnostics",
+      "experiment",
+      "get_config",
+      "labels",
+      "plugins",
+      "regime",
+      "robustness",
+      "run_audit",
+      "run_benchmarks",
+      "run_standard_audit",
+      "signal",
+      "standard_audit",
+      "standard_profile",
+      "validation",
+      "verify_bundle"
+    ]
+  },
+  "modules": [
+    {
+      "module": "lacuna.adapters",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/adapters-execution-plugins.md",
+      "exports": [
+        "AdaptedFrame",
+        "AvailabilityPolicy",
+        "BacktestArtifactKind",
+        "BacktestSchema",
+        "BacktestSemantics",
+        "FrameSummary",
+        "PolarsFrame",
+        "RevisionPolicy",
+        "SklearnCV",
+        "SupportedSplitter",
+        "VendorSchema",
+        "adapt_backtest",
+        "adapt_vendor",
+        "as_sklearn_cv",
+        "frame_summary",
+        "from_duckdb",
+        "require_columns",
+        "to_polars"
+      ]
+    },
+    {
+      "module": "lacuna.audit",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/audit-reporting.md",
+      "exports": [
+        "Applicability",
+        "ApplicabilityState",
+        "AuditContext",
+        "AuditRule",
+        "audit",
+        "default_rules",
+        "run_audit"
+      ]
+    },
+    {
+      "module": "lacuna.audit_profiles",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/reference/standardized-audit.md",
+      "exports": [
+        "AuditProfile",
+        "AuditScope",
+        "EvidenceDisposition",
+        "EvidenceRequirement",
+        "run_standard_audit",
+        "standard_audit",
+        "standard_profile"
+      ]
+    },
+    {
+      "module": "lacuna.benchmark",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/development/performance.md",
+      "exports": [
+        "BenchmarkCase",
+        "BenchmarkConfig",
+        "BenchmarkSuite",
+        "benchmark_config_for_tier",
+        "run_benchmarks"
+      ]
+    },
+    {
+      "module": "lacuna.bias",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/bias-point-in-time.md",
+      "exports": [
+        "AsOfTolerance",
+        "DatasetSpec",
+        "MembershipResult",
+        "PointInTimeJoinResult",
+        "RevisionMode",
+        "SurvivorshipStatus",
+        "UnmatchedPolicy",
+        "asof_join",
+        "future_data_check",
+        "membership_at",
+        "revision_diagnostics",
+        "survivorship_diagnostics",
+        "universe_drift",
+        "validate_dataset"
+      ]
+    },
+    {
+      "module": "lacuna.bundle",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/reference/reproducibility-bundle.md",
+      "exports": [
+        "BUNDLE_FORMAT",
+        "BUNDLE_VERSION",
+        "BundleArtifact",
+        "BundleManifest",
+        "BundleVerification",
+        "create_bundle",
+        "verify_bundle"
+      ]
+    },
+    {
+      "module": "lacuna.costs",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/costs-capacity.md",
+      "exports": [
+        "BorrowCostModel",
+        "BreakEvenMetric",
+        "CapacityScenario",
+        "CommissionModel",
+        "CompositeCostModel",
+        "CostEstimate",
+        "CostModel",
+        "CostScenario",
+        "CostUnit",
+        "LiquidityMode",
+        "MissingBorrowPolicy",
+        "ParticipationImpactModel",
+        "QuantityConvention",
+        "SlippageModel",
+        "SpreadMode",
+        "SpreadModel",
+        "SquareRootImpactModel",
+        "TradeColumns",
+        "VolatilitySlippageModel",
+        "break_even_cost",
+        "capacity_curve",
+        "liquidity_diagnostics",
+        "stress"
+      ]
+    },
+    {
+      "module": "lacuna.cv",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/financial-validation.md",
+      "exports": [
+        "CPCVPath",
+        "CombinatorialPurgedKFold",
+        "CombinatorialSplitResult",
+        "Duration",
+        "Fold",
+        "PurgedKFold",
+        "SplitResult",
+        "WalkForward"
+      ]
+    },
+    {
+      "module": "lacuna.diagnostics",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/development/installation-diagnostics.md",
+      "exports": [
+        "DIAGNOSTIC_VERSION",
+        "DiagnosticCheck",
+        "DiagnosticState",
+        "InstallationDiagnostics",
+        "diagnose_installation"
+      ]
+    },
+    {
+      "module": "lacuna.experiment",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/experiments-reproducibility.md",
+      "exports": [
+        "CANONICALIZATION_VERSION",
+        "REGISTRY_SCHEMA_VERSION",
+        "AttemptRecord",
+        "AttemptStatus",
+        "ExperimentRegistry",
+        "SelectionRecord",
+        "canonical_json",
+        "fingerprint"
+      ]
+    },
+    {
+      "module": "lacuna.labels",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/signal-labels.md",
+      "exports": ["Horizon", "LabelResult", "PriceAdjustment", "forward_returns"]
+    },
+    {
+      "module": "lacuna.plugins",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/adapters-execution-plugins.md",
+      "exports": [
+        "ENTRY_POINT_GROUPS",
+        "ActivatedPlugin",
+        "PluginCandidate",
+        "PluginDescriptor",
+        "PluginGroup",
+        "activate_plugin",
+        "discover_plugins",
+        "select_plugin"
+      ]
+    },
+    {
+      "module": "lacuna.regime",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/robustness.md",
+      "exports": [
+        "ClassificationMode",
+        "QuantileMethod",
+        "quantile_regimes",
+        "regime_analysis"
+      ]
+    },
+    {
+      "module": "lacuna.report",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/audit-reporting.md",
+      "exports": ["AuditReport", "render_html", "render_markdown"]
+    },
+    {
+      "module": "lacuna.robustness",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/robustness.md",
+      "exports": [
+        "Distribution",
+        "FailurePolicy",
+        "ObjectiveDirection",
+        "PerturbationSpec",
+        "Subperiod",
+        "UniverseScenario",
+        "continuous_perturbation",
+        "subperiod_analysis",
+        "universe_perturbation"
+      ]
+    },
+    {
+      "module": "lacuna.schemas",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/reference/persisted-artifacts.md",
+      "exports": [
+        "audit_result_v1_text",
+        "bundle_manifest_v1_text",
+        "persisted_artifact_compatibility_v1_text",
+        "standard_audit_profile_v1_text"
+      ]
+    },
+    {
+      "module": "lacuna.signal",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/signal-labels.md",
+      "exports": ["CorrelationMethod", "decay", "ic", "quantiles", "turnover"]
+    },
+    {
+      "module": "lacuna.validation",
+      "reference": "docs/reference/python-api-surface.md",
+      "design": "docs/subsystems/financial-validation.md",
+      "exports": [
+        "BootstrapMethod",
+        "IntervalMethod",
+        "MultipleTestingMethod",
+        "ObjectiveDirection",
+        "PBOStatistic",
+        "PBOTieBreak",
+        "PermutationAlternative",
+        "PermutationScheme",
+        "PermutationStatistic",
+        "Statistic",
+        "SurfaceFailurePolicy",
+        "bootstrap",
+        "joint_stationary_bootstrap",
+        "multiple_testing",
+        "parameter_surface",
+        "permutation_test",
+        "probability_of_backtest_overfitting",
+        "reality_check",
+        "sharpe_inference",
+        "superior_predictive_ability"
+      ]
+    }
+  ]
+}

@@ -29,7 +29,7 @@ evaluated in four states:
 | Polars/pandas/Arrow interoperability | Released | Eager/lazy Polars, NumPy, optional pandas/Arrow, DuckDB Arrow streams, and adapter matrices run in CI; vendor/backtester and options evidence enter the standardized profile in executable integration and wheel checks. |
 | published benchmark suite | Hardening | Versioned Python artifact v5 and Criterion kernels cover public workflows; `0.9` adds a deterministic integrated strategy-audit case and a measured profile without an unjustified production optimization. |
 | cross-platform wheels | Released | Stable-ABI Linux x86_64/aarch64, macOS arm64, and Windows x86_64 wheels are target-smoke-tested, checksummed, and attested. |
-| comprehensive methodology docs | Hardening | Every released analytical phase has methodology and subsystem contracts; `0.9` must audit reference coverage and close defects found through integrated or independent use. |
+| comprehensive methodology docs | Hardening | Every released analytical phase has methodology and subsystem contracts; `0.9` adds an exact machine-checked root/module export inventory and semantic route for every supported module. Independent-use defects remain external evidence. |
 | real users on independent stacks | External | No independent users are currently available. Maintainer testing and CI do not satisfy this item; `1.0.0` remains blocked until real independent use is evidenced or the specification is explicitly changed. |
 
 ## Coherent pre-v1 milestones

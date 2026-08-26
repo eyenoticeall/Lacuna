@@ -20,6 +20,9 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   spanning labels, signal IC, purged validation, stationary bootstrap, cost stress, point-in-time
   data, vendor/backtest adapters, and standardized-audit composition; publish the initial profile
   and retain production behavior because it found no justified semantic-preserving optimization.
+- Add a complete Python API surface reference and versioned coverage manifest; contract tests now
+  require every cumulative root/module export, compatibility fixture, human symbol section, and
+  semantic design route to agree exactly.
 
 ## [0.8.0] - 2026-08-26
 

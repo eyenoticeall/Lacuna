@@ -64,6 +64,7 @@ nav:
   - Reference:
       - Glossary: reference/glossary.md
       - Public API compatibility: reference/public-api.md
+      - Python API surface: reference/python-api-surface.md
       - Result schema: reference/result-schema.md
       - Persisted artifacts: reference/persisted-artifacts.md
       - Reproducibility bundle: reference/reproducibility-bundle.md

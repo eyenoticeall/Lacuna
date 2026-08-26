@@ -6,7 +6,7 @@ This handbook translates Lacuna's product specification into engineering rules. 
 
 | Change | Required reading |
 |---|---|
-| Any public API | [Python API](python-api.md), [Results and evidence](../concepts/evidence-model.md) |
+| Any public API | [Python API](python-api.md), [API surface](../reference/python-api-surface.md), [Results and evidence](../concepts/evidence-model.md) |
 | Dataframe or schema handling | [Data boundary](data-boundary.md), [Data and time](../concepts/data-model.md) |
 | Rust or performance work | [Native core](native-core.md), [Performance](performance.md) |
 | New statistical method | [Contributing a method](contributing-a-method.md), [Testing](testing.md) |

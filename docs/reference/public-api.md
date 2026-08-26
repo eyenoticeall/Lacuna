@@ -36,11 +36,18 @@ The following modules are part of the supported core contract through `0.9`:
 | `lacuna.adapters` | Physical normalization, DuckDB/sklearn interop, and declared vendor/backtest schemas |
 | `lacuna.plugins` | Metadata-only discovery, selection, protocol negotiation, and explicit trusted activation |
 | `lacuna.benchmark` | Reproducible developer benchmark services |
+| `lacuna.diagnostics` | Versioned, non-invasive installation and runtime health evidence |
+| `lacuna.schemas` | Packaged machine-readable result, bundle, profile, and compatibility contracts |
 
 Names declared by each module's `__all__`, the package-root exports, and the primary callable
 signatures are captured in the versioned files under `tests/fixtures/public-api-v*.json`. Contract
 tests compare the running package with the exact reviewed `0.9` additions. Separate tests require
 every `v0.1` through `v0.8` root/module export and primary signature to remain available.
+
+The [complete Python API surface](python-api-surface.md) lists every root and supported-module
+export with its semantic documentation route. Its
+[coverage manifest](public-reference-coverage-v1.json) is checked against the running package and
+the cumulative fixtures, so compatibility coverage and reference coverage cannot drift silently.
 
 `lacuna-options` is a separate distribution and import package. Its initial exact exports and
 signatures live in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; that contract
