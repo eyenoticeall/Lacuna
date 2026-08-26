@@ -369,6 +369,30 @@ class AuditReport:
             raise ReportError("report format must be json, md/markdown, or html")
         return _write_content(destination, content, overwrite=overwrite)
 
+    def bundle(
+        self,
+        path: str | os.PathLike[str],
+        *,
+        configuration: Mapping[str, object] | None = None,
+        evidence: Mapping[str, AnalysisResult] | None = None,
+        provenance: Mapping[str, object] | None = None,
+        invocation: Mapping[str, object] | None = None,
+        overwrite: bool = False,
+    ) -> Path:
+        """Persist a deterministic, checksummed, non-executable evidence bundle."""
+
+        from lacuna.bundle import create_bundle
+
+        return create_bundle(
+            self,
+            path,
+            configuration=configuration,
+            evidence=evidence,
+            provenance=provenance,
+            invocation=invocation,
+            overwrite=overwrite,
+        )
+
     def __str__(self) -> str:
         return render_markdown(self.result)
 

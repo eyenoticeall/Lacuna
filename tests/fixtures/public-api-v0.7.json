@@ -1,0 +1,41 @@
+{
+  "callables": [
+    {"module": "lacuna.bundle", "qualname": "BundleArtifact", "signature": "(path, role, media_type, sha256, size)"},
+    {"module": "lacuna.bundle", "qualname": "BundleManifest", "signature": "(producer_version, report_schema_version, report_method, report_method_version, report_input_fingerprint, artifact_set_sha256, artifacts, format='lacuna.reproducibility-bundle', bundle_version=1, reproducibility_level='identifiable')"},
+    {"module": "lacuna.bundle", "qualname": "BundleVerification", "signature": "(path, manifest, archive_sha256, total_size)"},
+    {"module": "lacuna.bundle", "qualname": "create_bundle", "signature": "(report, path, *, configuration=None, evidence=None, provenance=None, invocation=None, overwrite=False)"},
+    {"module": "lacuna.bundle", "qualname": "verify_bundle", "signature": "(path)"},
+    {"module": "lacuna.report", "qualname": "AuditReport.bundle", "signature": "(self, path, *, configuration=None, evidence=None, provenance=None, invocation=None, overwrite=False)"}
+  ],
+  "contract": "lacuna-public-api-v0.7",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6"
+  ],
+  "module_exports": {
+    "lacuna.bundle": [
+      "BUNDLE_FORMAT",
+      "BUNDLE_VERSION",
+      "BundleArtifact",
+      "BundleManifest",
+      "BundleVerification",
+      "create_bundle",
+      "verify_bundle"
+    ]
+  },
+  "package_series": "0.7",
+  "root_exports": [
+    "BUNDLE_FORMAT",
+    "BUNDLE_VERSION",
+    "BundleArtifact",
+    "BundleManifest",
+    "BundleVerification",
+    "bundle",
+    "create_bundle",
+    "verify_bundle"
+  ]
+}

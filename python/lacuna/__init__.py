@@ -3,6 +3,7 @@
 from lacuna import (
     adapters,
     bias,
+    bundle,
     costs,
     cv,
     experiment,
@@ -30,6 +31,15 @@ from lacuna.benchmark import (
     benchmark_config_for_tier,
     run_benchmarks,
 )
+from lacuna.bundle import (
+    BUNDLE_FORMAT,
+    BUNDLE_VERSION,
+    BundleArtifact,
+    BundleManifest,
+    BundleVerification,
+    create_bundle,
+    verify_bundle,
+)
 from lacuna.config import Config, config, configure, get_config
 from lacuna.exceptions import (
     ConfigurationError,
@@ -47,6 +57,8 @@ from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
 
 __all__ = [
+    "BUNDLE_FORMAT",
+    "BUNDLE_VERSION",
     "AnalysisResult",
     "Applicability",
     "ApplicabilityState",
@@ -56,6 +68,9 @@ __all__ = [
     "BenchmarkCase",
     "BenchmarkConfig",
     "BenchmarkSuite",
+    "BundleArtifact",
+    "BundleManifest",
+    "BundleVerification",
     "Config",
     "ConfigurationError",
     "DataContractError",
@@ -76,9 +91,11 @@ __all__ = [
     "audit",
     "benchmark_config_for_tier",
     "bias",
+    "bundle",
     "config",
     "configure",
     "costs",
+    "create_bundle",
     "cv",
     "default_rules",
     "experiment",
@@ -91,4 +108,5 @@ __all__ = [
     "run_benchmarks",
     "signal",
     "validation",
+    "verify_bundle",
 ]

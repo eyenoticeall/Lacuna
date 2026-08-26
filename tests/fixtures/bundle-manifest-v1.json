@@ -1,0 +1,37 @@
+{
+  "artifact_set_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "artifacts": [
+    {
+      "media_type": "application/json",
+      "path": "report/audit.json",
+      "role": "canonical_report",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "size": 1024
+    }
+  ],
+  "bundle_version": 1,
+  "format": "lacuna.reproducibility-bundle",
+  "producer": {
+    "name": "lacuna",
+    "version": "0.7.0"
+  },
+  "report": {
+    "input_fingerprint": "sha256:fixture-v1",
+    "method": "audit.v0_1",
+    "method_version": 1,
+    "path": "report/audit.json",
+    "schema_version": "1"
+  },
+  "reproducibility": {
+    "level": "identifiable",
+    "scope": "artifact identity and archive integrity",
+    "verified": true
+  },
+  "security": {
+    "absolute_paths": "redacted_or_rejected",
+    "credentials": "redacted_or_rejected",
+    "executable_code": false,
+    "plugins_activated": false,
+    "source_data": "not_included_automatically"
+  }
+}
