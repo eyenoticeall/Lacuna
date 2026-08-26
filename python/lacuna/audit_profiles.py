@@ -51,11 +51,16 @@ class EvidenceRequirement:
     severity: Severity = Severity.HIGH
 
     def __post_init__(self) -> None:
-        if not self.capability_id or not self.title or not self.category:
+        if any(
+            not isinstance(value, str) or not value
+            for value in (self.capability_id, self.title, self.category)
+        ):
             raise ValueError("evidence requirement identifiers and descriptions must not be empty")
         if not re.fullmatch(r"[a-z][a-z0-9_]*", self.capability_id):
             raise ValueError("capability_id must use lowercase letters, digits, and underscores")
-        if not self.methods or any(not method for method in self.methods):
+        if not isinstance(self.methods, tuple) or not self.methods:
+            raise TypeError("evidence requirement methods must be a non-empty tuple")
+        if any(not isinstance(method, str) or not method for method in self.methods):
             raise ValueError("evidence requirement methods must not be empty")
         if len(self.methods) != len(set(self.methods)):
             raise ValueError("evidence requirement methods must be unique")
@@ -86,13 +91,22 @@ class AuditProfile:
     requirements: tuple[EvidenceRequirement, ...] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
-        if not self.profile_id:
-            raise ValueError("profile_id must not be empty")
-        if isinstance(self.profile_version, bool) or self.profile_version < 1:
+        if (
+            not isinstance(self.profile_id, str)
+            or re.fullmatch(r"[a-z][a-z0-9_.-]*", self.profile_id) is None
+        ):
+            raise ValueError(
+                "profile_id must use lowercase letters, digits, dots, underscores, and hyphens"
+            )
+        if (
+            isinstance(self.profile_version, bool)
+            or not isinstance(self.profile_version, int)
+            or self.profile_version < 1
+        ):
             raise ValueError("profile_version must be a positive integer")
         if not isinstance(self.scope, AuditScope):
             raise TypeError("scope must be an AuditScope")
-        if not self.requirements:
+        if not isinstance(self.requirements, tuple) or not self.requirements:
             raise ValueError("an audit profile must contain at least one evidence requirement")
         if any(not isinstance(item, EvidenceRequirement) for item in self.requirements):
             raise TypeError("requirements must contain EvidenceRequirement values")
@@ -161,10 +175,17 @@ _BASE_REQUIREMENTS: tuple[tuple[str, str, str, tuple[str, ...], Severity], ...] 
         Severity.HIGH,
     ),
     (
+        "experiment_lineage",
+        "Experiment and selection lineage",
         "experiment_integrity",
-        "Experiment history and multiplicity",
+        ("experiment.*",),
+        Severity.HIGH,
+    ),
+    (
+        "multiple_testing",
+        "Multiple-testing evidence",
         "experiment_integrity",
-        ("experiment.*", "validation.multiple_testing.*"),
+        ("validation.multiple_testing.*",),
         Severity.HIGH,
     ),
     (
@@ -203,10 +224,26 @@ _BASE_REQUIREMENTS: tuple[tuple[str, str, str, tuple[str, ...], Severity], ...] 
         Severity.HIGH,
     ),
     (
-        "data_correctness",
-        "Point-in-time data and bias controls",
+        "point_in_time_data",
+        "Point-in-time data and revision controls",
         "data_integrity",
-        ("bias.*",),
+        (
+            "bias.asof_join",
+            "bias.future_data_check",
+            "bias.revision_diagnostics",
+            "bias.validate_dataset",
+        ),
+        Severity.CRITICAL,
+    ),
+    (
+        "survivorship",
+        "Survivorship and historical-universe controls",
+        "temporal_integrity",
+        (
+            "bias.survivorship_diagnostics",
+            "bias.membership_at",
+            "bias.universe_drift",
+        ),
         Severity.CRITICAL,
     ),
     (
@@ -241,13 +278,15 @@ _DISPOSITIONS: Mapping[AuditScope, Mapping[str, EvidenceDisposition]] = MappingP
                 "temporal_validation": EvidenceDisposition.REQUIRED,
                 "resampling_inference": EvidenceDisposition.REQUIRED,
                 "advanced_inference": EvidenceDisposition.OPTIONAL,
-                "experiment_integrity": EvidenceDisposition.REQUIRED,
+                "experiment_lineage": EvidenceDisposition.REQUIRED,
+                "multiple_testing": EvidenceDisposition.REQUIRED,
                 "parameter_robustness": EvidenceDisposition.REQUIRED,
                 "temporal_robustness": EvidenceDisposition.REQUIRED,
                 "universe_robustness": EvidenceDisposition.REQUIRED,
                 "regime_robustness": EvidenceDisposition.REQUIRED,
                 "execution_realism": EvidenceDisposition.NOT_APPLICABLE,
-                "data_correctness": EvidenceDisposition.REQUIRED,
+                "point_in_time_data": EvidenceDisposition.REQUIRED,
+                "survivorship": EvidenceDisposition.REQUIRED,
                 "adapter_provenance": EvidenceDisposition.OPTIONAL,
                 "plugin_provenance": EvidenceDisposition.OPTIONAL,
                 "options_evidence": EvidenceDisposition.NOT_APPLICABLE,
@@ -259,13 +298,15 @@ _DISPOSITIONS: Mapping[AuditScope, Mapping[str, EvidenceDisposition]] = MappingP
                 "temporal_validation": EvidenceDisposition.REQUIRED,
                 "resampling_inference": EvidenceDisposition.REQUIRED,
                 "advanced_inference": EvidenceDisposition.REQUIRED,
-                "experiment_integrity": EvidenceDisposition.REQUIRED,
+                "experiment_lineage": EvidenceDisposition.REQUIRED,
+                "multiple_testing": EvidenceDisposition.REQUIRED,
                 "parameter_robustness": EvidenceDisposition.REQUIRED,
                 "temporal_robustness": EvidenceDisposition.REQUIRED,
                 "universe_robustness": EvidenceDisposition.REQUIRED,
                 "regime_robustness": EvidenceDisposition.REQUIRED,
                 "execution_realism": EvidenceDisposition.REQUIRED,
-                "data_correctness": EvidenceDisposition.REQUIRED,
+                "point_in_time_data": EvidenceDisposition.REQUIRED,
+                "survivorship": EvidenceDisposition.REQUIRED,
                 "adapter_provenance": EvidenceDisposition.OPTIONAL,
                 "plugin_provenance": EvidenceDisposition.OPTIONAL,
                 "options_evidence": EvidenceDisposition.NOT_APPLICABLE,
@@ -277,13 +318,15 @@ _DISPOSITIONS: Mapping[AuditScope, Mapping[str, EvidenceDisposition]] = MappingP
                 "temporal_validation": EvidenceDisposition.REQUIRED,
                 "resampling_inference": EvidenceDisposition.REQUIRED,
                 "advanced_inference": EvidenceDisposition.REQUIRED,
-                "experiment_integrity": EvidenceDisposition.REQUIRED,
+                "experiment_lineage": EvidenceDisposition.REQUIRED,
+                "multiple_testing": EvidenceDisposition.REQUIRED,
                 "parameter_robustness": EvidenceDisposition.REQUIRED,
                 "temporal_robustness": EvidenceDisposition.REQUIRED,
                 "universe_robustness": EvidenceDisposition.OPTIONAL,
                 "regime_robustness": EvidenceDisposition.OPTIONAL,
                 "execution_realism": EvidenceDisposition.REQUIRED,
-                "data_correctness": EvidenceDisposition.REQUIRED,
+                "point_in_time_data": EvidenceDisposition.REQUIRED,
+                "survivorship": EvidenceDisposition.OPTIONAL,
                 "adapter_provenance": EvidenceDisposition.OPTIONAL,
                 "plugin_provenance": EvidenceDisposition.OPTIONAL,
                 "options_evidence": EvidenceDisposition.REQUIRED,

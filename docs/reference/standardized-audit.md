@@ -32,13 +32,15 @@ their original state, severity, category, message, and structured evidence.
 | temporal validation | `cv.*` | Required | Required | Required |
 | resampling inference | `validation.bootstrap.*`, `validation.permutation.*` | Required | Required | Required |
 | advanced inference | Sharpe, PBO, joint bootstrap, Reality Check, SPA | Optional | Required | Required |
-| experiment integrity | `experiment.*`, `validation.multiple_testing.*` | Required | Required | Required |
+| experiment lineage | `experiment.*` | Required | Required | Required |
+| multiple testing | `validation.multiple_testing.*` | Required | Required | Required |
 | parameter robustness | parameter surfaces, continuous perturbation | Required | Required | Required |
 | temporal robustness | subperiod analysis | Required | Required | Required |
 | universe robustness | universe perturbation | Required | Required | Optional |
 | regime robustness | `regime.*` | Required | Required | Optional |
 | execution realism | `costs.*` | Not applicable | Required | Required |
-| data correctness | `bias.*` | Required | Required | Required |
+| point-in-time data | as-of join, future/revision checks, dataset validation | Required | Required | Required |
+| survivorship | survivorship diagnostics, historical membership, universe drift | Required | Required | Optional |
 | adapter provenance | `adapters.*` | Optional | Optional | Optional |
 | plugin provenance | `plugins.*` | Optional | Optional | Optional |
 | options evidence | `options.*` | Not applicable | Not applicable | Required |
@@ -171,7 +173,8 @@ lacuna audit \
   --bundle strategy-audit.lacuna
 ```
 
-Each `NAME` is 1–64 letters, digits, dots, underscores, or hyphens. Names must be unique. Each file
+Each `NAME` matches `[a-z][a-z0-9_-]{0,63}` so it is valid both in the CLI and as a conservative
+bundle member name. Names must be unique. Each file
 is limited to 16 MiB and must be UTF-8 `AnalysisResult` schema-v1 JSON. The reader rejects:
 
 - unsupported schema versions;
@@ -234,4 +237,3 @@ Before changing a profile:
    archive checks.
 7. Test missing, optional, inapplicable-but-supplied, unrecognized, overlapping, duplicate-name,
    hostile-JSON, extension, rendering, and bundle paths.
-

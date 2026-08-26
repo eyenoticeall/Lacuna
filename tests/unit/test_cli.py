@@ -4,7 +4,9 @@ import json
 
 import numpy as np
 import polars as pl
+import pytest
 
+import lacuna.cli as cli
 from lacuna.cli import main
 from lacuna.types import AnalysisResult, ResultMetadata
 
@@ -295,6 +297,47 @@ def test_standard_audit_command_fail_on_warn_uses_audit_exit_code(
     )
     captured = capsys.readouterr()  # type: ignore[attr-defined]
     assert json.loads(captured.out)["metrics"]["unrecognized_result_count"] == 1
+
+
+def test_audit_commands_reject_identical_report_and_bundle_paths(
+    tmp_path: object,
+    capsys: object,
+) -> None:
+    destination = tmp_path / "same-output"  # type: ignore[operator]
+    assert (
+        main(
+            [
+                "audit",
+                "--out",
+                str(destination),
+                "--bundle",
+                str(destination),
+            ]
+        )
+        == 1
+    )
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "must use different paths" in captured.err
+    assert not destination.exists()
+
+
+def test_standard_audit_command_bounds_reads_and_uses_bundle_safe_names(
+    tmp_path: object,
+    capsys: object,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    oversized = tmp_path / "oversized.json"  # type: ignore[operator]
+    oversized.write_bytes(b"123456789")
+    monkeypatch.setattr(cli, "_MAX_EVIDENCE_BYTES", 8)
+    assert main(["audit", "--evidence", f"oversized={oversized}"]) == 1
+    captured = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "exceeds the 8-byte limit" in captured.err
+
+    with pytest.raises(SystemExit) as raised:
+        main(["audit", "--evidence", f"Bad.Name={oversized}"])
+    assert raised.value.code == 2
+    invalid_name = capsys.readouterr()  # type: ignore[attr-defined]
+    assert "must match [a-z][a-z0-9_-]{0,63}" in invalid_name.err
 
 
 def test_bench_command_emits_versioned_json(capsys: object) -> None:

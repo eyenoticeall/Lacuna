@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://lacuna.dev/schemas/audit-result-v1.schema.json",
   "title": "Lacuna audit result v1",
-  "description": "Canonical v0.1 JSON envelope for Lacuna analysis and audit evidence.",
+  "description": "Canonical JSON envelope for Lacuna analysis and audit evidence, introduced in v0.1.",
   "type": "object",
   "additionalProperties": false,
   "required": [

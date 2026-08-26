@@ -51,14 +51,23 @@
     },
     {
       "accepted_methods": [
-        "experiment.*",
-        "validation.multiple_testing.*"
+        "experiment.*"
       ],
-      "capability": "experiment_integrity",
+      "capability": "experiment_lineage",
       "category": "experiment_integrity",
       "disposition": "required",
       "missing_severity": "high",
-      "title": "Experiment history and multiplicity"
+      "title": "Experiment and selection lineage"
+    },
+    {
+      "accepted_methods": [
+        "validation.multiple_testing.*"
+      ],
+      "capability": "multiple_testing",
+      "category": "experiment_integrity",
+      "disposition": "required",
+      "missing_severity": "high",
+      "title": "Multiple-testing evidence"
     },
     {
       "accepted_methods": [
@@ -113,13 +122,28 @@
     },
     {
       "accepted_methods": [
-        "bias.*"
+        "bias.asof_join",
+        "bias.future_data_check",
+        "bias.revision_diagnostics",
+        "bias.validate_dataset"
       ],
-      "capability": "data_correctness",
+      "capability": "point_in_time_data",
       "category": "data_integrity",
       "disposition": "required",
       "missing_severity": "critical",
-      "title": "Point-in-time data and bias controls"
+      "title": "Point-in-time data and revision controls"
+    },
+    {
+      "accepted_methods": [
+        "bias.survivorship_diagnostics",
+        "bias.membership_at",
+        "bias.universe_drift"
+      ],
+      "capability": "survivorship",
+      "category": "temporal_integrity",
+      "disposition": "required",
+      "missing_severity": "critical",
+      "title": "Survivorship and historical-universe controls"
     },
     {
       "accepted_methods": [

@@ -107,10 +107,8 @@ def _evidence_spec(value: str) -> tuple[str, str]:
     name, separator, path = value.partition("=")
     if not separator or not name or not path:
         raise argparse.ArgumentTypeError("evidence must use NAME=PATH")
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", name):
-        raise argparse.ArgumentTypeError(
-            "evidence NAME must use 1-64 letters, digits, dots, underscores, or hyphens"
-        )
+    if not re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", name):
+        raise argparse.ArgumentTypeError("evidence NAME must match [a-z][a-z0-9_-]{0,63}")
     return name, path
 
 
@@ -121,24 +119,35 @@ def _load_evidence(specifications: Sequence[tuple[str, str]]) -> dict[str, Analy
             raise DataContractError(f"duplicate evidence name {name!r}")
         path = Path(raw_path)
         try:
-            size = path.stat().st_size
+            with path.open("rb") as source:
+                encoded = source.read(_MAX_EVIDENCE_BYTES + 1)
         except OSError as error:
-            raise DataContractError(f"cannot inspect evidence file for {name!r}: {path}") from error
-        if size > _MAX_EVIDENCE_BYTES:
+            raise DataContractError(f"cannot read evidence file for {name!r}: {path}") from error
+        if len(encoded) > _MAX_EVIDENCE_BYTES:
             raise DataContractError(
                 f"evidence file for {name!r} exceeds the {_MAX_EVIDENCE_BYTES}-byte limit"
             )
         try:
-            content = path.read_text(encoding="utf-8")
+            content = encoded.decode("utf-8")
             results[name] = AnalysisResult.from_json(content)
-        except (OSError, UnicodeError, TypeError, ValueError) as error:
+        except (UnicodeError, TypeError, ValueError) as error:
             raise DataContractError(
                 f"invalid v1 evidence file for {name!r}: {path}: {error}"
             ) from error
     return results
 
 
+def _require_distinct_outputs(arguments: argparse.Namespace) -> None:
+    if arguments.out is None or arguments.bundle is None:
+        return
+    report_path = Path(arguments.out).resolve(strict=False)
+    bundle_path = Path(arguments.bundle).resolve(strict=False)
+    if report_path == bundle_path:
+        raise ReportError("--out and --bundle must use different paths")
+
+
 def _run_signal(arguments: argparse.Namespace) -> int:
+    _require_distinct_outputs(arguments)
     horizons = tuple(arguments.horizon or ("1D", "5D", "20D"))
     study = SignalStudy(
         signal=_scan_frame(arguments.signal),
@@ -185,6 +194,7 @@ def _run_signal(arguments: argparse.Namespace) -> int:
 
 
 def _run_standard_audit(arguments: argparse.Namespace) -> int:
+    _require_distinct_outputs(arguments)
     results = _load_evidence(arguments.evidence)
     report = standard_audit(results=results, scope=arguments.scope)
     if arguments.bundle is not None:

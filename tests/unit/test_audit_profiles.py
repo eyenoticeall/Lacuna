@@ -209,6 +209,28 @@ def test_custom_profile_overlap_and_scope_mismatch_fail_closed() -> None:
         )
 
 
+def test_custom_profile_identifiers_versions_and_method_tuples_are_validated() -> None:
+    with pytest.raises(TypeError, match="non-empty tuple"):
+        EvidenceRequirement(
+            capability_id="bad_methods",
+            title="Bad methods",
+            category="operational",
+            methods=["custom.*"],  # type: ignore[arg-type]
+            disposition=EvidenceDisposition.REQUIRED,
+        )
+    requirement = EvidenceRequirement(
+        capability_id="custom",
+        title="Custom",
+        category="operational",
+        methods=("custom.*",),
+        disposition=EvidenceDisposition.REQUIRED,
+    )
+    with pytest.raises(ValueError, match="profile_id"):
+        AuditProfile("Invalid Profile", 1, AuditScope.STRATEGY, (requirement,))
+    with pytest.raises(ValueError, match="positive integer"):
+        AuditProfile("custom.strategy", True, AuditScope.STRATEGY, (requirement,))
+
+
 def test_public_wrapper_returns_a_renderable_categorical_report() -> None:
     report = standard_audit(
         results={"split": _result("cv.purged_kfold")},
