@@ -1,6 +1,6 @@
 # Python API surface
 
-This is the complete import inventory for Lacuna core `0.11.x`. It answers where a supported name
+This is the complete import inventory for Lacuna core `0.12.x`. It answers where a supported name
 lives and routes each module to the document that defines its semantics. Callable signatures are
 frozen by the cumulative `tests/fixtures/public-api-v0.*.json` contracts; formulas, temporal rules,
 failure modes, and result interpretation live in the linked design and methodology pages.
@@ -63,8 +63,9 @@ and backtest schemas do not certify caller declarations. See
 [Adapters, execution, and plugins](../subsystems/adapters-execution-plugins.md).
 
 Exports: `AdaptedFrame`, `AvailabilityPolicy`, `BacktestArtifactKind`, `BacktestSchema`,
-`BacktestSemantics`, `FrameSummary`, `PolarsFrame`, `RevisionPolicy`, `SklearnCV`, `SupportedSplitter`,
-`VendorSchema`, `adapt_backtest`, `adapt_vendor`, `as_sklearn_cv`, `frame_summary`, `from_duckdb`,
+`BacktestSemantics`, `FactorPanelSchema`, `FactorPanelSemantics`, `FrameSummary`, `PolarsFrame`,
+`RevisionPolicy`, `SklearnCV`, `SupportedSplitter`, `VendorSchema`, `adapt_backtest`,
+`adapt_factor_panel`, `adapt_vendor`, `as_sklearn_cv`, `frame_summary`, `from_duckdb`,
 `require_columns`, `to_polars`.
 
 ## `lacuna.audit`

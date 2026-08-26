@@ -3,7 +3,8 @@
 **Status:** Arrow/Polars/pandas ingestion and conservative local execution are implemented. The
 v0.6 milestone adds a DuckDB Arrow-stream adapter, a scikit-learn CV bridge, declarative vendor and
 backtest artifact schemas, and metadata-only plugin discovery with explicit trusted activation.
-DataFusion, framework-specific adapters, and a plugin marketplace remain later.
+v0.12 adds generic factor-panel schemas with fully declared research semantics. DataFusion,
+framework-specific adapters, and a plugin marketplace remain later.
 
 These systems control how Lacuna touches external data and code. Their shared design goal is a small, explicit trust and materialization boundary.
 
@@ -50,6 +51,26 @@ Mapping APIs take `canonical -> source`, not the inverse. They reject empty name
 targets, missing required canonical fields, and renames that would overwrite an unrelated existing
 canonical column. They preserve row order and extra columns. Normalization is not authorization to
 sort, impute, join, aggregate, deduplicate, or reinterpret identifiers.
+
+## Generic factor-panel ingestion
+
+`FactorPanelSchema` maps `observation_time`, `instrument`, and `signal`, plus optional forward
+return, horizon, group, bucket, availability, entry, and label-end fields. Its paired
+`FactorPanelSemantics` records signal observation, decision rule, return endpoints, horizon clock,
+timezone, calendar, adjustment policy, group availability, and any imported bucket definition.
+Every semantic is a required non-empty declaration; `"unknown"` is valid and produces explicit
+`UNKNOWN` evidence.
+
+`adapt_factor_panel(data, schema, *, collect=False)` returns an `AdaptedFrame`. Polars laziness is
+preserved unless collection is requested. Named pandas MultiIndex levels participate only when the
+schema explicitly maps their names. Arrow C-stream and chunked inputs use the ordinary physical
+boundary. Extra columns and row order survive; signal/forward-return numeric dtypes and imported
+bucket integer dtype are validated without transforming values.
+
+The adapter executes no methodology. In particular it does not filter outliers, infer frequency,
+build labels, perform an as-of join, bucket signals, calculate IC, or certify caller-supplied timing.
+Use the [Alphalens migration guide](../getting-started/alphalens-migration.md) for explicit mappings
+and deliberate non-equivalences.
 
 ## Execution planner
 

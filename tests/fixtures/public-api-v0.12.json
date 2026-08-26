@@ -1,0 +1,42 @@
+{
+  "callables": [
+    {
+      "module": "lacuna.adapters",
+      "qualname": "FactorPanelSemantics",
+      "signature": "(signal_observation, decision_time_rule, forward_return_entry, forward_return_exit, horizon_clock, timezone, calendar, adjustment_policy, group_availability, imported_bucket_definition)"
+    },
+    {
+      "module": "lacuna.adapters",
+      "qualname": "FactorPanelSchema",
+      "signature": "(schema_id, columns, semantics, schema_version=1)"
+    },
+    {
+      "module": "lacuna.adapters",
+      "qualname": "adapt_factor_panel",
+      "signature": "(data, schema, *, collect=False)"
+    }
+  ],
+  "contract": "lacuna-public-api-v0.12",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6",
+    "lacuna-public-api-v0.7",
+    "lacuna-public-api-v0.8",
+    "lacuna-public-api-v0.9",
+    "lacuna-public-api-v0.10",
+    "lacuna-public-api-v0.11"
+  ],
+  "module_exports": {
+    "lacuna.adapters": [
+      "FactorPanelSchema",
+      "FactorPanelSemantics",
+      "adapt_factor_panel"
+    ]
+  },
+  "package_series": "0.12",
+  "root_exports": ["adapters"]
+}

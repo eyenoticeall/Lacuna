@@ -10,6 +10,20 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   `ReportError`, so `lacuna bundle verify` rejects damaged archives without exposing a Python
   traceback.
 
+## [0.12.0] - 2026-08-26
+
+### Added
+
+- Add immutable `FactorPanelSchema` and `FactorPanelSemantics` contracts plus
+  `adapt_factor_panel()` for explicit generic Polars, Arrow, and optional named pandas MultiIndex
+  ingestion without filtering, joining, bucketing, label construction, or statistical work.
+- Add materialization/copy, source mapping, unknown-semantics, source-order, and no-methodology
+  evidence for factor-panel adaptation.
+- Add an Alphalens Reloaded migration guide and a small numerical IC fixture pinned and attributed
+  to reviewed commit `f0a07c22`, with named tests for compatible and deliberately divergent cases.
+- Add the cumulative `0.12.x` public API fixture while preserving every earlier compatibility
+  contract and result schema version 1.
+
 ## [0.11.0] - 2026-08-26
 
 ### Added

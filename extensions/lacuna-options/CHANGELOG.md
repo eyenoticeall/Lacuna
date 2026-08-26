@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6] - 2026-08-26
+
+### Changed
+
+- Expand the compatible core range to `lacuna>=0.5,<0.13` after the additive Lacuna `0.12`
+  factor-panel interoperability milestone passed the unchanged extension API and joint-install
+  gates.
+
 ## [0.1.5] - 2026-08-26
 
 ### Changed

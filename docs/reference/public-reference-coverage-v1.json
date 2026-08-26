@@ -1,7 +1,7 @@
 {
   "format": "lacuna.public-reference-coverage",
   "manifest_version": 1,
-  "package_series": "0.11",
+  "package_series": "0.12",
   "root": {
     "module": "lacuna",
     "reference": "docs/reference/python-api-surface.md",
@@ -90,6 +90,8 @@
         "BacktestArtifactKind",
         "BacktestSchema",
         "BacktestSemantics",
+        "FactorPanelSchema",
+        "FactorPanelSemantics",
         "FrameSummary",
         "PolarsFrame",
         "RevisionPolicy",
@@ -97,6 +99,7 @@
         "SupportedSplitter",
         "VendorSchema",
         "adapt_backtest",
+        "adapt_factor_panel",
         "adapt_vendor",
         "as_sklearn_cv",
         "frame_summary",

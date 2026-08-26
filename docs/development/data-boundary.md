@@ -132,6 +132,9 @@ pandas is an edge format. The optional adapter documents:
 - copy behavior for each common dtype family.
 
 Never treat a pandas index as `time` or `instrument` without an explicit argument or named adapter contract.
+The factor-panel adapter is that named contract: it includes a named pandas index level only when
+`FactorPanelSchema.columns` explicitly maps the corresponding source name. Index names and
+frequency metadata never supply timing semantics; those live in `FactorPanelSemantics`.
 
 ## DuckDB behavior
 

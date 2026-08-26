@@ -21,8 +21,8 @@ such as `0.2.0rc1`.
 | `0.8.x` | Versioned cross-phase standardized audit profiles and evidence composition | Released |
 | `0.9.x` | Persisted-artifact migration, integrated performance, diagnostics, and reference hardening | Released |
 | `0.10.x` | Group-aware signal transformations, attrition, multi-lag stability, interactive evidence | Released |
-| `0.11.x` | Validated decay inference, diagnostic portfolio projection, robust event studies | Implemented; release gates pending |
-| `0.12.x` | Generic factor-panel interoperability and migration guidance | Planned |
+| `0.11.x` | Validated decay inference, diagnostic portfolio projection, robust event studies | Implemented; release gates passed |
+| `0.12.x` | Generic factor-panel interoperability and migration guidance | Implemented; release gates pending |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -246,8 +246,8 @@ windows anchored to availability with clustered path inference. The portfolio bo
 ADR before implementation.
 
 `0.12` adds generic factor-panel schemas and fully declared timing semantics across Polars, Arrow,
-and optional pandas MultiIndexes. It also publishes migration guidance and frozen compatible
-numeric fixtures without a runtime Alphalens dependency.
+and optional pandas MultiIndexes. It publishes migration guidance and frozen compatible numeric
+fixtures pinned to a reviewed upstream commit without a runtime Alphalens dependency.
 
 Excluded throughout: lookahead z-score filtering, implicit calendars or timing, mandatory pandas
 or plotting, cumulative backtesting, order/fill simulation, and plotting side effects.

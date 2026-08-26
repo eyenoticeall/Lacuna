@@ -143,8 +143,8 @@ Do not create every package as an empty placeholder. Add a package when its firs
 The repository currently implements the v0.1 signal-validation path, v0.2 robustness milestone,
 v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
 milestone, the v0.6 optional-integration milestone, the v0.7 portable-evidence milestone, and the
-v0.8 standardized-audit, v0.9 operational-hardening, v0.10 factor-diagnostic, and v0.11
-decay/projection/event milestones:
+v0.8 standardized-audit, v0.9 operational-hardening, v0.10 factor-diagnostic, v0.11
+decay/projection/event, and v0.12 factor-panel interoperability milestones:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -173,6 +173,8 @@ decay/projection/event milestones:
   bootstrap, White Reality Check, and Hansen SPA.
 - DuckDB Arrow-stream ingestion, a scikit-learn temporal CV bridge, immutable vendor schemas, and
   explicit backtest artifact/semantics adapters without new core runtime dependencies;
+- generic factor-panel schemas with explicit timing, calendar, adjustment, group-availability, and
+  imported-bucket semantics across Polars, Arrow, and optional named pandas MultiIndexes;
 - metadata-only plugin discovery, conflict-safe selection, explicit trusted-code activation, and
   independent protocol-major/capability negotiation;
 - a separately packaged and independently versioned `lacuna-options` extension for normalized
@@ -185,10 +187,10 @@ decay/projection/event milestones:
 - strict current-schema result JSON ingestion plus file-oriented standardized-audit CLI and
   vendor/backtester/options-to-audit integration paths.
 
-DataFusion, framework-specific adapters, generic factor-panel ingestion, automatic execution
+DataFusion, framework-specific adapters, automatic execution
 planning, model-based option pricing/
 calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
-through documented migrations; the published `0.1.x` through `0.11.x` contracts govern their
+through documented migrations; the published `0.1.x` through `0.12.x` contracts govern their
 respective release lines.
 
 ## Detailed guides

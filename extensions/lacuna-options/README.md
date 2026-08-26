@@ -15,7 +15,7 @@ The initial `0.1.x` contract provides:
 Install the matching Lacuna core wheel and the extension wheel from the same GitHub Release:
 
 ```bash
-python -m pip install ./lacuna-0.11.0-*.whl ./lacuna_options-0.1.5-py3-none-any.whl
+python -m pip install ./lacuna-0.12.0-*.whl ./lacuna_options-0.1.6-py3-none-any.whl
 ```
 
 ```python
@@ -30,6 +30,6 @@ The package does not claim a universal implied-volatility solver, Greeks model, 
 arbitrage-free calibration. Those depend on explicit model, day-count, exercise, settlement,
 dividend, and numerical policies and belong in later separately versioned capabilities.
 
-Version `0.1.5` preserves the exact `0.1.x` Python surface while expanding its compatible core range
-to include additive Lacuna `0.11.x` releases. Validated chain evidence is recognized by the required
+Version `0.1.6` preserves the exact `0.1.x` Python surface while expanding its compatible core range
+to include additive Lacuna `0.12.x` releases. Validated chain evidence is recognized by the required
 `options_evidence` capability in Lacuna's standardized options audit profile.

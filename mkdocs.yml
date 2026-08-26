@@ -14,7 +14,9 @@ theme:
     accent: teal
 nav:
   - Home: index.md
-  - Getting started: getting-started/index.md
+  - Getting started:
+      - Quickstart: getting-started/index.md
+      - Migrating from Alphalens: getting-started/alphalens-migration.md
   - Concepts:
       - Architecture: concepts/architecture.md
       - Semantic data model: concepts/data-model.md

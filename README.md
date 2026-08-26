@@ -24,10 +24,10 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> Lacuna **v0.11** adds validated decay half-life inference, explicit non-compounding diagnostic
-> portfolio projections, and availability-anchored event studies with clustered complete-path
-> uncertainty. These additions preserve the audit schema and the boundary between diagnostics and
-> backtesting. `v0.9.0` remains the latest published GitHub release while later release gates run.
+> Lacuna **v0.12** adds generic factor-panel ingestion with explicit timing semantics, named pandas
+> MultiIndex support, and an Alphalens Reloaded migration path without adopting implicit research
+> methodology. This follows v0.10 factor diagnostics and v0.11 decay, projection, and event-study
+> inference. `v0.9.0` remains the latest published GitHub release while later releases are prepared.
 > Lacuna remains pre-1.0 software; later minor versions may evolve through documented migrations.
 
 > [!NOTE]
@@ -81,7 +81,7 @@ The design keeps **Python outside, Rust inside**: Python supplies research ergon
 | Audit and reports | Frozen signal rules plus standardized signal/strategy/options profiles, categorical coverage, unchanged source findings, JSON, Markdown, and self-contained HTML |
 | Reproducibility | Deterministic `.lacuna` archives, published manifest schema, privacy redaction, SHA-256 integrity, and strict non-executing verification |
 | Native core | Rust grouped-rank IC, bootstrap-mean reduction, and half-open interval purging with Python references |
-| Data boundary | Polars eager/lazy, NumPy, optional pandas, and Arrow-compatible inputs |
+| Data boundary | Polars eager/lazy, NumPy, optional pandas/MultiIndex, Arrow-compatible inputs, and explicit factor-panel schemas |
 | Quality | Published result schema, golden fixtures, property/reference/statistical/differential tests, and Python/Criterion benchmarks |
 | Experiment lineage | Canonical fingerprints, append-only SQLite attempts/corrections, full eligible-set selection records, and structured snapshots |
 | Multiplicity | Bonferroni, Holm, Benjamini-Hochberg, and Benjamini-Yekutieli adjustment over explicit or registered trial families |
