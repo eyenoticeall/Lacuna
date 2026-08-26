@@ -251,7 +251,7 @@ method metadata and warnings
 - deterministic bootstrap indices are generated in bounded Python batches and mean reductions are
   implemented in Rust with a NumPy reference;
 - CPCV, permutation, PBO, joint stationary bootstrap, Reality Check, and SPA currently use validated
-  NumPy/Python reference paths; benchmark artifact v4 records their complete public-call cost before
+  NumPy/Python reference paths; benchmark artifact v5 retains their complete public-call cost before
   any native optimization is considered.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.

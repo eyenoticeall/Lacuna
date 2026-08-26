@@ -300,7 +300,7 @@ The v0.5 gate includes:
 - an independent direct-lag implementation of Hansen's long-run variance and all SPA recenterings;
 - fixed-seed Reality Check/SPA null-size and planted-power simulations;
 - a planted poor-model family demonstrating White's conservatism and SPA's intended robustness;
-- benchmark artifact v4 cases for CPCV, PBO, Reality Check, and SPA;
+- benchmark artifact v5 cases retaining CPCV, PBO, Reality Check, and SPA coverage;
 - clean-wheel smoke calls through the supported public API.
 
 These are deterministic regression guardrails, not universal empirical validation. A method change

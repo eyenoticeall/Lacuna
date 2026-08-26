@@ -16,6 +16,10 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   check codes for package/native identity, Python and wheel support, dependency metadata, packaged
   schemas, and runtime configuration; diagnostics redact configured paths and never inspect user
   data or activate plugins.
+- Advance the deterministic benchmark artifact to version 5 with an integrated strategy-audit case
+  spanning labels, signal IC, purged validation, stationary bootstrap, cost stress, point-in-time
+  data, vendor/backtest adapters, and standardized-audit composition; publish the initial profile
+  and retain production behavior because it found no justified semantic-preserving optimization.
 
 ## [0.8.0] - 2026-08-26
 

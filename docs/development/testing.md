@@ -154,7 +154,8 @@ The v0.5 gate additionally requires:
 - fixed-seed Reality Check/SPA null-size and planted-power simulations, including irrelevant poor
   high-variance alternatives;
 - exact `0.5.x` public exports/signatures plus preservation of every `0.1.x` through `0.4.x` subset;
-- deterministic benchmark artifact v4 cases and a clean-wheel advanced-inference smoke path.
+- deterministic benchmark artifact v5 cases, including the integrated strategy-audit workflow,
+  and a clean-wheel advanced-inference smoke path.
 
 ### Optional-integration and extension tests
 

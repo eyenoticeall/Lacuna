@@ -21,6 +21,14 @@ import numpy.typing as npt
 import polars as pl
 
 from lacuna import bias, costs, signal
+from lacuna.adapters import (
+    BacktestSchema,
+    BacktestSemantics,
+    VendorSchema,
+    adapt_backtest,
+    adapt_vendor,
+)
+from lacuna.audit_profiles import standard_audit
 from lacuna.bias import PointInTimeJoinResult
 from lacuna.cv import CombinatorialPurgedKFold, CombinatorialSplitResult, PurgedKFold, SplitResult
 from lacuna.exceptions import MethodContractError
@@ -148,7 +156,7 @@ class BenchmarkSuite:
     generated_at: datetime
     environment: Mapping[str, object]
     schema_version: str = "1"
-    benchmark_version: int = 4
+    benchmark_version: int = 5
 
     def to_dict(self) -> dict[str, object]:
         """Return the complete benchmark artifact."""
@@ -357,12 +365,115 @@ def _process_peak_rss_bytes() -> int | None:
     return peak if platform.system() == "Darwin" else peak * 1024
 
 
+def _standard_audit_workflow(
+    config: BenchmarkConfig,
+    observations: pl.DataFrame,
+    prices: pl.DataFrame,
+    trades: pl.DataFrame,
+    decisions: pl.DataFrame,
+    available_records: pl.DataFrame,
+    interval_frame: pl.DataFrame,
+    bootstrap_values: npt.NDArray[np.float64],
+    *,
+    use_native: bool,
+) -> AuditReport:
+    """Execute the released cross-phase strategy-audit path as one workload."""
+
+    labels = forward_returns(
+        prices,
+        horizons=config.horizon_names,
+        price_adjustment="raw",
+    )
+    signal_result = signal.ic(observations, labels, use_native=use_native)
+    split_result = PurgedKFold(n_splits=5, embargo=2, use_native=use_native).split(interval_frame)
+    bootstrap_result = bootstrap(
+        bootstrap_values,
+        method="stationary",
+        expected_block_length=max(2, round(len(bootstrap_values) ** (1 / 3))),
+        resamples=config.bootstrap_resamples,
+        seed=config.seed,
+        use_native=use_native,
+    )
+    cost_result = costs.stress(
+        trades,
+        spread_bps=(0.0, 5.0, 10.0),
+        slippage_bps=(0.0, 5.0, 10.0),
+    )
+    point_in_time = bias.asof_join(
+        decisions,
+        available_records,
+        revision_mode="not_applicable",
+    )
+    vendor = adapt_vendor(
+        available_records,
+        VendorSchema(
+            schema_id="lacuna.benchmark.vendor.v1",
+            columns={
+                "available_time": "available_time",
+                "instrument": "instrument",
+                "value": "value",
+            },
+            required=("available_time", "instrument", "value"),
+            availability="point_in_time",
+            revisions="not_applicable",
+        ),
+        collect=True,
+    )
+    backtest = adapt_backtest(
+        pl.DataFrame(
+            {
+                "time": np.arange(len(bootstrap_values), dtype=np.int64),
+                "strategy": ["benchmark"] * len(bootstrap_values),
+                "return": bootstrap_values,
+            }
+        ),
+        BacktestSchema(
+            schema_id="lacuna.benchmark.backtest.v1",
+            artifact="returns",
+            columns={"time": "time", "strategy": "strategy", "return": "return"},
+            semantics=BacktestSemantics(
+                returns="net",
+                return_frequency="daily",
+                compounding="simple",
+                position_timing="close-to-close",
+                execution_delay="one session",
+                price_field="close",
+                price_adjustment="raw",
+                costs="included",
+                borrow="included",
+                timezone="UTC",
+                calendar="synthetic",
+                session="regular",
+                missing_instruments="retain as null",
+                delistings="terminal return included",
+            ),
+        ),
+        collect=True,
+    )
+    report = standard_audit(
+        results={
+            "backtest_adapter": backtest.evidence,
+            "cost_stress": cost_result,
+            "forward_returns": labels.evidence,
+            "point_in_time": point_in_time.evidence,
+            "purged_split": split_result.evidence,
+            "signal_ic": signal_result,
+            "stationary_bootstrap": bootstrap_result,
+            "vendor_adapter": vendor.evidence,
+        },
+        scope="strategy",
+    )
+    if report.metrics["recognized_result_count"] != 8:
+        raise RuntimeError("integrated benchmark evidence was not fully recognized")
+    return report
+
+
 def run_benchmarks(
     config: BenchmarkConfig | None = None,
     *,
     use_native: bool = True,
 ) -> BenchmarkSuite:
-    """Measure public v0.1 paths without enforcing machine-specific speed budgets."""
+    """Measure released public workflows without enforcing machine-specific speed budgets."""
 
     resolved = config or BenchmarkConfig()
     observations, prices = _panels(resolved)
@@ -544,6 +655,22 @@ def run_benchmarks(
             ),
             resolved.rows,
             "left_rows/second",
+        ),
+        (
+            "workflow.standard_audit.strategy",
+            lambda: _standard_audit_workflow(
+                resolved,
+                observations,
+                prices,
+                trades,
+                decisions,
+                available_records,
+                interval_frame,
+                bootstrap_values,
+                use_native=use_native,
+            ),
+            resolved.rows,
+            "panel_rows/second",
         ),
     ]
     native = native_status()

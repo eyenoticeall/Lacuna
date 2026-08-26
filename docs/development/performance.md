@@ -1,9 +1,9 @@
 # Performance architecture and benchmarking
 
-**Status:** benchmark artifact version 4 covers public signal/audit workflows, the three native
-kernels, the v0.3 path-independent cost-stress surface, the v0.4 point-in-time as-of path, and v0.5
-CPCV/PBO/Reality Check/SPA reference paths. The measurements establish reproducible baselines; no
-hardware-independent latency promise is claimed.
+**Status:** benchmark artifact version 5 covers public signal/audit workflows, the three native
+kernels, the v0.3 path-independent cost-stress surface, the v0.4 point-in-time as-of path, v0.5
+CPCV/PBO/Reality Check/SPA reference paths, and the v0.9 integrated strategy-audit workload. The
+measurements establish reproducible baselines; no hardware-independent latency promise is claimed.
 
 Performance is a product requirement, but only measured workloads justify optimization decisions.
 
@@ -93,6 +93,12 @@ measured in input intervals, PBO in enumerated symmetric combinations, and Reali
 joint bootstrap replicates. Any later optimized path must reproduce the same checksums in
 differential tests before it can replace or accompany these baselines.
 
+Artifact v5 adds `workflow.standard_audit.strategy`. One measured call constructs forward labels,
+signal IC, purged K-fold evidence, a stationary bootstrap, a nine-scenario cost surface, a
+point-in-time join, vendor and backtest adapter evidence, and then the standardized strategy audit.
+Its throughput unit is source panel rows per second. That unit makes runs comparable; it is not the
+sum of every intermediate row visited by the cross-phase workflow.
+
 ```bash
 lacuna bench --tier smoke --out benchmark.json
 
@@ -102,6 +108,25 @@ python benches/python/bench_signal.py --tier small --repetitions 5
 
 Use `--no-native` to isolate reference paths. Output is canonical JSON on stdout unless `--out` is
 given; existing artifacts require `--overwrite`.
+
+### Initial v5 integrated profile
+
+The initial `0.9` profiling run used the smoke tier, Python 3.13, Polars 1.44, NumPy 2.5, reference
+paths, three timed repetitions, and one warm-up on Apple arm64. The integrated case produced the
+same checksum in every invocation, a 145.8 ms median, about 27,432 source panel rows per second, and
+a 5,283,858-byte traced Python peak. These values are environment evidence, not release budgets.
+
+`cProfile` attributed about 78% of the integrated call's instrumented cumulative time to the
+required nine-scenario cost surface and 16% to the point-in-time join. Signal IC, stationary
+bootstrap, purged splitting, labels, adapters, and final audit composition each accounted for the
+remaining single-digit share. Profiling instrumentation magnifies Python canonicalization work, so
+those percentages are routing evidence rather than production latency estimates.
+
+No production optimization accompanies v5. Inspection found no accidental repeated cross-phase
+call: cost evidence performs the declared scenario calculation and stable full-input fingerprint,
+while the as-of join executes once. Changing either persistence identity or calculation semantics
+for a smoke-only timing would be unjustified. A future optimization must reproduce this checksum at
+small and medium tiers and show an improvement outside profiler overhead.
 
 ### Study benchmarks
 
