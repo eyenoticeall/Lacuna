@@ -13,6 +13,7 @@ from typing import Literal, cast
 import polars as pl
 
 from lacuna import __version__
+from lacuna.bundle import verify_bundle
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, LacunaError, ReportError
 from lacuna.labels import PriceAdjustment
@@ -129,6 +130,9 @@ def _run_signal(arguments: argparse.Namespace) -> int:
         policies=policies,
         use_native=not arguments.no_native,
     )
+    if arguments.bundle is not None:
+        destination = report.bundle(arguments.bundle, overwrite=arguments.overwrite)
+        print(f"wrote Lacuna reproducibility bundle to {destination}", file=sys.stderr)
     if arguments.out is not None:
         destination = report.write(
             arguments.out,
@@ -140,6 +144,22 @@ def _run_signal(arguments: argparse.Namespace) -> int:
         selected = cast(ReportFormat, arguments.format or "markdown")
         print(_render_report(report, selected), end="")
     return _audit_exit_code(report, arguments.fail_on)
+
+
+def _run_bundle_verify(arguments: argparse.Namespace) -> int:
+    verification = verify_bundle(arguments.path)
+    payload = verification.to_dict()
+    if arguments.json:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0
+    print(f"Bundle       {verification.path}")
+    print(f"Format       {verification.manifest.format} v{verification.manifest.bundle_version}")
+    print(f"Artifacts    {verification.artifact_count}")
+    print(f"Total bytes  {verification.total_size}")
+    print(f"SHA-256      {verification.archive_sha256}")
+    print("Integrity    verified")
+    print("Authenticity not verified (use signed release/provenance channels separately)")
+    return 0
 
 
 def _run_bench(arguments: argparse.Namespace) -> int:
@@ -248,6 +268,10 @@ def _parser() -> argparse.ArgumentParser:
         help="report format; inferred from --out or Markdown on stdout",
     )
     signal.add_argument("--out", help="write the report to this path")
+    signal.add_argument(
+        "--bundle",
+        help="also write a deterministic .lacuna reproducibility bundle",
+    )
     signal.add_argument("--overwrite", action="store_true", help="replace an existing report")
     signal.add_argument(
         "--fail-on",
@@ -269,6 +293,14 @@ def _parser() -> argparse.ArgumentParser:
     bench.add_argument("--no-native", action="store_true", help="omit native benchmark cases")
     bench.add_argument("--out", help="write the benchmark JSON to this path")
     bench.add_argument("--overwrite", action="store_true", help="replace an existing artifact")
+
+    bundle = subcommands.add_parser("bundle", help="inspect non-executable reproducibility bundles")
+    bundle_subcommands = bundle.add_subparsers(dest="bundle_command", required=True)
+    bundle_verify = bundle_subcommands.add_parser(
+        "verify", help="verify structure and artifact SHA-256 digests"
+    )
+    bundle_verify.add_argument("path", help="path to a .lacuna bundle")
+    bundle_verify.add_argument("--json", action="store_true", help="emit machine-readable JSON")
     return parser
 
 
@@ -292,6 +324,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             return _run_bench(arguments)
         except (LacunaError, OSError, pl.exceptions.PolarsError) as error:
+            print(f"lacuna: error: {error}", file=sys.stderr)
+            return 1
+
+    if arguments.command == "bundle":
+        try:
+            return _run_bundle_verify(arguments)
+        except (LacunaError, OSError) as error:
             print(f"lacuna: error: {error}", file=sys.stderr)
             return 1
 

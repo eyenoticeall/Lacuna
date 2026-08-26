@@ -164,6 +164,7 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
             "lacuna/_native.pyi",
             "lacuna/_version.py",
             "lacuna/bias.py",
+            "lacuna/bundle.py",
             "lacuna/costs.py",
             "lacuna/cv.py",
             "lacuna/experiment.py",
@@ -177,6 +178,7 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
             "lacuna/adapters/sklearn.py",
             "lacuna/adapters/vendor.py",
             "lacuna/schemas/audit-result-v1.schema.json",
+            "lacuna/schemas/lacuna-bundle-manifest-v1.schema.json",
         }
         missing = sorted(required.difference(names))
         if missing:
@@ -202,6 +204,7 @@ def _verify_sdist(path: Path, version: str) -> None:
         f"{prefix}python/lacuna/_native.pyi",
         f"{prefix}python/lacuna/_version.py",
         f"{prefix}python/lacuna/bias.py",
+        f"{prefix}python/lacuna/bundle.py",
         f"{prefix}python/lacuna/costs.py",
         f"{prefix}python/lacuna/cv.py",
         f"{prefix}python/lacuna/experiment.py",
@@ -217,6 +220,7 @@ def _verify_sdist(path: Path, version: str) -> None:
         f"{prefix}rust/lacuna-core/src/lib.rs",
         f"{prefix}rust/lacuna-python/src/lib.rs",
         f"{prefix}schemas/audit-result-v1.schema.json",
+        f"{prefix}schemas/lacuna-bundle-manifest-v1.schema.json",
     }
     with tarfile.open(path, mode="r:gz") as archive:
         names = {member.name for member in archive.getmembers()}

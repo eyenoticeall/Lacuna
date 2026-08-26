@@ -5,20 +5,23 @@ from __future__ import annotations
 import importlib
 import json
 import math
+import tempfile
 from importlib import metadata
 from importlib.resources import files
+from pathlib import Path
 
 import numpy as np
 
 import lacuna
 from lacuna import _native
-from lacuna.schemas import audit_result_v1_text
+from lacuna.schemas import audit_result_v1_text, bundle_manifest_v1_text
 
 PUBLIC_MODULES = (
     "lacuna.adapters",
     "lacuna.audit",
     "lacuna.benchmark",
     "lacuna.bias",
+    "lacuna.bundle",
     "lacuna.cli",
     "lacuna.config",
     "lacuna.costs",
@@ -228,11 +231,22 @@ require(duckdb_frame.evidence.metrics["row_count"] == 1, "DuckDB adapter failed"
 plugin_candidates = lacuna.plugins.discover_plugins()
 require(isinstance(plugin_candidates, tuple), "plugin discovery failed")
 
+bundle_report = lacuna.audit(policies={"study_type": "signal"})
+with tempfile.TemporaryDirectory() as temporary_directory:
+    bundle_path = bundle_report.bundle(Path(temporary_directory) / "wheel-smoke.lacuna")
+    bundle_verification = lacuna.verify_bundle(bundle_path)
+require(bundle_verification.artifact_count == 5, "reproducibility bundle verification failed")
+
 package = files("lacuna")
 require(package.joinpath("py.typed").is_file(), "wheel is missing py.typed")
 require(package.joinpath("_native.pyi").is_file(), "wheel is missing native type stubs")
 schema = json.loads(audit_result_v1_text())
 require(schema.get("title") == "Lacuna audit result v1", "wheel is missing the audit schema")
+bundle_schema = json.loads(bundle_manifest_v1_text())
+require(
+    bundle_schema.get("title") == "Lacuna reproducibility bundle manifest v1",
+    "wheel is missing the bundle schema",
+)
 
 print(
     json.dumps(
@@ -246,6 +260,7 @@ print(
             "cost_scenarios": cost_stress.metrics["scenario_count"],
             "point_in_time_matches": point_in_time.evidence.metrics["matched_rows"],
             "plugin_candidates": len(plugin_candidates),
+            "bundle_artifacts": bundle_verification.artifact_count,
             "cpcv_combinations": len(combinatorial.folds),
             "pbo_combinations": pbo.metrics["n_combinations"],
             "reality_check_p_value": reality.metrics["p_value"],

@@ -110,6 +110,49 @@ def test_signal_command_writes_without_silent_overwrite(tmp_path: object, capsys
     assert "refusing to overwrite" in second.err
 
 
+def test_signal_command_writes_and_cli_verifies_bundle(tmp_path: object, capsys: object) -> None:
+    signal_path, price_path = _write_signal_inputs(tmp_path)
+    bundle_path = tmp_path / "study.lacuna"  # type: ignore[operator]
+    report_path = tmp_path / "report.json"  # type: ignore[operator]
+
+    assert (
+        main(
+            [
+                "signal",
+                "--signal",
+                signal_path,
+                "--prices",
+                price_path,
+                "--horizon",
+                "1D",
+                "--quantiles",
+                "3",
+                "--bootstrap-resamples",
+                "100",
+                "--seed",
+                "9",
+                "--no-native",
+                "--out",
+                str(report_path),
+                "--bundle",
+                str(bundle_path),
+            ]
+        )
+        == 0
+    )
+    created = capsys.readouterr()  # type: ignore[attr-defined]
+    assert created.out == ""
+    assert "wrote Lacuna reproducibility bundle" in created.err
+
+    assert main(["bundle", "verify", str(bundle_path), "--json"]) == 0
+    verified = capsys.readouterr()  # type: ignore[attr-defined]
+    payload = json.loads(verified.out)
+    assert payload["integrity_verified"] is True
+    assert payload["authenticity_verified"] is False
+    assert payload["artifact_count"] == 5
+    assert verified.err == ""
+
+
 def test_signal_command_rejects_unsupported_input_format(tmp_path: object, capsys: object) -> None:
     invalid = tmp_path / "signal.txt"  # type: ignore[operator]
     exit_code = main(
