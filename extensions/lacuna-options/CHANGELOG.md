@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- License future `lacuna-options` distributions under MIT only and include the MIT text in wheel
+  and source archives. Previously published versions retain their original license grants.
+
 ## [0.1.6] - 2026-08-26
 
 ### Changed

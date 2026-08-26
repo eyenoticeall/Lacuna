@@ -4,6 +4,11 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Changed
+
+- License the repository and all future core and extension distributions under MIT only. Releases
+  already published under the former dual-license terms retain those original grants.
+
 ## [0.12.0] - 2026-08-26
 
 ### Added

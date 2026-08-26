@@ -76,6 +76,19 @@ def options_version(root: Path, *, core_version: str) -> str:
 
     options_root = root / OPTIONS_ROOT
     pyproject = tomllib.loads((options_root / "pyproject.toml").read_text(encoding="utf-8"))
+    if pyproject["project"].get("license") != "MIT":
+        fail("lacuna-options must use the MIT license expression")
+    if pyproject["project"].get("license-files") != ["LICENSE"]:
+        fail("lacuna-options must package exactly its MIT LICENSE file")
+    options_license_classifiers = [
+        classifier
+        for classifier in pyproject["project"].get("classifiers", [])
+        if classifier.startswith("License ::")
+    ]
+    if options_license_classifiers != ["License :: OSI Approved :: MIT License"]:
+        fail("lacuna-options must publish only the MIT license classifier")
+    if not (options_root / "LICENSE").is_file():
+        fail("lacuna-options MIT LICENSE file is missing")
     project_version = pyproject["project"]["version"]
     source_version = _python_source_version(options_root / "src/lacuna_options/_version.py")
     if project_version != source_version:
@@ -129,6 +142,27 @@ def verify_source(root: Path, tag: str, *, require_tag: bool) -> str:
     source_version = _python_source_version(root / "python/lacuna/_version.py")
     expected_python_version = python_version_from_cargo(cargo_version)
 
+    if pyproject["project"].get("license") != "MIT":
+        fail("core Python metadata must use the MIT license expression")
+    if pyproject["project"].get("license-files") != ["LICENSE"]:
+        fail("core Python metadata must package exactly the MIT LICENSE file")
+    core_license_classifiers = [
+        classifier
+        for classifier in pyproject["project"].get("classifiers", [])
+        if classifier.startswith("License ::")
+    ]
+    if core_license_classifiers != ["License :: OSI Approved :: MIT License"]:
+        fail("core Python metadata must publish only the MIT license classifier")
+    if cargo["workspace"]["package"].get("license") != "MIT":
+        fail("Rust workspace metadata must use the MIT license expression")
+    if not (root / "LICENSE").is_file():
+        fail("repository MIT LICENSE file is missing")
+    if (root / "LICENSE").read_bytes() != (root / OPTIONS_ROOT / "LICENSE").read_bytes():
+        fail("core and lacuna-options MIT license texts must be identical")
+    obsolete_license_files = [root / "LICENSE-APACHE", root / "LICENSE-MIT"]
+    if any(path.exists() for path in obsolete_license_files):
+        fail("repository must contain only the canonical MIT LICENSE file")
+
     if python_version != expected_python_version or source_version != expected_python_version:
         fail(
             "release versions disagree: "
@@ -166,20 +200,30 @@ def verify_source(root: Path, tag: str, *, require_tag: bool) -> str:
     return python_version
 
 
-def _wheel_metadata(archive: zipfile.ZipFile) -> tuple[str, str, str]:
+def _wheel_metadata(
+    archive: zipfile.ZipFile,
+) -> tuple[str, str, str, str, tuple[str, ...]]:
     metadata_paths = [name for name in archive.namelist() if name.endswith(".dist-info/METADATA")]
     wheel_paths = [name for name in archive.namelist() if name.endswith(".dist-info/WHEEL")]
     if len(metadata_paths) != 1 or len(wheel_paths) != 1:
         fail("wheel must contain exactly one METADATA and one WHEEL file")
     metadata = BytesParser().parsebytes(archive.read(metadata_paths[0]))
     wheel = BytesParser().parsebytes(archive.read(wheel_paths[0]))
-    return str(metadata["Name"]), str(metadata["Version"]), str(wheel["Tag"])
+    return (
+        str(metadata["Name"]),
+        str(metadata["Version"]),
+        str(wheel["Tag"]),
+        str(metadata["License-Expression"]),
+        tuple(metadata.get_all("License-File", [])),
+    )
 
 
 def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
-        metadata_name, metadata_version, wheel_tag = _wheel_metadata(archive)
+        metadata_name, metadata_version, wheel_tag, license_expression, license_files = (
+            _wheel_metadata(archive)
+        )
         if metadata_name != "lacuna":
             fail(f"{path.name} distribution name is {metadata_name!r}, expected 'lacuna'")
         if metadata_version != version:
@@ -187,6 +231,8 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
         expected_tag = f"cp311-abi3-{expected_platform}"
         if wheel_tag != expected_tag:
             fail(f"{path.name} wheel tag is {wheel_tag!r}, expected {expected_tag!r}")
+        if license_expression != "MIT" or license_files != ("LICENSE",):
+            fail(f"{path.name} must contain only the MIT license metadata and text")
         required = {
             "lacuna/__init__.py",
             "lacuna/_advanced_inference.py",
@@ -221,6 +267,8 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
             name.startswith("lacuna/_native") and name.endswith(native_suffix) for name in names
         ):
             fail(f"{path.name} is missing its native extension")
+        if not any(name.endswith(".dist-info/licenses/LICENSE") for name in names):
+            fail(f"{path.name} is missing its MIT license text")
 
 
 def _verify_sdist(path: Path, version: str) -> None:
@@ -228,8 +276,7 @@ def _verify_sdist(path: Path, version: str) -> None:
     required = {
         f"{prefix}Cargo.toml",
         f"{prefix}CHANGELOG.md",
-        f"{prefix}LICENSE-APACHE",
-        f"{prefix}LICENSE-MIT",
+        f"{prefix}LICENSE",
         f"{prefix}README.md",
         f"{prefix}pyproject.toml",
         f"{prefix}python/lacuna/__init__.py",
@@ -264,18 +311,25 @@ def _verify_sdist(path: Path, version: str) -> None:
     missing = sorted(required.difference(names))
     if missing:
         fail(f"{path.name} is missing source resources: {', '.join(missing)}")
+    forbidden = {f"{prefix}LICENSE-APACHE", f"{prefix}LICENSE-MIT"}.intersection(names)
+    if forbidden:
+        fail(f"{path.name} contains obsolete license files: {', '.join(sorted(forbidden))}")
 
 
 def _verify_options_wheel(path: Path, version: str) -> None:
     with zipfile.ZipFile(path) as archive:
         names = set(archive.namelist())
-        metadata_name, metadata_version, wheel_tag = _wheel_metadata(archive)
+        metadata_name, metadata_version, wheel_tag, license_expression, license_files = (
+            _wheel_metadata(archive)
+        )
         if metadata_name != "lacuna-options":
             fail(f"{path.name} distribution name is {metadata_name!r}, expected 'lacuna-options'")
         if metadata_version != version:
             fail(f"{path.name} metadata version is {metadata_version!r}, expected {version!r}")
         if wheel_tag != "py3-none-any":
             fail(f"{path.name} wheel tag is {wheel_tag!r}, expected 'py3-none-any'")
+        if license_expression != "MIT" or license_files != ("LICENSE",):
+            fail(f"{path.name} must contain only the MIT license metadata and text")
         required = {
             "lacuna_options/__init__.py",
             "lacuna_options/_version.py",
@@ -285,12 +339,15 @@ def _verify_options_wheel(path: Path, version: str) -> None:
         missing = sorted(required.difference(names))
         if missing:
             fail(f"{path.name} is missing packaged resources: {', '.join(missing)}")
+        if not any(name.endswith(".dist-info/licenses/LICENSE") for name in names):
+            fail(f"{path.name} is missing its MIT license text")
 
 
 def _verify_options_sdist(path: Path, version: str) -> None:
     prefix = f"lacuna_options-{version}/"
     required = {
         f"{prefix}CHANGELOG.md",
+        f"{prefix}LICENSE",
         f"{prefix}README.md",
         f"{prefix}pyproject.toml",
         f"{prefix}src/lacuna_options/__init__.py",

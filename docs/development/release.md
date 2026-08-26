@@ -48,14 +48,14 @@ another CPython API that the stable ABI cannot represent safely.
 7. Result-schema fixtures and method versions are reviewed.
 8. Wheels build for the platform matrix.
 9. Each wheel installs in a clean environment and passes an import/native smoke test.
-10. Source distribution contains Rust sources, Python sources, stubs, licenses, and required docs.
+10. Source distribution contains Rust sources, Python sources, stubs, the MIT license, and required docs.
 11. Changelog is complete and target APIs are not presented as shipped.
 12. Security advisories and dependency changes are reviewed.
 13. Each independently versioned extension passes its own format/type/test/API gate and clean joint
     installation with the exact core wheel.
 
 CI rebuilds the wheel through the source distribution (`maturin build --sdist`) so omitted Rust,
-Python, typing, license, or schema files fail before release. The package job then installs that
+Python, typing, MIT license, or schema files fail before release. The package job then installs that
 wheel into a separate environment and checks version agreement, the native module, packaged JSON
 Schema, and CLI diagnostics.
 

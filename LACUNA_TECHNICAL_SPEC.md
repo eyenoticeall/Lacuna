@@ -10,7 +10,7 @@
 **Primary language:** Python  
 **Performance core:** Rust  
 **Primary data model:** Apache Arrow-compatible columnar data  
-**License recommendation:** MIT OR Apache-2.0
+**License:** MIT
 
 ---
 
@@ -2908,20 +2908,16 @@ Escape user-supplied labels/metadata before HTML rendering.
 
 # 36. Licensing and Governance
 
-## 36.1 License recommendation
+## 36.1 License decision
 
-**MIT OR Apache-2.0** is a strong choice.
+Lacuna uses the **MIT License** only.
 
-Benefits:
+This keeps use, modification, redistribution, and commercial adoption straightforward across the
+Python and Rust packages. Repository metadata, contribution terms, and every future distribution
+must identify MIT as the sole project license and include the MIT license text.
 
-- permissive commercial use;
-- familiar in Rust;
-- broad contribution compatibility;
-- Apache-2.0 offers an explicit patent grant.
-
-Alternatively, choose Apache-2.0 alone for simplicity.
-
-Avoid copyleft unless it is a deliberate strategic decision.
+Releases published before this decision retain the license grants under which they were originally
+distributed. Changing the license on later versions does not revoke those existing grants.
 
 ## 36.2 Governance
 

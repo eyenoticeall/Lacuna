@@ -8,7 +8,8 @@ version = "0.12.0"
 description = "Open-source quantitative research validation for finding where alpha breaks."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "MIT OR Apache-2.0"
+license = "MIT"
+license-files = ["LICENSE"]
 keywords = [
   "backtesting",
   "finance",
@@ -20,7 +21,6 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Intended Audience :: Financial and Insurance Industry",
-  "License :: OSI Approved :: Apache Software License",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
@@ -83,8 +83,7 @@ bindings = "pyo3"
 strip = true
 include = [
   { path = "CHANGELOG.md", format = "sdist" },
-  { path = "LICENSE-APACHE", format = "sdist" },
-  { path = "LICENSE-MIT", format = "sdist" },
+  { path = "LICENSE", format = "sdist" },
   { path = "schemas/**/*", format = "sdist" },
 ]
 

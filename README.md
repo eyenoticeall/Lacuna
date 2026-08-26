@@ -15,7 +15,7 @@
     <code>Python 3.11+</code>&nbsp;&nbsp;
     <code>Rust 2024</code>&nbsp;&nbsp;
     <code>Arrow-native</code>&nbsp;&nbsp;
-    <code>MIT OR Apache-2.0</code>
+    <code>MIT</code>
   </p>
 </div>
 
@@ -417,7 +417,7 @@ Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete 
 
 ## License
 
-Lacuna is dual-licensed under the [MIT License](LICENSE-MIT) or [Apache License 2.0](LICENSE-APACHE), at your option.
+Lacuna is released under the [MIT License](LICENSE).
 
 ---
 

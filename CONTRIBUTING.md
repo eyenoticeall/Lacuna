@@ -46,4 +46,4 @@ See the [native-core guide](docs/development/native-core.md) for ownership, Arro
 
 Keep changes reviewable and update `CHANGELOG.md` under **Unreleased** for user-visible behavior. Cross-cutting architectural changes should update [the architecture decision record](docs/reference/architecture-decisions.md) with context, consequences, migration needs, and revisit triggers.
 
-By contributing, you agree that your contribution may be distributed under the project's MIT OR Apache-2.0 dual license.
+By contributing, you agree that your contribution may be distributed under the project's MIT License.
