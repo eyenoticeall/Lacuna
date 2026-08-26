@@ -24,6 +24,15 @@ from lacuna.audit import (
     default_rules,
     run_audit,
 )
+from lacuna.audit_profiles import (
+    AuditProfile,
+    AuditScope,
+    EvidenceDisposition,
+    EvidenceRequirement,
+    run_standard_audit,
+    standard_audit,
+    standard_profile,
+)
 from lacuna.benchmark import (
     BenchmarkCase,
     BenchmarkConfig,
@@ -63,8 +72,10 @@ __all__ = [
     "Applicability",
     "ApplicabilityState",
     "AuditContext",
+    "AuditProfile",
     "AuditReport",
     "AuditRule",
+    "AuditScope",
     "BenchmarkCase",
     "BenchmarkConfig",
     "BenchmarkSuite",
@@ -74,6 +85,8 @@ __all__ = [
     "Config",
     "ConfigurationError",
     "DataContractError",
+    "EvidenceDisposition",
+    "EvidenceRequirement",
     "ExperimentRegistry",
     "Finding",
     "FindingState",
@@ -106,7 +119,10 @@ __all__ = [
     "robustness",
     "run_audit",
     "run_benchmarks",
+    "run_standard_audit",
     "signal",
+    "standard_audit",
+    "standard_profile",
     "validation",
     "verify_bundle",
 ]

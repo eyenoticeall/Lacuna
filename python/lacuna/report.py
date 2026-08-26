@@ -108,13 +108,25 @@ def render_markdown(result: AnalysisResult) -> str:
     metrics = result.metrics
     score = metrics.get("robustness_score")
     coverage = metrics.get("evidence_coverage")
+    if score is None:
+        summary_lines = [
+            "- Assessment model: **Categorical evidence profile — No universal score**",
+            "- Required evidence coverage: "
+            f"**{_markdown_cell(metrics.get('required_evidence_coverage', coverage))}**",
+            "- Optional evidence coverage: "
+            f"**{_markdown_cell(metrics.get('optional_evidence_coverage'))}**",
+        ]
+    else:
+        summary_lines = [
+            f"- Robustness score: **{_markdown_cell(score)} / 100**",
+            f"- Evidence coverage: **{_markdown_cell(coverage)}**",
+        ]
     lines = [
         "# Lacuna audit",
         "",
         "## Summary",
         "",
-        f"- Robustness score: **{_markdown_cell(score)} / 100**",
-        f"- Evidence coverage: **{_markdown_cell(coverage)}**",
+        *summary_lines,
         f"- Failures: **{_markdown_cell(metrics.get('failure_count'))}**",
         f"- Warnings: **{_markdown_cell(metrics.get('warning_count'))}**",
         f"- Unknown checks: **{_markdown_cell(metrics.get('unknown_count'))}**",
@@ -188,8 +200,23 @@ def render_html(result: AnalysisResult) -> str:
         f"{_html_table(result.table(name))}</section>"
         for name in sorted(result.tables)
     )
-    score = _html_text(result.metrics.get("robustness_score"))
+    raw_score = result.metrics.get("robustness_score")
     coverage = _html_text(result.metrics.get("evidence_coverage"))
+    if raw_score is None:
+        summary = (
+            "<div class='metric'>Assessment<strong>No universal score</strong></div>"
+            "<div class='metric'>Required evidence coverage"
+            f"<strong>{_html_text(result.metrics.get('required_evidence_coverage', coverage))}"
+            "</strong></div>"
+            "<div class='metric'>Optional evidence coverage"
+            f"<strong>{_html_text(result.metrics.get('optional_evidence_coverage'))}</strong></div>"
+        )
+    else:
+        score = _html_text(raw_score)
+        summary = (
+            f"<div class='metric'>Score<strong>{score} / 100</strong></div>"
+            f"<div class='metric'>Evidence coverage<strong>{coverage}</strong></div>"
+        )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -229,10 +256,7 @@ def render_html(result: AnalysisResult) -> str:
     <h1>Lacuna audit</h1>
     <p>Structured quantitative research evidence.</p>
   </header>
-  <div class="summary">
-    <div class="metric">Score<strong>{score} / 100</strong></div>
-    <div class="metric">Evidence coverage<strong>{coverage}</strong></div>
-  </div>
+  <div class="summary">{summary}</div>
   <h2>Findings</h2>{findings or "<p><em>No findings.</em></p>"}
   <h2>Evidence tables</h2>{tables}
   <h2>Provenance</h2>
@@ -267,6 +291,9 @@ class AuditReport:
         names = (
             "robustness_score",
             "evidence_coverage",
+            "required_evidence_coverage",
+            "optional_evidence_coverage",
+            "required_evidence_complete",
             "failure_count",
             "warning_count",
             "unknown_count",
