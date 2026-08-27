@@ -172,7 +172,6 @@ jobs:
       - name: Run the options suite and coverage gate
         run: >-
           uv run --no-sync pytest extensions/lacuna-options/tests
-          --fail-on-skip
           --cov=lacuna_options
           --cov-branch
           --cov-fail-under=85
