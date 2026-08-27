@@ -190,6 +190,7 @@ def test_timed_fingerprint_worker_skips_python_memory_trace() -> None:
         "migration.costs.stress.public",
         "migration.costs.capacity.public",
         "migration.costs.break_even.public",
+        "migration.validation.permutation.public",
     ),
 )
 def test_private_cost_cases_measure_public_calls_without_extending_benchmark_v6(

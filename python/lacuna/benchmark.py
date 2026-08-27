@@ -45,6 +45,7 @@ from lacuna.study import SignalStudy
 from lacuna.types import AnalysisResult
 from lacuna.validation import (
     bootstrap,
+    permutation_test,
     probability_of_backtest_overfitting,
     reality_check,
     superior_predictive_ability,
@@ -68,6 +69,9 @@ _PRIVATE_MIGRATION_COST_CASES = {
     "migration.costs.break_even.public",
     "migration.costs.capacity.public",
     "migration.costs.stress.public",
+}
+_PRIVATE_MIGRATION_VALIDATION_CASES = {
+    "migration.validation.permutation.public",
 }
 
 
@@ -939,6 +943,27 @@ def _run_benchmarks(
         }
         cases.extend(
             (name, *private_cost_cases[name]) for name in sorted(requested_private_cost_cases)
+        )
+    requested_private_validation_cases = (
+        set()
+        if case_names is None
+        else case_names.intersection(_PRIVATE_MIGRATION_VALIDATION_CASES)
+    )
+    if "migration.validation.permutation.public" in requested_private_validation_cases:
+        cases.append(
+            (
+                "migration.validation.permutation.public",
+                lambda: permutation_test(
+                    inference_matrix[:, :2],
+                    paired_with="benchmark",
+                    statistic="pearson",
+                    scheme="unrestricted",
+                    permutations=resolved.bootstrap_resamples * 2,
+                    seed=resolved.seed,
+                ),
+                inference_matrix.shape[0] * resolved.bootstrap_resamples * 2,
+                "permuted_rows/second",
+            )
         )
     native = native_status()
     if use_native and native.available:
