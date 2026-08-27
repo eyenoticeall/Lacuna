@@ -259,7 +259,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-07 | Built-in permutation schemes/statistics | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
 | R-08 | PBO/CSCV combination evaluation, `O(KNM)` | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | compact output, representative `M` |
 | R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | one-plan Polars reference |
-| R-10 | Membership portion of turnover | POLARS_FIRST | P1 | Medium | High | Medium | PROPOSED | encoded IDs/self-join reference |
+| R-10 | Membership portion of turnover | KEEP_PYTHON | P1 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | endpoint self-joins |
 | R-11 | Prior-only expanding/rolling regime quantiles | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | exact quantile reference, F-03a |
 | R-12 | Event-window alignment/path extraction | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | range/as-of reference |
 | R-13 | Event-response cluster resampling | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
@@ -467,14 +467,17 @@ aggregation remains Polars.
 ### R-10: membership turnover reducer
 
 The rank-turnover and signal-autocorrelation portions are already expressed as Polars joins and
-aggregations. The native candidate is only membership churn: the current path builds Python sets for
-every period and bucket, then iterates over `L × G × B`.
+aggregations. Membership churn now uses exact-lag endpoint self-joins, grouped membership sizes and
+intersections, and an explicit period/bucket/lag grid. This removes Python sets and the prior
+`L × G × B` reconstruction loop while preserving absent versus empty buckets, changing universes,
+denominator-zero behavior, stable time ordering, and top/bottom bucket projection.
 
-Dictionary-encode instrument identities in Python/Polars, sort integer IDs by period and bucket,
-and pass values plus offsets to a native intersection/symmetric-difference reducer. Return counts
-and turnover values per lag/period/bucket. Preserve exact-lag behavior, absent versus empty buckets,
-changing universes, denominator-zero behavior, stable time ordering, and top/bottom bucket
-projection.
+At 100,000 rows, 200 periods, 500 instruments, five buckets, and three lags, the exact public
+checksum was preserved while median latency fell from 77.84 ms to 42.10 ms (1.85 times faster).
+Incremental RSS fell by 13.3%, and traced Python peak memory fell by 83.8%. Because the optimized
+public call is below the 50 ms representative-tier threshold and no residual native kernel is
+material, R-10 is `OPTIMIZED_NON_NATIVE`. Reopen only if a new workload isolates a material
+sorted-intersection bottleneck.
 
 ### R-11: exact prior-only trailing regime quantiles
 
