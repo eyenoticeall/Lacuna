@@ -92,6 +92,9 @@ _PRIVATE_MIGRATION_EVENT_CASES = {
     "migration.events.response.public",
     "migration.events.windows.public",
 }
+_PRIVATE_MIGRATION_BIAS_CASES = {
+    "migration.bias.universe_drift.public",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1220,6 +1223,39 @@ def _run_benchmarks(
                 ),
                 len(response_anchors) * resolved.bootstrap_resamples * 4,
                 "cluster_offset_resamples/second",
+            )
+        )
+    requested_private_bias_cases = (
+        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_BIAS_CASES)
+    )
+    if "migration.bias.universe_drift.public" in requested_private_bias_cases:
+        universe_count = min(4, resolved.instruments)
+        instruments_per_universe = max(5, resolved.instruments // universe_count)
+        universe_snapshots = pl.DataFrame(
+            [
+                {
+                    "universe": f"universe-{universe_id}",
+                    "snapshot_time": snapshot,
+                    "instrument": instrument_id,
+                }
+                for universe_id in range(universe_count)
+                for snapshot in range(resolved.periods)
+                for instrument_id in range(instruments_per_universe)
+                if (instrument_id + snapshot) % 5 != 0
+            ]
+        )
+        cases.append(
+            (
+                "migration.bias.universe_drift.public",
+                partial(
+                    bias.universe_drift,
+                    universe_snapshots,
+                    universe="universe",
+                    source_status=bias.SurvivorshipStatus.CONFIRMED_SAFE,
+                    warning_threshold=0.5,
+                ),
+                universe_snapshots.height,
+                "membership_rows/second",
             )
         )
     native = native_status()
