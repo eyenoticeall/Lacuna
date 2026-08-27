@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 from types import MappingProxyType
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -394,6 +394,193 @@ def _assign_bucket_group(
     return ordered.with_columns(pl.Series("bucket", assignments)), 0
 
 
+def _position_bucket(position: pl.Expr, boundaries: Sequence[float]) -> pl.Expr:
+    bucket = pl.lit(1, dtype=pl.Int32)
+    for boundary in boundaries[1:-1]:
+        bucket += (position >= boundary).cast(pl.Int32)
+    return bucket
+
+
+def _polars_bucket_plan(
+    frame: pl.DataFrame,
+    spec: BucketSpec,
+    *,
+    by: tuple[str, ...],
+    ascending: bool,
+    small_group_policy: SmallGroupPolicy,
+) -> tuple[pl.DataFrame, int, int, int]:
+    """Assign buckets in one columnar plan while retaining the literal oracle above."""
+
+    assert spec.count is not None
+    ordered = frame.sort(
+        [*by, "signal", "instrument"],
+        descending=[*[False] * len(by), not ascending, False],
+    )
+    group_rows = pl.len().alias("_group_rows")
+    status: pl.DataFrame
+    lower_expression: pl.Expr | None = None
+    if spec.kind == "quantile" and spec.split_at is None:
+        status = (
+            ordered.group_by(list(by), maintain_order=True)
+            .agg(group_rows)
+            .with_columns((pl.col("_group_rows") >= spec.count).alias("_valid_group"))
+        )
+    elif spec.kind == "quantile":
+        assert spec.split_at is not None
+        lower_expression = (
+            pl.col("signal") <= spec.split_at
+            if spec.equal_to == "lower"
+            else pl.col("signal") < spec.split_at
+        )
+        lower_count = spec.count // 2
+        upper_count = spec.count - lower_count
+        status = (
+            ordered.group_by(list(by), maintain_order=True)
+            .agg(
+                group_rows,
+                lower_expression.sum().alias("_lower_rows"),
+                (~lower_expression).sum().alias("_upper_rows"),
+            )
+            .with_columns(
+                (
+                    (pl.col("_lower_rows") >= lower_count) & (pl.col("_upper_rows") >= upper_count)
+                ).alias("_valid_group")
+            )
+        )
+    elif spec.kind == "equal_width":
+        status = (
+            ordered.group_by(list(by), maintain_order=True)
+            .agg(
+                group_rows,
+                pl.col("signal").min().alias("_group_min"),
+                pl.col("signal").max().alias("_group_max"),
+            )
+            .with_columns((pl.col("_group_min") != pl.col("_group_max")).alias("_valid_group"))
+        )
+    elif spec.kind == "edges":
+        first, last = spec.boundaries[0], spec.boundaries[-1]
+        in_range = pl.col("signal").is_between(first, last, closed="both")
+        status = ordered.group_by(list(by), maintain_order=True).agg(
+            group_rows,
+            (~in_range).sum().alias("_out_of_range"),
+        )
+        status = status.with_columns(
+            (pl.col("_out_of_range") == 0 if spec.out_of_range == "raise" else pl.lit(True)).alias(
+                "_valid_group"
+            )
+        )
+    else:
+        status = (
+            ordered.group_by(list(by), maintain_order=True)
+            .agg(group_rows)
+            .with_columns(pl.lit(True).alias("_valid_group"))
+        )
+
+    invalid = status.filter(~pl.col("_valid_group"))
+    dropped_group_count = invalid.height
+    dropped_groups = int(invalid.get_column("_group_rows").sum() or 0)
+    if dropped_group_count and small_group_policy == "raise":
+        if spec.kind == "quantile" and spec.split_at is None:
+            smallest = int(cast(int, invalid.get_column("_group_rows").min()))
+            raise DataContractError(
+                f"bucket group has {smallest} rows but requires at least {spec.count}"
+            )
+        if spec.kind == "quantile":
+            raise DataContractError(
+                "split-aware quantile group lacks rows on one side of the split"
+            )
+        if spec.kind == "equal_width":
+            raise DataContractError("equal-width buckets are undefined for a constant group")
+        excluded = int(invalid.get_column("_out_of_range").sum() or 0)
+        raise DataContractError(f"numeric bucket edges exclude {excluded} finite signal rows")
+
+    working = ordered.join(
+        status.filter(pl.col("_valid_group")),
+        on=list(by),
+        how="inner",
+    ).sort(
+        [*by, "signal", "instrument"],
+        descending=[*[False] * len(by), not ascending, False],
+    )
+    out_of_range = 0
+    if spec.kind == "edges" and spec.out_of_range == "drop":
+        first, last = spec.boundaries[0], spec.boundaries[-1]
+        in_range = pl.col("signal").is_between(first, last, closed="both")
+        out_of_range = int(working.select((~in_range).sum()).item())
+        working = working.filter(in_range)
+
+    if spec.kind == "quantile" and spec.split_at is None:
+        if spec.tie_policy == "balanced":
+            position = (pl.int_range(0, pl.len()).over(list(by)).cast(pl.Float64) + 0.5) / pl.col(
+                "_group_rows"
+            )
+        else:
+            position = (pl.col("signal").rank(method="average").over(list(by)) - 0.5) / pl.col(
+                "_group_rows"
+            )
+        boundaries = spec.boundaries or tuple(np.linspace(0.0, 1.0, spec.count + 1))
+        working = working.with_columns(_position_bucket(position, boundaries).alias("bucket"))
+    elif spec.kind == "quantile":
+        assert lower_expression is not None
+        lower_count = spec.count // 2
+        upper_count = spec.count - lower_count
+        working = working.with_columns(
+            pl.when(lower_expression)
+            .then(pl.lit(0, dtype=pl.Int8))
+            .otherwise(pl.lit(1, dtype=pl.Int8))
+            .alias("_bucket_side")
+        )
+        side_keys = [*by, "_bucket_side"]
+        if spec.tie_policy == "balanced":
+            side_position = (
+                pl.int_range(0, pl.len()).over(side_keys).cast(pl.Float64) + 0.5
+            ) / pl.len().over(side_keys)
+        else:
+            side_position = (
+                pl.col("signal").rank(method="average").over(side_keys) - 0.5
+            ) / pl.len().over(side_keys)
+        lower_bucket = _position_bucket(
+            side_position,
+            tuple(np.linspace(0.0, 1.0, lower_count + 1)),
+        )
+        upper_bucket = _position_bucket(
+            side_position,
+            tuple(np.linspace(0.0, 1.0, upper_count + 1)),
+        )
+        working = working.with_columns(
+            pl.when(pl.col("_bucket_side") == 0)
+            .then(lower_bucket)
+            .otherwise(upper_bucket + lower_count)
+            .cast(pl.Int32)
+            .alias("bucket")
+        )
+    elif spec.kind == "equal_width":
+        bucket = pl.lit(1, dtype=pl.Int32)
+        width = (pl.col("_group_max") - pl.col("_group_min")) / spec.count
+        for edge_index in range(1, spec.count):
+            threshold_expression = pl.col("_group_min") + width * edge_index
+            bucket += (pl.col("signal") >= threshold_expression).cast(pl.Int32)
+        working = working.with_columns(bucket.alias("bucket"))
+    elif spec.kind == "edges":
+        bucket = pl.lit(1, dtype=pl.Int32)
+        for fixed_edge in spec.boundaries[1:-1]:
+            bucket += (pl.col("signal") >= fixed_edge).cast(pl.Int32)
+        working = working.with_columns(bucket.alias("bucket"))
+    else:
+        assert spec.split_at is not None
+        lower = (
+            pl.col("signal") <= spec.split_at
+            if spec.equal_to == "lower"
+            else pl.col("signal") < spec.split_at
+        )
+        working = working.with_columns(
+            pl.when(lower).then(pl.lit(1)).otherwise(pl.lit(2)).cast(pl.Int32).alias("bucket")
+        )
+
+    output = working.select([*frame.columns, "bucket"]).sort([*by, "bucket", "instrument"])
+    return output, dropped_groups, dropped_group_count, out_of_range
+
+
 def bucketize(
     signal: object,
     *,
@@ -430,30 +617,19 @@ def bucketize(
     if frame.is_empty():
         raise DataContractError("signal has no finite observations")
 
-    assigned: list[pl.DataFrame] = []
-    dropped_groups = 0
-    dropped_group_count = 0
-    out_of_range = 0
-    for group in frame.sort([*normalized_by, "instrument"]).partition_by(
-        list(normalized_by), maintain_order=True
-    ):
-        try:
-            result, excluded = _assign_bucket_group(group, selected, ascending=ascending)
-        except DataContractError:
-            if small_group_policy == "raise":
-                raise
-            dropped_groups += group.height
-            dropped_group_count += 1
-            continue
-        out_of_range += excluded
-        assigned.append(result)
-    if not assigned:
+    output, dropped_groups, dropped_group_count, out_of_range = _polars_bucket_plan(
+        frame,
+        selected,
+        by=normalized_by,
+        ascending=ascending,
+        small_group_policy=small_group_policy,
+    )
+    if dropped_group_count and output.is_empty():
         if selected.kind == "quantile":
             raise DataContractError(
                 f"no groups contain at least {selected.count} observations for bucket assignment"
             )
         raise DataContractError("no signal groups remain after bucket assignment")
-    output = pl.concat(assigned, how="vertical").sort([*normalized_by, "bucket", "instrument"])
     counts = (
         output.group_by([*normalized_by, "bucket"], maintain_order=True)
         .len(name="n_observations")

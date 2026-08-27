@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 
+from lacuna._signal_transform import _assign_bucket_group
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.signal import BucketSpec, bucketize, neutralize
 
@@ -92,6 +93,63 @@ def test_grouped_bucketize_requires_availability_evidence_or_marks_unknown() -> 
             by=("time", "sector"),
             available_time="available",
         )
+
+
+@pytest.mark.parametrize(
+    "spec",
+    (
+        BucketSpec.quantiles(4),
+        BucketSpec.quantiles(4, tie_policy="preserve"),
+        BucketSpec.quantiles(4, split_at=0.0),
+        BucketSpec.equal_width(4),
+        BucketSpec.edges((-4.0, -1.0, 1.0, 4.0), out_of_range="drop"),
+        BucketSpec.threshold(0.0, equal_to="lower"),
+    ),
+)
+@pytest.mark.parametrize("ascending", (True, False))
+def test_polars_bucket_plan_matches_literal_group_oracle(
+    spec: BucketSpec,
+    ascending: bool,
+) -> None:
+    rng = np.random.default_rng(91_009)
+    frame = pl.DataFrame(
+        {
+            "time": np.repeat(np.arange(5), 24),
+            "instrument": np.tile(np.arange(24), 5),
+            "signal": np.round(rng.normal(size=120), 1) * 2.0,
+        }
+    )
+    expected_groups: list[pl.DataFrame] = []
+    for group in (
+        frame.rename({"time": "observation_time"})
+        .sort(["observation_time", "instrument"])
+        .partition_by("observation_time", maintain_order=True)
+    ):
+        expected, _ = _assign_bucket_group(group, spec, ascending=ascending)
+        expected_groups.append(expected)
+    expected = pl.concat(expected_groups).sort(["observation_time", "bucket", "instrument"])
+
+    observed = bucketize(frame, spec=spec, ascending=ascending).frame
+    assert observed.to_dicts() == expected.to_dicts()
+
+
+def test_polars_bucket_plan_drops_only_invalid_groups_under_explicit_policy() -> None:
+    frame = pl.DataFrame(
+        {
+            "time": [0, 0, 1, 1, 1, 1],
+            "instrument": [0, 1, 0, 1, 2, 3],
+            "signal": [0.0, 1.0, 0.0, 1.0, 2.0, 3.0],
+        }
+    )
+    result = bucketize(
+        frame,
+        spec=BucketSpec.quantiles(4),
+        small_group_policy="drop",
+    )
+
+    assert result.frame.get_column("observation_time").unique().to_list() == [1]
+    assert result.evidence.metrics["excluded_bucket_rows"] == 2
+    assert result.evidence.metrics["excluded_groups"] == 1
 
 
 def test_neutralization_matches_hand_residuals_and_weighted_orthogonality() -> None:
