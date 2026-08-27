@@ -87,6 +87,9 @@ _PRIVATE_MIGRATION_SIGNAL_CASES = {
 _PRIVATE_MIGRATION_REGIME_CASES = {
     "migration.regime.quantiles.rolling",
 }
+_PRIVATE_MIGRATION_EVENT_CASES = {
+    "migration.events.windows.public",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1124,6 +1127,39 @@ def _run_benchmarks(
                 ),
                 resolved.rows * 252,
                 "history_cells/second",
+            )
+        )
+    requested_private_event_cases = (
+        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_EVENT_CASES)
+    )
+    if "migration.events.windows.public" in requested_private_event_cases:
+        event_anchors = list(range(5, max(6, resolved.periods - 10), 20))
+        event_instruments = range(min(resolved.instruments, 500))
+        migration_events = pl.DataFrame(
+            [
+                {
+                    "event_id": f"event-{instrument_id}-{anchor_time}",
+                    "instrument": instrument_id,
+                    "event_time": anchor_time,
+                    "available_time": anchor_time,
+                }
+                for instrument_id in event_instruments
+                for anchor_time in event_anchors
+            ]
+        )
+        cases.append(
+            (
+                "migration.events.windows.public",
+                partial(
+                    events.event_windows,
+                    migration_events,
+                    prices,
+                    before=5,
+                    after=10,
+                    price_adjustment="raw",
+                ),
+                migration_events.height * 16,
+                "window_rows/second",
             )
         )
     native = native_status()
