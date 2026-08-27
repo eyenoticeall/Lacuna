@@ -128,7 +128,9 @@ jobs:
       - name: Run the complete Python suite
         env:
           PYTEST_ARGS: ${{ matrix.pytest-args }}
-        run: uv run --no-sync pytest ${PYTEST_ARGS}
+        run: |
+          read -r -a pytest_args <<< "$PYTEST_ARGS"
+          uv run --no-sync pytest "${pytest_args[@]}"
       - name: Retain test evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -261,7 +263,9 @@ jobs:
       - name: Test the affected extra with no skips
         env:
           EXTRA_TESTS: ${{ matrix.tests }}
-        run: uv run --no-sync pytest --fail-on-skip ${EXTRA_TESTS} --junitxml=junit.xml
+        run: |
+          read -r -a extra_tests <<< "$EXTRA_TESTS"
+          uv run --no-sync pytest --fail-on-skip "${extra_tests[@]}" --junitxml=junit.xml
       - name: Retain extra-specific evidence
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
