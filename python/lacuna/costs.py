@@ -14,6 +14,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from lacuna._carriers import CostComponentBatch
 from lacuna._frames import (
     FrameDiagnostics,
     eager_frame,
@@ -1306,23 +1307,38 @@ def _complete_non_negative_or_signed_column(frame: pl.DataFrame, *, column: str)
     return cast(FloatArray, values.to_numpy())
 
 
-def _period_values(
+def _period_aggregate_matrix(
     frame: pl.DataFrame,
     *,
     period: str,
-    values: FloatArray,
-) -> FloatArray:
+    values: Mapping[str, FloatArray],
+) -> dict[str, FloatArray]:
+    """Aggregate several aligned vectors in one stable Polars grouping plan."""
+
     if period not in frame.columns:
         raise DataContractError(f"trades is missing period column {period!r}")
+    aliases: dict[str, str] = {}
+    occupied = {period}
+    expressions: list[pl.Series] = []
+    for index, (name, array) in enumerate(values.items()):
+        if array.ndim != 1 or array.size != frame.height:
+            raise DataContractError("period aggregate values must align to the trade frame")
+        alias = f"__lacuna_period_value_{index}"
+        while alias in occupied:
+            alias += "_"
+        occupied.add(alias)
+        aliases[name] = alias
+        expressions.append(pl.Series(alias, array))
     grouped = (
         frame.select(period)
-        .with_columns(pl.Series("__value", values))
+        .with_columns(expressions)
         .group_by(period, maintain_order=True)
-        .agg(pl.col("__value").sum())
-        .get_column("__value")
-        .to_numpy()
+        .agg(*(pl.col(alias).sum() for alias in aliases.values()))
     )
-    return cast(FloatArray, grouped)
+    return {
+        name: cast(FloatArray, grouped.get_column(alias).to_numpy())
+        for name, alias in aliases.items()
+    }
 
 
 def _sharpe(values: FloatArray, *, annualization: float | None) -> float | None:
@@ -1430,49 +1446,49 @@ def stress(
         base_components.update(estimate.components)
         base_fingerprints.append(estimate.input_fingerprint)
         findings.extend(estimate.findings)
+    base_batch = CostComponentBatch.from_components(
+        base_components,
+        row_count=data.frame.height,
+    )
+    base_row_totals = base_batch.row_totals
+    known_rows = base_batch.row_validity
+    unknown_rows = int((~known_rows).sum())
+    known_notional = float(np.sum(data.notional[known_rows], dtype=np.float64))
+    known_base_cost = float(np.sum(base_row_totals[known_rows], dtype=np.float64))
+    base_component_totals = base_batch.component_totals()
+    period_aggregates: dict[str, FloatArray] | None = None
+    if unknown_rows == 0:
+        period_aggregates = _period_aggregate_matrix(
+            data.frame,
+            period=period,
+            values={"gross": pnl, "notional": data.notional, "base": base_row_totals},
+        )
     for scenario in resolved_scenarios:
-        components: dict[str, tuple[float | None, ...]] = {
-            "commission": tuple(
-                float(value) for value in data.notional * (scenario.commission_bps / 10_000.0)
-            ),
-            "spread": tuple(
-                float(value) for value in data.notional * (scenario.spread_bps / 20_000.0)
-            ),
-            "slippage": tuple(
-                float(value) for value in data.notional * (scenario.slippage_bps / 10_000.0)
-            ),
-            **base_components,
-        }
-        per_trade_costs: list[float | None] = []
-        for index in range(data.frame.height):
-            values = [component[index] for component in components.values()]
-            per_trade_costs.append(
-                None
-                if any(value is None for value in values)
-                else float(sum(cast(float, value) for value in values))
-            )
-        unknown_rows = sum(value is None for value in per_trade_costs)
-        known_total_cost = float(sum(value for value in per_trade_costs if value is not None))
-        total_cost = None if unknown_rows else known_total_cost
+        commission_rate = scenario.commission_bps / 10_000.0
+        spread_rate = scenario.spread_bps / 20_000.0
+        slippage_rate = scenario.slippage_bps / 10_000.0
+        linear_rate = commission_rate + spread_rate + slippage_rate
         component_totals: dict[str, JsonValue] = {
-            name: (
-                None
-                if any(value is None for value in values)
-                else float(sum(cast(float, value) for value in values))
-            )
-            for name, values in components.items()
+            "commission": total_notional * commission_rate,
+            "spread": total_notional * spread_rate,
+            "slippage": total_notional * slippage_rate,
+            **base_component_totals,
         }
+        known_total_cost = known_base_cost + known_notional * linear_rate
+        total_cost = None if unknown_rows else known_total_cost
         if total_cost is None:
             net_pnl: float | None = None
             net_return: float | None = None
             net_sharpe: float | None = None
             status = "unknown_cost"
         else:
-            net_values = pnl - np.asarray(per_trade_costs, dtype=np.float64)
             net_pnl = gross_total - total_cost
             net_return = None if capital is None else net_pnl / capital
+            assert period_aggregates is not None
             net_sharpe = _sharpe(
-                _period_values(data.frame, period=period, values=net_values),
+                period_aggregates["gross"]
+                - period_aggregates["base"]
+                - period_aggregates["notional"] * linear_rate,
                 annualization=annualization,
             )
             status = "ok"
@@ -1556,40 +1572,47 @@ def stress(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _BreakEvenAggregates:
+    gross_total: float
+    notional_total: float
+    period_gross: FloatArray | None
+    period_notional: FloatArray | None
+
+
 def _metric_at_cost(
     *,
-    data: _TradeData,
-    gross_pnl: FloatArray,
+    aggregates: _BreakEvenAggregates,
     cost_bps: float,
     metric: BreakEvenMetric,
     threshold: float,
-    period: str,
     annualization: float | None,
     capital: float | None,
 ) -> tuple[float, float]:
     del threshold
-    costs = data.notional * (cost_bps / 10_000.0)
-    net = gross_pnl - costs
-    net_total = float(net.sum())
+    total_cost = aggregates.notional_total * (cost_bps / 10_000.0)
+    net_total = aggregates.gross_total - total_cost
     if metric == "net_pnl":
-        return net_total, float(costs.sum())
+        return net_total, total_cost
     if capital is None:
         raise MethodContractError(f"metric={metric!r} requires capital")
     if metric == "net_return":
-        return net_total / capital, float(costs.sum())
-    periods = _period_values(data.frame, period=period, values=net)
+        return net_total / capital, total_cost
+    if aggregates.period_gross is None or aggregates.period_notional is None:
+        raise RuntimeError("period aggregates are required for path-dependent break-even metrics")
+    periods = aggregates.period_gross - aggregates.period_notional * (cost_bps / 10_000.0)
     if annualization is None:
         raise MethodContractError(f"metric={metric!r} requires annualization")
     if metric == "net_sharpe":
         observed = _sharpe(periods / capital, annualization=annualization)
         if observed is None:
             raise DataContractError("net Sharpe is undefined for this sample")
-        return observed, float(costs.sum())
+        return observed, total_cost
     returns = periods / capital
     if bool((returns <= -1.0).any()):
         raise DataContractError("CAGR is undefined when a modeled period return is <= -100%")
     growth = float(np.prod(1.0 + returns))
-    return growth ** (annualization / periods.size) - 1.0, float(costs.sum())
+    return growth ** (annualization / periods.size) - 1.0, total_cost
 
 
 def break_even_cost(
@@ -1632,17 +1655,30 @@ def break_even_cost(
         trades, columns=resolved_columns, quantity_convention=quantity_convention
     )
     pnl = _gross_pnl(data, column=gross_pnl)
+    if metric != "net_pnl" and capital is None:
+        raise MethodContractError(f"metric={metric!r} requires capital")
+    period_aggregates: dict[str, FloatArray] | None = None
+    if metric in {"net_sharpe", "cagr"}:
+        period_aggregates = _period_aggregate_matrix(
+            data.frame,
+            period=period,
+            values={"gross": pnl, "notional": data.notional},
+        )
+    aggregates = _BreakEvenAggregates(
+        gross_total=float(np.sum(pnl, dtype=np.float64)),
+        notional_total=float(np.sum(data.notional, dtype=np.float64)),
+        period_gross=None if period_aggregates is None else period_aggregates["gross"],
+        period_notional=None if period_aggregates is None else period_aggregates["notional"],
+    )
 
     check_points = np.linspace(lower_bps, upper_bps, num=33)
     checked: list[tuple[float, float, float]] = []
     for point in check_points:
         value, total_cost = _metric_at_cost(
-            data=data,
-            gross_pnl=pnl,
+            aggregates=aggregates,
             cost_bps=float(point),
             metric=metric,
             threshold=threshold,
-            period=period,
             annualization=annualization,
             capital=capital,
         )
@@ -1690,12 +1726,10 @@ def break_even_cost(
         while high - low > tolerance_bps and iterations < max_iterations:
             midpoint = (low + high) / 2.0
             value, total_cost = _metric_at_cost(
-                data=data,
-                gross_pnl=pnl,
+                aggregates=aggregates,
                 cost_bps=midpoint,
                 metric=metric,
                 threshold=threshold,
-                period=period,
                 annualization=annualization,
                 capital=capital,
             )
@@ -1991,28 +2025,55 @@ def capacity_curve(
     known = valid_market & available
     cost_known = known | (data.absolute_quantity == 0.0)
     coverage = float(known.mean())
+    base_participation: FloatArray = np.full(data.frame.height, np.nan, dtype=np.float64)
+    base_participation[known] = data.absolute_quantity[known] / volumes[known]
+    base_participation[(data.absolute_quantity == 0.0) & ~known] = 0.0
+    base_impact_unit: FloatArray = np.zeros(data.frame.height, dtype=np.float64)
+    base_impact_unit[known] = (
+        data.notional[known] * volatilities[known] * np.sqrt(base_participation[known])
+    )
+    base_gross_total = float(np.sum(base_pnl, dtype=np.float64))
+    base_notional_total = float(np.sum(data.notional, dtype=np.float64))
+    known_impact_unit_total = float(np.sum(base_impact_unit[cost_known], dtype=np.float64))
+    incomplete = not bool(cost_known.all())
+    period_aggregates: dict[str, FloatArray] | None = None
+    if not incomplete:
+        period_aggregates = _period_aggregate_matrix(
+            data.frame,
+            period=period,
+            values={
+                "gross": base_pnl,
+                "notional": data.notional,
+                "impact_unit": base_impact_unit,
+            },
+        )
+    capital_aggregates: dict[float, tuple[float, int, float | None, float | None]] = {}
+    for capital_value in capital_values:
+        scale = capital_value / base_capital
+        known_participation = base_participation[known] * scale
+        breached = known & (base_participation * scale > max_participation)
+        capital_aggregates[capital_value] = (
+            scale,
+            int(breached.sum()),
+            float(np.median(known_participation)) if known_participation.size else None,
+            float(known_participation.max()) if known_participation.size else None,
+        )
     rows: list[dict[str, JsonValue]] = []
     any_breach = False
     for scenario in resolved_scenarios:
         for capital_value in capital_values:
-            scale = capital_value / base_capital
-            quantity = data.absolute_quantity * scale
-            notional = data.notional * scale
-            participation: FloatArray = np.full(data.frame.height, np.nan, dtype=np.float64)
-            participation[known] = quantity[known] / volumes[known]
-            participation[(data.absolute_quantity == 0.0) & ~known] = 0.0
-            breached = known & (participation > max_participation)
-            any_breach = any_breach or bool(breached.any())
-            impact_fraction: FloatArray = np.full(data.frame.height, np.nan, dtype=np.float64)
-            impact_fraction[known] = (
-                scenario.impact_coefficient * volatilities[known] * np.sqrt(participation[known])
-            )
-            impact_fraction[(data.absolute_quantity == 0.0) & ~known] = 0.0
-            known_impact_cost = float(np.sum(notional[cost_known] * impact_fraction[cost_known]))
-            spread_cost = float(notional.sum() * scenario.spread_bps / 20_000.0)
-            slippage_cost = float(notional.sum() * scenario.slippage_bps / 10_000.0)
-            gross_total = float(base_pnl.sum() * scale)
-            incomplete = not bool(cost_known.all())
+            (
+                scale,
+                breach_rows,
+                median_participation,
+                max_observed_participation,
+            ) = capital_aggregates[capital_value]
+            any_breach = any_breach or breach_rows > 0
+            scale_impact = scale**1.5
+            known_impact_cost = scenario.impact_coefficient * known_impact_unit_total * scale_impact
+            spread_cost = base_notional_total * scale * scenario.spread_bps / 20_000.0
+            slippage_cost = base_notional_total * scale * scenario.slippage_bps / 10_000.0
+            gross_total = base_gross_total * scale
             total_cost = None if incomplete else known_impact_cost + spread_cost + slippage_cost
             if total_cost is None:
                 net_pnl: float | None = None
@@ -2020,35 +2081,29 @@ def capacity_curve(
                 net_sharpe: float | None = None
                 status = "unknown_liquidity"
             else:
-                per_trade_cost = (
-                    notional * scenario.spread_bps / 20_000.0
-                    + notional * scenario.slippage_bps / 10_000.0
-                    + notional * impact_fraction
-                )
-                net_values = base_pnl * scale - per_trade_cost
                 net_pnl = gross_total - total_cost
                 net_return = net_pnl / capital_value
+                assert period_aggregates is not None
                 net_sharpe = _sharpe(
-                    _period_values(data.frame, period=period, values=net_values),
+                    period_aggregates["gross"] * scale
+                    - period_aggregates["notional"]
+                    * scale
+                    * (scenario.spread_bps / 20_000.0 + scenario.slippage_bps / 10_000.0)
+                    - period_aggregates["impact_unit"] * scenario.impact_coefficient * scale_impact,
                     annualization=annualization,
                 )
-                status = "constraint_breach" if bool(breached.any()) else "ok"
-            known_participation = participation[known]
+                status = "constraint_breach" if breach_rows else "ok"
             rows.append(
                 {
                     "scenario": scenario.name,
                     "capital": capital_value,
                     "scale": scale,
                     "gross_pnl": gross_total,
-                    "gross_turnover": float(notional.sum() / capital_value),
+                    "gross_turnover": base_notional_total * scale / capital_value,
                     "liquidity_coverage": coverage,
-                    "median_participation": (
-                        float(np.median(known_participation)) if known_participation.size else None
-                    ),
-                    "max_observed_participation": (
-                        float(known_participation.max()) if known_participation.size else None
-                    ),
-                    "participation_breach_rows": int(breached.sum()),
+                    "median_participation": median_participation,
+                    "max_observed_participation": max_observed_participation,
+                    "participation_breach_rows": breach_rows,
                     "known_impact_cost": known_impact_cost,
                     "impact_cost": None if incomplete else known_impact_cost,
                     "spread_cost": spread_cost,

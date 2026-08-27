@@ -124,9 +124,14 @@ turnover and sample support
 status/warnings
 ```
 
-The implementation validates the trade table once, reuses the notional vector for all linear grid
-points, and evaluates each optional base model once. The reuse count and results are tested. It does
-not claim that a path-dependent execution simulation can use the same sufficient statistics.
+The implementation validates the trade table once, evaluates each optional base model once, and
+stores its values and explicit validity in a private contiguous component batch. It preaggregates
+gross P&L, traded notional, base cost, and period totals before evaluating the grid. Scenario rows
+therefore do not rebuild per-trade Python tuples or repeat Polars group-bys. Unknown-row eligibility,
+component order, scenario order, and public evidence remain unchanged.
+
+This reduction is valid for the implemented path-independent linear scenario terms. It does not
+claim that a path-dependent execution simulation can use the same sufficient statistics.
 
 ## Cost uncertainty
 
@@ -147,6 +152,10 @@ Break-even calculations solve for the all-in cost where a declared target crosse
 
 The solver checks monotonicity over its domain, reports bracketing bounds and tolerance, and returns no solution when the target does not cross. It does not extrapolate silently.
 
+Gross P&L and traded notional are aggregated once. Net P&L and net-return evaluations are then
+constant time per solver point. Sharpe and CAGR retain one ordered period vector and remain linear
+in the number of periods, because those estimands genuinely depend on the return path.
+
 ## Capacity
 
 Capacity is a curve over capital or trade size:
@@ -164,6 +173,11 @@ constraint flags
 Inputs include market volume, execution horizon, participation constraint, price/volatility, and capital-to-position scaling.
 
 Do not reduce the curve to one capacity number without a declared objective and threshold. Missing liquidity data becomes unknown capacity evidence.
+
+For a capital scale `s`, the implementation applies the model's exact identities: participation,
+gross P&L, spread, and linear slippage scale with `s`, while square-root impact cost scales with
+`s^(3/2)`. Base period terms are aggregated once and reused over the scenario/capital grid. This is
+an algebraic optimization of the existing model, not a change to its estimand.
 
 ## Temporal correctness
 
@@ -186,9 +200,12 @@ Nonlinear capacity models document where monotonicity should still hold.
 
 ## Execution ownership
 
-Polars owns normalization/grouping and NumPy owns validated vector arithmetic in v0.3. The
-versioned end-to-end benchmark includes stress grids, output checksums, and traced memory. A Rust
-path remains contingent on large-grid crossover evidence and would require differential tests.
+Polars owns normalization/grouping and NumPy owns validated vector arithmetic. Lacuna v0.14 keeps
+the public signatures and method versions unchanged while replacing repeated scenario rescans with
+the sufficient-statistic reductions above. Independent literal-rescan fixtures remain in the test
+suite. Private migration benchmarks include full public-call latency, result projection, process
+RSS, and traced Python memory. A Rust reducer is considered only if these optimized references
+remain material under the admission gate.
 
 ## Required tests
 
