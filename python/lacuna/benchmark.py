@@ -82,6 +82,8 @@ _PRIVATE_MIGRATION_CV_CASES = {
     "migration.cv.cpcv.reference",
 }
 _PRIVATE_MIGRATION_SIGNAL_CASES = {
+    "migration.signal.ic.skewed.native",
+    "migration.signal.ic.skewed.reference",
     "migration.signal.portfolio.grouped_rank",
     "migration.signal.turnover.multilag",
 }
@@ -1093,6 +1095,41 @@ def _run_benchmarks(
     requested_private_signal_cases = (
         set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_SIGNAL_CASES)
     )
+    requested_private_ic_cases = requested_private_signal_cases.intersection(
+        {
+            "migration.signal.ic.skewed.native",
+            "migration.signal.ic.skewed.reference",
+        }
+    )
+    if requested_private_ic_cases:
+        group_size = (
+            pl.when(pl.col("time") % 4 == 0)
+            .then(pl.lit(3))
+            .when(pl.col("time") % 4 == 1)
+            .then(pl.lit(max(3, resolved.instruments // 20)))
+            .when(pl.col("time") % 4 == 2)
+            .then(pl.lit(max(3, resolved.instruments // 4)))
+            .otherwise(pl.lit(resolved.instruments))
+        )
+        skewed_observations = observations.filter(pl.col("instrument") < group_size)
+        ic_backends = {
+            "migration.signal.ic.skewed.native": True,
+            "migration.signal.ic.skewed.reference": False,
+        }
+        for case_name in sorted(requested_private_ic_cases):
+            cases.append(
+                (
+                    case_name,
+                    partial(
+                        signal.ic,
+                        skewed_observations,
+                        labels,
+                        use_native=ic_backends[case_name],
+                    ),
+                    skewed_observations.height,
+                    "input_rows/second",
+                )
+            )
     if "migration.signal.turnover.multilag" in requested_private_signal_cases:
         cases.append(
             (

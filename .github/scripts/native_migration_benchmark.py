@@ -17,7 +17,7 @@ from lacuna.benchmark import benchmark_config_for_tier
 
 
 def _source_commit() -> str:
-    configured = os.environ.get("GITHUB_SHA")
+    configured = os.environ.get("LACUNA_SOURCE_COMMIT") or os.environ.get("GITHUB_SHA")
     if configured:
         return configured
     status = subprocess.run(
@@ -103,6 +103,18 @@ def _validate(arguments: argparse.Namespace) -> int:
     if not isinstance(decoded, dict):
         raise ValueError("migration benchmark artifact must be a JSON object")
     validate_artifact(decoded)
+    if arguments.require_state is not None:
+        admission = decoded.get("admission")
+        if not isinstance(admission, dict) or admission.get("state") != arguments.require_state:
+            raise ValueError(f"migration benchmark state must be {arguments.require_state!r}")
+    if arguments.source_commit is not None and decoded.get("source_commit") != (
+        arguments.source_commit
+    ):
+        raise ValueError("migration benchmark source commit does not match")
+    if arguments.candidate_id is not None:
+        target = decoded.get("target")
+        if not isinstance(target, dict) or target.get("candidate_id") != arguments.candidate_id:
+            raise ValueError("migration benchmark candidate ID does not match")
     return 0
 
 
@@ -129,6 +141,20 @@ def main() -> int:
 
     validate = subparsers.add_parser("validate")
     validate.add_argument("path", type=Path)
+    validate.add_argument(
+        "--require-state",
+        choices=(
+            "PROPOSED",
+            "MEASURED",
+            "ADMITTED",
+            "SHIPPED_NATIVE",
+            "OPTIMIZED_NON_NATIVE",
+            "NOT_MIGRATING",
+            "BLOCKED",
+        ),
+    )
+    validate.add_argument("--source-commit")
+    validate.add_argument("--candidate-id")
 
     arguments = parser.parse_args()
     return _run(arguments) if arguments.command == "run" else _validate(arguments)

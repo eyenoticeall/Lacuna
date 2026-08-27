@@ -226,6 +226,8 @@ def test_instrumented_native_pbo_reconciles_boundary_and_projection_bytes() -> N
         "migration.validation.pbo.reference",
         "migration.validation.pbo.native",
         "migration.cv.cpcv.reference",
+        "migration.signal.ic.skewed.native",
+        "migration.signal.ic.skewed.reference",
         "migration.signal.turnover.multilag",
         "migration.signal.portfolio.grouped_rank",
         "migration.regime.quantiles.rolling",
@@ -254,3 +256,32 @@ def test_private_migration_cases_measure_public_calls_without_extending_benchmar
     assert measurement["backend"]
     assert measurement["python_traced_peak_bytes"] == 0
     assert len(str(measurement["checksum"])) == 64
+
+
+def test_skewed_group_ic_migration_cases_are_backend_equivalent() -> None:
+    config = BenchmarkConfig(
+        periods=12,
+        instruments=20,
+        horizons=(1, 2),
+        quantiles=3,
+        bootstrap_resamples=100,
+        repetitions=1,
+        warmups=0,
+    )
+    reference = _worker_payload(
+        "migration.signal.ic.skewed.reference",
+        config,
+        use_native=False,
+        instrumented=False,
+    )["measurement"]
+    candidate = _worker_payload(
+        "migration.signal.ic.skewed.native",
+        config,
+        use_native=True,
+        instrumented=False,
+    )["measurement"]
+    assert isinstance(reference, dict)
+    assert isinstance(candidate, dict)
+    assert reference["checksum"] == candidate["checksum"]
+    assert reference["backend"] == "numpy_reference"
+    assert candidate["backend"] == "rust_native"
