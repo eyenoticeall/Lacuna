@@ -21,6 +21,10 @@ EXPECTED_WHEEL_PLATFORMS = (
     "macosx_11_0_arm64",
     "win_amd64",
 )
+CORE_DISTRIBUTION = "lacuna-quant"
+CORE_ARCHIVE_STEM = "lacuna_quant"
+OPTIONS_DISTRIBUTION = "lacuna-options"
+OPTIONS_ARCHIVE_STEM = "lacuna_options"
 OPTIONS_ROOT = Path("extensions/lacuna-options")
 
 
@@ -76,6 +80,8 @@ def options_version(root: Path, *, core_version: str) -> str:
 
     options_root = root / OPTIONS_ROOT
     pyproject = tomllib.loads((options_root / "pyproject.toml").read_text(encoding="utf-8"))
+    if pyproject["project"].get("name") != OPTIONS_DISTRIBUTION:
+        fail(f"options distribution must be named {OPTIONS_DISTRIBUTION!r}")
     if pyproject["project"].get("license") != "MIT":
         fail("lacuna-options must use the MIT license expression")
     if pyproject["project"].get("license-files") != ["LICENSE"]:
@@ -101,12 +107,12 @@ def options_version(root: Path, *, core_version: str) -> str:
     core_requirements = [
         requirement
         for requirement in pyproject["project"]["dependencies"]
-        if requirement.startswith("lacuna")
+        if requirement.startswith(CORE_DISTRIBUTION)
     ]
     if len(core_requirements) != 1:
         fail("lacuna-options must declare exactly one Lacuna core requirement")
     requirement_match = re.fullmatch(
-        r"lacuna>=(\d+\.\d+(?:\.\d+)?),<(\d+\.\d+(?:\.\d+)?)",
+        rf"{re.escape(CORE_DISTRIBUTION)}>=(\d+\.\d+(?:\.\d+)?),<(\d+\.\d+(?:\.\d+)?)",
         core_requirements[0],
     )
     if requirement_match is None:
@@ -142,6 +148,8 @@ def verify_source(root: Path, tag: str, *, require_tag: bool) -> str:
     source_version = _python_source_version(root / "python/lacuna/_version.py")
     expected_python_version = python_version_from_cargo(cargo_version)
 
+    if pyproject["project"].get("name") != CORE_DISTRIBUTION:
+        fail(f"core distribution must be named {CORE_DISTRIBUTION!r}")
     if pyproject["project"].get("license") != "MIT":
         fail("core Python metadata must use the MIT license expression")
     if pyproject["project"].get("license-files") != ["LICENSE"]:
@@ -224,8 +232,11 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
         metadata_name, metadata_version, wheel_tag, license_expression, license_files = (
             _wheel_metadata(archive)
         )
-        if metadata_name != "lacuna":
-            fail(f"{path.name} distribution name is {metadata_name!r}, expected 'lacuna'")
+        if metadata_name != CORE_DISTRIBUTION:
+            fail(
+                f"{path.name} distribution name is {metadata_name!r}, "
+                f"expected {CORE_DISTRIBUTION!r}"
+            )
         if metadata_version != version:
             fail(f"{path.name} metadata version is {metadata_version!r}, expected {version!r}")
         expected_tag = f"cp311-abi3-{expected_platform}"
@@ -272,7 +283,7 @@ def _verify_wheel(path: Path, version: str, expected_platform: str) -> None:
 
 
 def _verify_sdist(path: Path, version: str) -> None:
-    prefix = f"lacuna-{version}/"
+    prefix = f"{CORE_ARCHIVE_STEM}-{version}/"
     required = {
         f"{prefix}Cargo.toml",
         f"{prefix}CHANGELOG.md",
@@ -322,8 +333,11 @@ def _verify_options_wheel(path: Path, version: str) -> None:
         metadata_name, metadata_version, wheel_tag, license_expression, license_files = (
             _wheel_metadata(archive)
         )
-        if metadata_name != "lacuna-options":
-            fail(f"{path.name} distribution name is {metadata_name!r}, expected 'lacuna-options'")
+        if metadata_name != OPTIONS_DISTRIBUTION:
+            fail(
+                f"{path.name} distribution name is {metadata_name!r}, "
+                f"expected {OPTIONS_DISTRIBUTION!r}"
+            )
         if metadata_version != version:
             fail(f"{path.name} metadata version is {metadata_version!r}, expected {version!r}")
         if wheel_tag != "py3-none-any":
@@ -344,7 +358,8 @@ def _verify_options_wheel(path: Path, version: str) -> None:
 
 
 def _verify_options_sdist(path: Path, version: str) -> None:
-    prefix = f"lacuna_options-{version}/"
+    prefix = f"{OPTIONS_ARCHIVE_STEM}-{version}/"
+    release_series = ".".join(version.split(".")[:2])
     required = {
         f"{prefix}CHANGELOG.md",
         f"{prefix}LICENSE",
@@ -355,6 +370,7 @@ def _verify_options_sdist(path: Path, version: str) -> None:
         f"{prefix}src/lacuna_options/chain.py",
         f"{prefix}src/lacuna_options/py.typed",
         f"{prefix}tests/fixtures/public-api-v0.1.json",
+        f"{prefix}tests/fixtures/public-api-v{release_series}.json",
         f"{prefix}tests/test_public_api.py",
     }
     with tarfile.open(path, mode="r:gz") as archive:
@@ -381,8 +397,8 @@ def verify_artifacts(root: Path, dist: Path, tag: str) -> str:
     if len(wheels) != expected_wheel_count:
         fail(f"expected {expected_wheel_count} wheels, found {len(wheels)}")
     expected_sdists = {
-        f"lacuna-{version}.tar.gz",
-        f"lacuna_options-{extension_version}.tar.gz",
+        f"{CORE_ARCHIVE_STEM}-{version}.tar.gz",
+        f"{OPTIONS_ARCHIVE_STEM}-{extension_version}.tar.gz",
     }
     observed_sdists = {path.name for path in sdists}
     if observed_sdists != expected_sdists:
@@ -393,10 +409,10 @@ def verify_artifacts(root: Path, dist: Path, tag: str) -> str:
         )
 
     expected_wheels = {
-        f"lacuna-{version}-cp311-abi3-{platform}.whl": platform
+        f"{CORE_ARCHIVE_STEM}-{version}-cp311-abi3-{platform}.whl": platform
         for platform in EXPECTED_WHEEL_PLATFORMS
     }
-    options_wheel_name = f"lacuna_options-{extension_version}-py3-none-any.whl"
+    options_wheel_name = f"{OPTIONS_ARCHIVE_STEM}-{extension_version}-py3-none-any.whl"
     observed_names = {path.name for path in wheels}
     all_expected_wheels = {*expected_wheels, options_wheel_name}
     if observed_names != all_expected_wheels:
@@ -410,9 +426,9 @@ def verify_artifacts(root: Path, dist: Path, tag: str) -> str:
             _verify_options_wheel(wheel, extension_version)
         else:
             _verify_wheel(wheel, version, expected_wheels[wheel.name])
-    _verify_sdist(dist / f"lacuna-{version}.tar.gz", version)
+    _verify_sdist(dist / f"{CORE_ARCHIVE_STEM}-{version}.tar.gz", version)
     _verify_options_sdist(
-        dist / f"lacuna_options-{extension_version}.tar.gz",
+        dist / f"{OPTIONS_ARCHIVE_STEM}-{extension_version}.tar.gz",
         extension_version,
     )
     _write_checksums([*wheels, *sdists], dist / "SHA256SUMS")

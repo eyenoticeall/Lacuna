@@ -65,7 +65,11 @@ def test_distribution_version_mismatch_is_actionable_failure(
     actual = diagnostics._distribution_metadata_version
 
     def mismatched(name: str) -> str | None:
-        return "999.0.0" if name == "lacuna" else actual(name)
+        if name == "lacuna-quant":
+            return "999.0.0"
+        if name == "lacuna":
+            return None
+        return actual(name)
 
     monkeypatch.setattr(diagnostics, "_distribution_metadata_version", mismatched)
     report = diagnose_installation()
@@ -74,6 +78,28 @@ def test_distribution_version_mismatch_is_actionable_failure(
     assert report.status == DiagnosticState.FAIL
     assert check.state == DiagnosticState.FAIL
     assert "reinstall one matching wheel" in check.message
+
+
+def test_conflicting_lacuna_distribution_is_actionable_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    actual = diagnostics._distribution_metadata_version
+
+    def conflicting(name: str) -> str | None:
+        if name == "lacuna-quant":
+            return diagnostics.__version__
+        if name == "lacuna":
+            return "2026.1.51"
+        return actual(name)
+
+    monkeypatch.setattr(diagnostics, "_distribution_metadata_version", conflicting)
+    report = diagnose_installation()
+    check = _check(report, "DISTRIBUTION_NAME_COLLISION")
+
+    assert report.status == DiagnosticState.FAIL
+    assert check.state == DiagnosticState.FAIL
+    assert check.evidence["conflicting_distribution"] == "lacuna"
+    assert "uninstall it" in check.message
 
 
 def test_unavailable_native_core_fails_without_leaking_raw_error(

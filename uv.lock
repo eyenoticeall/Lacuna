@@ -18,8 +18,8 @@ resolution-markers = [
 
 [manifest]
 members = [
-    "lacuna",
     "lacuna-options",
+    "lacuna-quant",
 ]
 
 [[package]]
@@ -705,8 +705,26 @@ wheels = [
 ]
 
 [[package]]
-name = "lacuna"
-version = "0.12.0"
+name = "lacuna-options"
+version = "0.2.0"
+source = { editable = "extensions/lacuna-options" }
+dependencies = [
+    { name = "lacuna-quant" },
+    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
+    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
+    { name = "polars" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "lacuna-quant", editable = "." },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "polars", specifier = ">=1.30" },
+]
+
+[[package]]
+name = "lacuna-quant"
+version = "0.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
@@ -798,24 +816,6 @@ dev = [
     { name = "ruff", specifier = ">=0.11" },
 ]
 docs = [{ name = "mkdocs-material", specifier = ">=9.6" }]
-
-[[package]]
-name = "lacuna-options"
-version = "0.1.6"
-source = { editable = "extensions/lacuna-options" }
-dependencies = [
-    { name = "lacuna" },
-    { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
-    { name = "numpy", version = "2.5.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
-    { name = "polars" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "lacuna", editable = "." },
-    { name = "numpy", specifier = ">=2.0" },
-    { name = "polars", specifier = ">=1.30" },
-]
 
 [[package]]
 name = "librt"

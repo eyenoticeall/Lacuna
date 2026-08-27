@@ -465,7 +465,7 @@ jobs:
         run: uv build --package lacuna-options --no-build-isolation --out-dir dist
       - name: Resolve built wheel paths
         run: |
-          echo "CORE_WHEEL=$(find dist -maxdepth 1 -name 'lacuna-*.whl' -print -quit)" >> "$GITHUB_ENV"
+          echo "CORE_WHEEL=$(find dist -maxdepth 1 -name 'lacuna_quant-*.whl' -print -quit)" >> "$GITHUB_ENV"
           echo "OPTIONS_WHEEL=$(find dist -maxdepth 1 -name 'lacuna_options-*.whl' -print -quit)" >> "$GITHUB_ENV"
       - name: Install and exercise the core-only wheel
         run: |

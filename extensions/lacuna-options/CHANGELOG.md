@@ -2,8 +2,12 @@
 
 ## Unreleased
 
+## [0.2.0] - 2026-08-27
+
 ### Changed
 
+- Depend on `lacuna-quant>=0.13,<0.14`, preserving the `lacuna_options` import and the complete
+  `0.1.x` public API while severing dependency resolution from the unrelated PyPI `lacuna` project.
 - License future `lacuna-options` distributions under MIT only and include the MIT text in wheel
   and source archives. Previously published versions retain their original license grants.
 

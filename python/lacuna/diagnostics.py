@@ -35,6 +35,9 @@ DIAGNOSTIC_VERSION = 1
 MINIMUM_PYTHON = (3, 11)
 TESTED_PYTHON = ((3, 11), (3, 12), (3, 13), (3, 14))
 
+_CORE_DISTRIBUTION = "lacuna-quant"
+_CONFLICTING_DISTRIBUTION = "lacuna"
+
 _PACKAGE_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+(?:rc[0-9]+)?\Z")
 _SUPPORTED_WHEELS = {
     ("Darwin", "arm64"),
@@ -230,10 +233,7 @@ def _native_check() -> tuple[NativeStatus, DiagnosticCheck]:
         return status, _check(
             "NATIVE_CORE",
             DiagnosticState.FAIL,
-            (
-                "The native core is unavailable; install a target-matching Lacuna GitHub "
-                "Release wheel."
-            ),
+            ("The native core is unavailable; install a target-matching lacuna-quant wheel."),
             available=False,
         )
     if status.version != __version__:
@@ -345,7 +345,7 @@ def diagnose_installation() -> InstallationDiagnostics:
         )
     )
 
-    installed_version = _distribution_metadata_version("lacuna")
+    installed_version = _distribution_metadata_version(_CORE_DISTRIBUTION)
     if installed_version is None:
         distribution_state = DiagnosticState.WARN
         distribution_message = (
@@ -368,6 +368,24 @@ def diagnose_installation() -> InstallationDiagnostics:
             distribution_message,
             distribution_version=installed_version,
             package_version=__version__,
+        )
+    )
+
+    conflicting_version = _distribution_metadata_version(_CONFLICTING_DISTRIBUTION)
+    checks.append(
+        _check(
+            "DISTRIBUTION_NAME_COLLISION",
+            (DiagnosticState.PASS if conflicting_version is None else DiagnosticState.FAIL),
+            (
+                "No conflicting distribution owns the lacuna import package."
+                if conflicting_version is None
+                else (
+                    "A distribution named lacuna is also installed; uninstall it before using "
+                    "lacuna-quant to avoid ambiguous ownership of the lacuna import package."
+                )
+            ),
+            conflicting_distribution=_CONFLICTING_DISTRIBUTION,
+            conflicting_version=conflicting_version,
         )
     )
 

@@ -1,0 +1,22 @@
+{
+  "callables": [
+    {"module": "lacuna_options", "qualname": "OptionFrameResult", "signature": "(frame, evidence)"},
+    {"module": "lacuna_options", "qualname": "OptionChain", "signature": "(frame, evidence)"},
+    {"module": "lacuna_options", "qualname": "validate_chain", "signature": "(data, *, columns=None, year_basis=365.25)"},
+    {"module": "lacuna_options", "qualname": "delta_buckets", "signature": "(chain, *, edges=(0.0, 0.1, 0.25, 0.4, 0.6, 0.75, 0.9, 1.0))"},
+    {"module": "lacuna_options", "qualname": "empirical_residual", "signature": "(chain, *, observed='iv', expected='expected_iv', output='iv_residual')"}
+  ],
+  "contract": "lacuna-options-public-api-v0.2",
+  "inherited_contracts": ["lacuna-options-public-api-v0.1"],
+  "module_exports": [
+    "OPTIONAL_CHAIN_COLUMNS",
+    "REQUIRED_CHAIN_COLUMNS",
+    "OptionChain",
+    "OptionFrameResult",
+    "__version__",
+    "delta_buckets",
+    "empirical_residual",
+    "validate_chain"
+  ],
+  "package_series": "0.2"
+}

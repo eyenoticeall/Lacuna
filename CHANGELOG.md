@@ -4,10 +4,19 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+## [0.13.0] - 2026-08-27
+
 ### Changed
 
+- Publish future core distributions under the unambiguous PyPI name `lacuna-quant` while
+  preserving the `lacuna` import package and `lacuna` command.
+- Add an installation diagnostic that fails clearly when the conflicting `lacuna` distribution is
+  installed beside `lacuna-quant`, preserving diagnostic schema and method version 1.
 - License the repository and all future core and extension distributions under MIT only. Releases
   already published under the former dual-license terms retain those original grants.
+- Advance `lacuna-options` to `0.2.0` so its dependency metadata targets
+  `lacuna-quant>=0.13,<0.14` instead of the unrelated PyPI `lacuna` project; its import API and
+  analytical semantics are unchanged.
 
 ## [0.12.0] - 2026-08-26
 

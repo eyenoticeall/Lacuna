@@ -57,7 +57,7 @@ def require(condition: bool, message: str) -> None:
 for module in PUBLIC_MODULES:
     importlib.import_module(module)
 
-distribution_version = metadata.version("lacuna")
+distribution_version = metadata.version("lacuna-quant")
 require(lacuna.__version__ == distribution_version, "package and distribution versions disagree")
 require(_native.version() == distribution_version, "native and distribution versions disagree")
 require(_native.checked_mean([1.0, 2.0, 3.0]) == 2.0, "native mean kernel failed")
@@ -71,6 +71,7 @@ require(
         "AUDIT_RESULT_SCHEMA",
         "BUNDLE_MANIFEST_SCHEMA",
         "DISTRIBUTION_METADATA",
+        "DISTRIBUTION_NAME_COLLISION",
         "NATIVE_CORE",
         "PACKAGE_VERSION",
         "PERSISTED_ARTIFACT_COMPATIBILITY",
