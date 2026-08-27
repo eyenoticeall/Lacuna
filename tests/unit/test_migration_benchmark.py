@@ -181,3 +181,32 @@ def test_timed_fingerprint_worker_skips_python_memory_trace() -> None:
     measurement = payload["measurement"]
     assert isinstance(measurement, dict)
     assert measurement["python_traced_peak_bytes"] == 0
+
+
+@pytest.mark.parametrize(
+    "case_name",
+    (
+        "migration.costs.stress.public",
+        "migration.costs.capacity.public",
+        "migration.costs.break_even.public",
+    ),
+)
+def test_private_cost_cases_measure_public_calls_without_extending_benchmark_v6(
+    case_name: str,
+) -> None:
+    config = BenchmarkConfig(
+        periods=8,
+        instruments=5,
+        horizons=(1, 2),
+        quantiles=3,
+        bootstrap_resamples=100,
+        repetitions=1,
+        warmups=0,
+    )
+    payload = _worker_payload(case_name, config, use_native=False, instrumented=False)
+    measurement = payload["measurement"]
+    assert isinstance(measurement, dict)
+    assert measurement["case_name"] == case_name
+    assert measurement["backend"] == "polars"
+    assert measurement["python_traced_peak_bytes"] == 0
+    assert len(str(measurement["checksum"])) == 64

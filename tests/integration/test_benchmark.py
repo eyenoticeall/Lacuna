@@ -51,6 +51,7 @@ def test_smoke_benchmark_runs_public_reference_and_native_paths() -> None:
     assert "signal.portfolio_projection" in names
     assert "adapters.factor_panel.chunked" in names
     assert "events.event_windows" in names
+    assert not any(name.startswith("migration.costs.") for name in names)
     checksums = {case["name"]: case["checksum"] for case in payload["cases"]}
     assert checksums["signal.ic.reference"] == checksums["signal.ic.native"]
     assert checksums["validation.bootstrap.reference"] == checksums["validation.bootstrap.native"]

@@ -64,6 +64,11 @@ BenchmarkOutput: TypeAlias = (
 )
 BenchmarkCallable: TypeAlias = Callable[[], BenchmarkOutput]
 IntArray: TypeAlias = npt.NDArray[np.int64]
+_PRIVATE_MIGRATION_COST_CASES = {
+    "migration.costs.break_even.public",
+    "migration.costs.capacity.public",
+    "migration.costs.stress.public",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -876,6 +881,65 @@ def _run_benchmarks(
             "panel_rows/second",
         ),
     ]
+    requested_private_cost_cases = (
+        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_COST_CASES)
+    )
+    if requested_private_cost_cases:
+        market_trades = trades.with_columns(
+            (pl.col("quantity").abs() * 500.0).alias("adv"),
+            (
+                0.15 + pl.col("instrument").cast(pl.Float64) / max(10.0 * resolved.instruments, 1.0)
+            ).alias("volatility"),
+            pl.col("execution_time").alias("market_available_time"),
+        )
+        capacity_capital = tuple(float(1_000_000 * scale) for scale in range(1, 11))
+        capacity_scenarios = (
+            costs.CapacityScenario("low", impact_coefficient=0.1, spread_bps=1.0),
+            costs.CapacityScenario(
+                "base", impact_coefficient=0.3, spread_bps=3.0, slippage_bps=1.0
+            ),
+            costs.CapacityScenario(
+                "stress", impact_coefficient=0.7, spread_bps=8.0, slippage_bps=5.0
+            ),
+        )
+        private_cost_cases: dict[str, tuple[BenchmarkCallable, int, str]] = {
+            "migration.costs.stress.public": (
+                lambda: costs.stress(
+                    trades,
+                    spread_bps=(0.0, 5.0, 10.0),
+                    slippage_bps=(0.0, 5.0, 10.0),
+                ),
+                resolved.rows * 9,
+                "scenario_rows/second",
+            ),
+            "migration.costs.capacity.public": (
+                lambda: costs.capacity_curve(
+                    market_trades,
+                    capital=capacity_capital,
+                    base_capital=1_000_000.0,
+                    scenarios=capacity_scenarios,
+                    available_time="market_available_time",
+                    classification_mode="point_in_time",
+                    annualization=252.0,
+                ),
+                resolved.rows * len(capacity_capital) * len(capacity_scenarios),
+                "scenario_rows/second",
+            ),
+            "migration.costs.break_even.public": (
+                lambda: costs.break_even_cost(
+                    trades,
+                    metric="net_pnl",
+                    threshold=0.0,
+                    upper_bps=1_000.0,
+                    tolerance_bps=1e-6,
+                ),
+                resolved.rows * 33,
+                "solver_rows/second",
+            ),
+        }
+        cases.extend(
+            (name, *private_cost_cases[name]) for name in sorted(requested_private_cost_cases)
+        )
     native = native_status()
     if use_native and native.available:
         cases.extend(
