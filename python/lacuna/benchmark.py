@@ -1092,8 +1092,10 @@ def _run_benchmarks(
                 "role_evaluations/second",
             )
         )
-    requested_private_signal_cases = (
-        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_SIGNAL_CASES)
+    requested_private_signal_cases: set[str] = (
+        set()
+        if case_names is None
+        else set(case_names.intersection(_PRIVATE_MIGRATION_SIGNAL_CASES))
     )
     requested_private_ic_cases = requested_private_signal_cases.intersection(
         {
