@@ -85,6 +85,56 @@ def test_projection_reconciles_nonzero_net_exposure_and_is_permutation_stable() 
         assert row["net_exposure"] == pytest.approx(0.2)
 
 
+@pytest.mark.parametrize("weighting", ("equal", "rank", "absolute_signal"))
+def test_vectorized_group_allocation_matches_literal_leg_scores(weighting: str) -> None:
+    source = pl.DataFrame(
+        {
+            "time": [0] * 12,
+            "instrument": [f"a{index}" for index in range(6)] + [f"b{index}" for index in range(6)],
+            "signal": [-3.0, -2.0, -1.0, 1.0, 2.0, 3.0, -6.0, -4.0, -2.0, 2.0, 4.0, 6.0],
+            "sector": ["a"] * 6 + ["b"] * 6,
+        }
+    )
+    bucketed = bucketize(source, spec=BucketSpec.threshold(0.0), by=("time", "sector"))
+    result = portfolio_projection(
+        bucketed,
+        _labels(source),
+        horizon="1D",
+        long_buckets=(2,),
+        short_buckets=(1,),
+        weighting=weighting,  # type: ignore[arg-type]
+        group_neutral="sector",
+    )
+
+    expected: dict[str, float] = {}
+    for sector in ("a", "b"):
+        for leg, sign in (("long", 1.0), ("short", -1.0)):
+            rows = (
+                result.frame.filter((pl.col("sector") == sector) & (pl.col("leg") == leg))
+                .sort("instrument")
+                .select("instrument", "signal")
+                .to_dicts()
+            )
+            values = [float(row["signal"]) for row in rows]
+            if weighting == "equal":
+                scores = [1.0] * len(rows)
+            elif weighting == "absolute_signal":
+                scores = [abs(value) for value in values]
+            else:
+                strengths = values if leg == "long" else [-value for value in values]
+                order = {value: rank + 1.0 for rank, value in enumerate(sorted(strengths))}
+                scores = [order[value] for value in strengths]
+            score_sum = sum(scores)
+            for row, score in zip(rows, scores, strict=True):
+                expected[str(row["instrument"])] = sign * score / score_sum * 0.25
+
+    for row in result.frame.iter_rows(named=True):
+        assert float(row["target_weight"]) == pytest.approx(
+            expected[str(row["instrument"])],
+            abs=1e-15,
+        )
+
+
 def test_group_neutrality_raises_or_explicitly_drops_one_sided_groups() -> None:
     signal = pl.DataFrame(
         {

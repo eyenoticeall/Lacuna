@@ -5,10 +5,8 @@ from __future__ import annotations
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Literal, TypeAlias
+from typing import Literal
 
-import numpy as np
-import numpy.typing as npt
 import polars as pl
 
 from lacuna._attrition import attrition_record
@@ -27,7 +25,6 @@ from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.labels import LabelResult
 from lacuna.types import AnalysisResult, Finding, FindingState, JsonValue, ResultMetadata, Severity
 
-FloatArray: TypeAlias = npt.NDArray[np.float64]
 Weighting = Literal["equal", "rank", "absolute_signal"]
 IncompleteGroupPolicy = Literal["raise", "drop"]
 
@@ -66,26 +63,6 @@ def _bucket_selection(values: Sequence[int], *, name: str) -> tuple[int, ...]:
     if len(set(normalized)) != len(normalized):
         raise MethodContractError(f"{name} must not contain duplicate buckets")
     return tuple(sorted(normalized))
-
-
-def _leg_scores(frame: pl.DataFrame, *, leg: str, weighting: Weighting) -> FloatArray:
-    values: FloatArray = frame.get_column("signal").to_numpy().astype(np.float64, copy=False)
-    if weighting == "equal":
-        return np.ones(frame.height, dtype=np.float64)
-    if weighting == "absolute_signal":
-        scores = np.abs(values)
-        return scores if float(scores.sum()) > 0.0 else np.ones(frame.height, dtype=np.float64)
-    strength = values if leg == "long" else -values
-    return (
-        pl.Series("strength", strength)
-        .rank(method="average")
-        .to_numpy()
-        .astype(np.float64, copy=False)
-    )
-
-
-def _group_identity(frame: pl.DataFrame, columns: Sequence[str]) -> tuple[object, ...]:
-    return tuple(frame.get_column(column)[0] for column in columns)
 
 
 def _mean_float(series: pl.Series) -> float | None:
@@ -229,83 +206,105 @@ def portfolio_projection(
 
     long_allocation = (float(gross_exposure) + float(net_exposure)) / 2.0
     short_allocation = (float(gross_exposure) - float(net_exposure)) / 2.0
-    weighted_frames: list[pl.DataFrame] = []
-    incomplete_rows = 0
-    fallback_groups = 0
-    for cohort in matched.sort(["observation_time", *group_columns, "instrument"]).partition_by(
-        "observation_time", maintain_order=True
-    ):
-        subgroups = (
-            cohort.partition_by(list(group_columns), maintain_order=True)
-            if group_columns
-            else [cohort]
-        )
-        long_groups = {
-            _group_identity(group, group_columns)
-            for group in subgroups
-            if group.filter(pl.col("bucket").is_in(list(long_selection))).height
-        }
-        short_groups = {
-            _group_identity(group, group_columns)
-            for group in subgroups
-            if group.filter(pl.col("bucket").is_in(list(short_selection))).height
-        }
-        eligible_groups = long_groups.intersection(short_groups)
-        incomplete_groups = long_groups.symmetric_difference(short_groups)
-        if incomplete_groups and incomplete_group_policy == "raise":
-            raise DataContractError(
-                "portfolio cohort contains a one-sided group; use incomplete_group_policy='drop' "
-                "to exclude and renormalize it"
-            )
-        if not eligible_groups:
-            raise DataContractError("portfolio cohort has no groups containing both legs")
-        group_allocation_count = len(eligible_groups)
-        for group in subgroups:
-            identity = _group_identity(group, group_columns)
-            if identity not in eligible_groups:
-                incomplete_rows += group.height
-                continue
-            for leg, selection, allocation, sign in (
-                ("long", long_selection, long_allocation, 1.0),
-                ("short", short_selection, short_allocation, -1.0),
-            ):
-                leg_frame = group.filter(pl.col("bucket").is_in(list(selection))).sort("instrument")
-                scores = _leg_scores(leg_frame, leg=leg, weighting=weighting)
-                score_sum = float(scores.sum())
-                if weighting == "absolute_signal" and np.all(
-                    leg_frame.get_column("signal").to_numpy() == 0.0
-                ):
-                    fallback_groups += 1
-                magnitudes = scores / score_sum * (allocation / group_allocation_count)
-                target_weights = sign * magnitudes
-                weighted_frames.append(
-                    leg_frame.with_columns(
-                        pl.lit(leg).alias("leg"),
-                        pl.Series("target_weight", target_weights, dtype=pl.Float64),
-                    ).with_columns(
-                        (pl.col("target_weight") * pl.col("forward_return")).alias("contribution")
-                    )
-                )
-    if not weighted_frames:
-        raise DataContractError("no portfolio rows remain after group policy")
-    output = (
-        pl.concat(weighted_frames, how="vertical")
-        .select(
-            "observation_time",
-            "entry_time",
-            "label_end",
-            "instrument",
-            "horizon",
-            "bucket",
-            "leg",
-            "target_weight",
-            "forward_return",
-            "contribution",
-            "signal",
-            *group_columns,
-        )
-        .sort(["observation_time", "leg", *group_columns, "bucket", "instrument"])
+    cohort_group_columns = ["observation_time", *group_columns]
+    legged = matched.with_columns(
+        pl.when(pl.col("bucket").is_in(list(long_selection)))
+        .then(pl.lit("long"))
+        .otherwise(pl.lit("short"))
+        .alias("leg")
     )
+    group_support = legged.group_by(cohort_group_columns, maintain_order=True).agg(
+        (pl.col("leg") == "long").any().alias("_has_long"),
+        (pl.col("leg") == "short").any().alias("_has_short"),
+        pl.len().cast(pl.Int64).alias("_group_rows"),
+    )
+    incomplete_groups = group_support.filter(pl.col("_has_long") != pl.col("_has_short"))
+    incomplete_rows = int(incomplete_groups.get_column("_group_rows").sum() or 0)
+    if incomplete_rows and incomplete_group_policy == "raise":
+        raise DataContractError(
+            "portfolio cohort contains a one-sided group; use incomplete_group_policy='drop' "
+            "to exclude and renormalize it"
+        )
+    eligible_groups = group_support.filter(pl.col("_has_long") & pl.col("_has_short"))
+    eligible_group_counts = eligible_groups.group_by("observation_time", maintain_order=True).agg(
+        pl.len().cast(pl.Int64).alias("_eligible_group_count")
+    )
+    missing_eligible_cohorts = (
+        matched.select("observation_time")
+        .unique(maintain_order=True)
+        .join(eligible_group_counts, on="observation_time", how="anti")
+        .height
+    )
+    if missing_eligible_cohorts:
+        raise DataContractError("portfolio cohort has no groups containing both legs")
+
+    weighted = legged.join(
+        eligible_groups.select(cohort_group_columns),
+        on=cohort_group_columns,
+        how="semi",
+        maintain_order="left",
+    ).join(
+        eligible_group_counts,
+        on="observation_time",
+        how="left",
+        maintain_order="left",
+    )
+    score_group_columns = [*cohort_group_columns, "leg"]
+    fallback_groups = 0
+    if weighting == "equal":
+        score = pl.lit(1.0)
+    elif weighting == "rank":
+        score = (
+            pl.when(pl.col("leg") == "long")
+            .then(pl.col("signal"))
+            .otherwise(-pl.col("signal"))
+            .rank(method="average")
+            .over(score_group_columns)
+        )
+    else:
+        weighted = weighted.with_columns(
+            pl.col("signal").abs().sum().over(score_group_columns).alias("_raw_score_sum")
+        )
+        fallback_groups = (
+            weighted.select(*score_group_columns, "_raw_score_sum")
+            .unique(maintain_order=True)
+            .filter(pl.col("_raw_score_sum") == 0.0)
+            .height
+        )
+        score = pl.when(pl.col("_raw_score_sum") > 0.0).then(pl.col("signal").abs()).otherwise(1.0)
+    weighted = weighted.with_columns(score.cast(pl.Float64).alias("_score")).with_columns(
+        pl.col("_score").sum().over(score_group_columns).alias("_score_sum")
+    )
+    magnitude = (
+        pl.col("_score")
+        / pl.col("_score_sum")
+        * (
+            pl.when(pl.col("leg") == "long").then(long_allocation).otherwise(short_allocation)
+            / pl.col("_eligible_group_count")
+        )
+    )
+    weighted = weighted.with_columns(
+        pl.when(pl.col("leg") == "long")
+        .then(magnitude)
+        .otherwise(-magnitude)
+        .alias("target_weight")
+    ).with_columns((pl.col("target_weight") * pl.col("forward_return")).alias("contribution"))
+    if weighted.is_empty():
+        raise DataContractError("no portfolio rows remain after group policy")
+    output = weighted.select(
+        "observation_time",
+        "entry_time",
+        "label_end",
+        "instrument",
+        "horizon",
+        "bucket",
+        "leg",
+        "target_weight",
+        "forward_return",
+        "contribution",
+        "signal",
+        *group_columns,
+    ).sort(["observation_time", "leg", *group_columns, "bucket", "instrument"])
 
     exposure = output.group_by("observation_time", maintain_order=True).agg(
         pl.col("target_weight").filter(pl.col("leg") == "long").sum().alias("long_exposure"),
