@@ -264,7 +264,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-12 | Event-window alignment/path extraction | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars range/as-of plan |
 | R-13 | Event-response cluster resampling | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | cluster sufficient statistics |
 | R-14 | Diagnostic portfolio allocation core | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars window allocator |
-| R-15 | Universe membership transitions | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | encoded-ID self-join reference |
+| R-15 | Universe membership transitions | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars snapshot self-joins |
 | R-16 | c14n-v1 semantic frame fingerprint | MIGRATE_AFTER_PROFILE | P0 | High | High | Low | PROPOSED | F-02a exact Python streaming |
 
 ### Audit coverage by subsystem
@@ -557,9 +557,23 @@ permutation tests remain authoritative.
 
 ### R-15: universe transitions
 
-Universe drift and membership checks should first use encoded IDs plus Polars self-joins and grouped
-set/count expressions. A native sorted-membership transition scan is reasonable only if snapshot
-cardinality and churn remain material after that rewrite.
+Universe drift now uses stable identity keys, per-source group ordering, consecutive snapshot
+metadata, membership self-joins, and grouped retained/addition/removal counts in Polars. It retains
+the exact retention, Jaccard, drift, finding, ordering, and survivorship-source semantics. Its input
+identity now uses the already-admitted byte-identical streaming c14n-v1 frame encoder rather than a
+whole `to_dicts()` intermediate.
+
+At 80,000 membership rows, four universes, 800 snapshots, and 20% rotating exclusions, the exact
+public checksum was preserved while median latency fell from 579.37 ms to 400.23 ms (1.45 times
+faster). Incremental RSS fell by 25.6% and traced Python peak memory fell by 20.5%. Profiling the
+optimized call attributes only 5.6% of instrumented public time to all Polars work; exact streaming
+c14n-v1 identity owns more than 92%. A native membership scan therefore fails materiality. R-15 is
+`OPTIMIZED_NON_NATIVE`; reopen only with a workload where transition calculation—not required
+semantic identity—is at least 15% of public latency or incremental RSS.
+
+Literal multi-universe fixtures cover zero and partial retention, additions/removals, skipped
+snapshot times, input chunking, group ordering, duplicate rejection, and exact materialized-versus-
+streaming c14n-v1 identity.
 
 ## Explicit non-candidates
 
