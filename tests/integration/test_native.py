@@ -10,6 +10,8 @@ import pytest
 
 import lacuna
 from lacuna import _native
+from lacuna._advanced_inference import _probability_of_backtest_overfitting
+from lacuna.exceptions import DataContractError
 from lacuna.native import native_status
 from lacuna.signal import ic
 
@@ -62,6 +64,96 @@ def test_native_bootstrap_mean_reduction() -> None:
     )
     assert result.dtype == np.float64
     assert result == pytest.approx([7 / 3, 4.0])
+
+
+def test_native_pbo_boundary_returns_compact_typed_arrays() -> None:
+    matrix = np.sin(np.arange(24, dtype=np.float64).reshape(8, 3) * 0.17)
+    combinations = np.asarray(
+        [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]],
+        dtype=np.int64,
+    )
+    selected, in_sample, out_sample, ranks, logits, ties, underperformed = (
+        _native.pbo_partition_splits(matrix, combinations, 4, "mean")
+    )
+
+    assert selected.dtype == np.int64
+    assert in_sample.dtype == np.float64
+    assert out_sample.dtype == np.float64
+    assert ranks.dtype == np.float64
+    assert logits.dtype == np.float64
+    assert ties.dtype == np.uint8
+    assert underperformed.dtype == np.uint8
+    assert all(value.shape == (6,) for value in (selected, in_sample, out_sample, ranks))
+    assert np.isin(ties, (0, 1)).all()
+    assert np.isin(underperformed, (0, 1)).all()
+
+
+def test_native_pbo_boundary_rejects_strides_negative_groups_and_bad_statistics() -> None:
+    matrix = np.arange(48, dtype=np.float64).reshape(8, 6)[:, ::2]
+    groups = np.asarray([[0, 1]], dtype=np.int64)
+    with pytest.raises(ValueError, match="C-contiguous"):
+        _native.pbo_partition_splits(matrix, groups, 4, "mean")
+
+    contiguous = np.ascontiguousarray(matrix)
+    with pytest.raises(ValueError, match="non-negative"):
+        _native.pbo_partition_splits(
+            contiguous,
+            np.asarray([[0, -1]], dtype=np.int64),
+            4,
+            "mean",
+        )
+    with pytest.raises(ValueError, match="statistic"):
+        _native.pbo_partition_splits(contiguous, groups, 4, "median")
+
+
+@pytest.mark.parametrize("statistic", ["mean", "sharpe"])
+def test_native_pbo_matches_partition_moment_reference(statistic: str) -> None:
+    rng = np.random.default_rng(14_008)
+    matrix = rng.normal(size=(60, 8)) + np.arange(8) * 0.02
+    reference = _probability_of_backtest_overfitting(
+        matrix,
+        partitions=6,
+        statistic=statistic,  # type: ignore[arg-type]
+        tie_break="first",
+        backend="reference",
+    )
+    native = _probability_of_backtest_overfitting(
+        matrix,
+        partitions=6,
+        statistic=statistic,  # type: ignore[arg-type]
+        tie_break="first",
+        backend="native",
+    )
+
+    assert native.metrics == reference.metrics
+    assert native.findings == reference.findings
+    assert native.warnings == reference.warnings
+    native_rows = native.table("combinations")
+    reference_rows = reference.table("combinations")
+    for observed, expected in zip(native_rows, reference_rows, strict=True):
+        for field in (
+            "combination",
+            "in_sample_groups",
+            "out_of_sample_groups",
+            "selected_strategy",
+            "selected_strategy_index",
+            "out_of_sample_rank",
+            "relative_rank",
+            "underperformed_median",
+        ):
+            assert observed[field] == expected[field]
+        for field in ("in_sample_performance", "out_of_sample_performance", "logit"):
+            assert observed[field] == pytest.approx(expected[field], rel=1e-12, abs=1e-12)
+
+
+def test_native_pbo_preserves_declared_tie_policy() -> None:
+    matrix = np.column_stack((np.arange(8, dtype=float), np.arange(8, dtype=float)))
+    with pytest.raises(DataContractError, match="selection has a tie"):
+        _probability_of_backtest_overfitting(
+            matrix,
+            partitions=4,
+            backend="native",
+        )
 
 
 def test_native_interval_purge_uses_half_open_intervals() -> None:

@@ -14,7 +14,7 @@ _Scalar = TypeVar("_Scalar", bound=np.generic)
 
 @dataclass(frozen=True, slots=True)
 class NativeArray:
-    """A read-only native-endian one-dimensional array and copy accounting."""
+    """A read-only native-endian array and copy accounting."""
 
     values: npt.NDArray[np.generic]
     copied_bytes: int
@@ -25,10 +25,12 @@ def _readonly_array(
     *,
     dtype: np.dtype[_Scalar],
     name: str,
+    ndim: int = 1,
 ) -> NativeArray:
     array = np.asarray(values)
-    if array.ndim != 1:
-        raise ValueError(f"{name} must be one-dimensional")
+    if array.ndim != ndim:
+        dimension_name = "one-dimensional" if ndim == 1 else "two-dimensional"
+        raise ValueError(f"{name} must be {dimension_name}")
 
     compatible = (
         array.dtype == dtype
@@ -64,3 +66,15 @@ def readonly_int64(values: object, *, name: str) -> NativeArray:
     """Normalize integer input to the native int64 boundary contract."""
 
     return _readonly_array(values, dtype=np.dtype(np.int64), name=name)
+
+
+def readonly_float64_matrix(values: object, *, name: str) -> NativeArray:
+    """Normalize matrix input to the native float64 boundary contract."""
+
+    return _readonly_array(values, dtype=np.dtype(np.float64), name=name, ndim=2)
+
+
+def readonly_int64_matrix(values: object, *, name: str) -> NativeArray:
+    """Normalize matrix input to the native int64 boundary contract."""
+
+    return _readonly_array(values, dtype=np.dtype(np.int64), name=name, ndim=2)

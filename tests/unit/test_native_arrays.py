@@ -4,7 +4,12 @@ import numpy as np
 import polars as pl
 import pytest
 
-from lacuna._native_arrays import readonly_float64, readonly_int64
+from lacuna._native_arrays import (
+    readonly_float64,
+    readonly_float64_matrix,
+    readonly_int64,
+    readonly_int64_matrix,
+)
 
 
 def test_readonly_float64_preserves_compatible_input_without_mutating_flags() -> None:
@@ -45,3 +50,24 @@ def test_readonly_float64_records_polars_copy_fallback() -> None:
 def test_native_array_normalization_rejects_multidimensional_input() -> None:
     with pytest.raises(ValueError, match="one-dimensional"):
         readonly_float64(np.ones((2, 2)), name="values")
+
+
+def test_native_matrix_normalization_preserves_or_accounts_for_storage() -> None:
+    source = np.arange(12, dtype=np.float64).reshape(3, 4)
+    normalized = readonly_float64_matrix(source, name="matrix")
+    assert normalized.values.shape == (3, 4)
+    assert normalized.copied_bytes == 0
+    assert normalized.values.flags.writeable is False
+    assert np.shares_memory(source, normalized.values)
+
+    transposed = np.arange(12, dtype=np.int64).reshape(3, 4).T
+    copied = readonly_int64_matrix(transposed, name="groups")
+    assert copied.values.shape == (4, 3)
+    assert copied.copied_bytes == copied.values.nbytes
+    assert copied.values.flags.c_contiguous
+    assert copied.values.flags.writeable is False
+
+
+def test_native_matrix_normalization_rejects_vectors() -> None:
+    with pytest.raises(ValueError, match="two-dimensional"):
+        readonly_float64_matrix(np.ones(4), name="matrix")

@@ -24,6 +24,7 @@ from lacuna._frames import (
     require_numeric,
     require_time_key,
 )
+from lacuna._native_arrays import readonly_float64_matrix, readonly_int64_matrix
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.experiment import fingerprint
@@ -39,6 +40,8 @@ PermutationStatistic: TypeAlias = (
 )
 PBOStatistic: TypeAlias = Literal["mean", "sharpe"]
 PBOTieBreak: TypeAlias = Literal["raise", "first"]
+_PBOBackend: TypeAlias = Literal["auto", "reference", "native"]
+_PBO_NATIVE_CROSSOVER_COMBINATIONS = 512
 
 
 def _resolved_seed(seed: int | None) -> int:
@@ -790,7 +793,7 @@ def _combined_partition_performance(
     return mean / np.sqrt(variance)
 
 
-def _pbo_for_partitions(
+def _pbo_for_partitions_reference(
     matrix: FloatArray,
     names: tuple[str, ...],
     *,
@@ -868,7 +871,149 @@ def _pbo_for_partitions(
     return pbo, rows, tie_count
 
 
-def probability_of_backtest_overfitting(
+def _native_pbo_for_partitions(
+    matrix: FloatArray,
+    names: tuple[str, ...],
+    *,
+    partitions: int,
+    statistic: PBOStatistic,
+    tie_break: PBOTieBreak,
+    max_combinations: int,
+) -> tuple[float, list[dict[str, JsonValue]], int] | None:
+    """Return compact native PBO output, or ``None`` when the symbol is unavailable."""
+
+    if isinstance(partitions, bool) or not isinstance(partitions, int):
+        raise MethodContractError("PBO partitions must be an integer")
+    if partitions < 2 or partitions % 2:
+        raise MethodContractError("PBO partitions must be an even integer of at least 2")
+    if matrix.shape[0] % partitions:
+        raise DataContractError("PBO requires equal partitions; row count must divide partitions")
+    combination_count = math.comb(partitions, partitions // 2)
+    if combination_count > max_combinations:
+        raise MethodContractError(
+            "PBO combination count exceeds max_combinations; reduce partitions or raise the "
+            "explicit safety limit"
+        )
+    combination_tuples = tuple(combinations(range(partitions), partitions // 2))
+    combination_groups: npt.NDArray[np.int64] = np.asarray(
+        combination_tuples,
+        dtype=np.int64,
+    )
+    try:
+        from lacuna import _native
+    except ImportError:
+        return None
+    if not hasattr(_native, "pbo_partition_splits"):
+        return None
+
+    native_matrix = readonly_float64_matrix(matrix, name="matrix").values
+    native_groups = readonly_int64_matrix(
+        combination_groups,
+        name="combination_groups",
+    ).values
+    try:
+        raw = _native.pbo_partition_splits(
+            native_matrix,
+            native_groups,
+            partitions,
+            statistic,
+        )
+    except ValueError as error:
+        raise DataContractError(str(error)) from error
+    if len(raw) != 7:
+        raise RuntimeError("native PBO reducer returned an invalid carrier")
+    selected, in_performance, out_performance, ranks, logits, ties, underperformed = raw
+    arrays = tuple(np.asarray(value) for value in raw)
+    if any(value.shape != (combination_count,) for value in arrays):
+        raise RuntimeError("native PBO reducer returned inconsistent output lengths")
+    if not np.isfinite(in_performance).all() or not np.isfinite(out_performance).all():
+        raise RuntimeError("native PBO reducer returned non-finite performance")
+    if not np.isfinite(ranks).all() or not np.isfinite(logits).all():
+        raise RuntimeError("native PBO reducer returned non-finite ranks")
+    if np.any(selected < 0) or np.any(selected >= matrix.shape[1]):
+        raise RuntimeError("native PBO reducer returned an invalid strategy index")
+    if not np.isin(ties, (0, 1)).all() or not np.isin(underperformed, (0, 1)).all():
+        raise RuntimeError("native PBO reducer returned an invalid status code")
+    tie_count = int(ties.sum())
+    if tie_count and tie_break == "raise":
+        raise DataContractError(
+            "PBO in-sample selection has a tie; use tie_break='first' only when the "
+            "declared strategy order is a defensible deterministic rule"
+        )
+
+    all_groups = set(range(partitions))
+    rows: list[dict[str, JsonValue]] = []
+    for combination_index, in_sample_groups in enumerate(combination_tuples):
+        out_of_sample_groups = tuple(sorted(all_groups.difference(in_sample_groups)))
+        selected_index = int(selected[combination_index])
+        rank = float(ranks[combination_index])
+        relative_rank = rank / (matrix.shape[1] + 1.0)
+        logit = float(logits[combination_index])
+        expected_logit = math.log(relative_rank / (1.0 - relative_rank))
+        if not math.isclose(logit, expected_logit, rel_tol=1e-15, abs_tol=1e-15):
+            raise RuntimeError("native PBO reducer returned an inconsistent rank logit")
+        rows.append(
+            {
+                "combination": combination_index,
+                "in_sample_groups": tuple(in_sample_groups),
+                "out_of_sample_groups": out_of_sample_groups,
+                "selected_strategy": names[selected_index],
+                "selected_strategy_index": selected_index,
+                "in_sample_performance": float(in_performance[combination_index]),
+                "out_of_sample_performance": float(out_performance[combination_index]),
+                "out_of_sample_rank": rank,
+                "relative_rank": relative_rank,
+                "logit": logit,
+                "underperformed_median": bool(underperformed[combination_index]),
+            }
+        )
+    pbo = float(np.mean(underperformed, dtype=np.float64))
+    return pbo, rows, tie_count
+
+
+def _pbo_for_partitions(
+    matrix: FloatArray,
+    names: tuple[str, ...],
+    *,
+    partitions: int,
+    statistic: PBOStatistic,
+    tie_break: PBOTieBreak,
+    max_combinations: int,
+    backend: _PBOBackend,
+) -> tuple[float, list[dict[str, JsonValue]], int, str]:
+    combination_count = (
+        math.comb(partitions, partitions // 2)
+        if isinstance(partitions, int) and not isinstance(partitions, bool) and partitions >= 2
+        else 0
+    )
+    attempt_native = backend == "native" or (
+        backend == "auto" and combination_count >= _PBO_NATIVE_CROSSOVER_COMBINATIONS
+    )
+    if attempt_native:
+        native = _native_pbo_for_partitions(
+            matrix,
+            names,
+            partitions=partitions,
+            statistic=statistic,
+            tie_break=tie_break,
+            max_combinations=max_combinations,
+        )
+        if native is not None:
+            return (*native, "rust_native")
+        if backend == "native":
+            raise RuntimeError("native PBO reducer is unavailable")
+    reference = _pbo_for_partitions_reference(
+        matrix,
+        names,
+        partitions=partitions,
+        statistic=statistic,
+        tie_break=tie_break,
+        max_combinations=max_combinations,
+    )
+    return (*reference, "numpy_partition_moments")
+
+
+def _probability_of_backtest_overfitting(
     data: object,
     *,
     strategy_columns: Sequence[str] | None = None,
@@ -877,16 +1022,8 @@ def probability_of_backtest_overfitting(
     partition_sensitivity: Sequence[int] | None = None,
     tie_break: PBOTieBreak = "raise",
     max_combinations: int = 20_000,
+    backend: _PBOBackend,
 ) -> AnalysisResult:
-    """Estimate PBO with combinatorially symmetric cross-validation (CSCV).
-
-    This consumes a synchronous ``T x N`` matrix of already-computed strategy
-    performance, partitions its rows into equal chronological groups, performs
-    every symmetric IS/OOS selection, and reports the selected strategy's OOS
-    relative rank and logit for every combination. It is deliberately distinct
-    from model-fitting CPCV in :mod:`lacuna.cv`.
-    """
-
     if statistic not in {"mean", "sharpe"}:
         raise MethodContractError("statistic must be 'mean' or 'sharpe'")
     if tie_break not in {"raise", "first"}:
@@ -905,15 +1042,18 @@ def probability_of_backtest_overfitting(
     main_rows: list[dict[str, JsonValue]] = []
     main_pbo = 0.0
     main_ties = 0
+    selected_backends: set[str] = set()
     for count in counts:
-        pbo, rows, tie_count = _pbo_for_partitions(
+        pbo, rows, tie_count, selected_backend = _pbo_for_partitions(
             matrix,
             names,
             partitions=count,
             statistic=statistic,
             tie_break=tie_break,
             max_combinations=max_combinations,
+            backend=backend,
         )
+        selected_backends.add(selected_backend)
         sensitivity_rows.append(
             {
                 "partitions": count,
@@ -967,7 +1107,11 @@ def probability_of_backtest_overfitting(
                 "tie_break": tie_break,
                 "max_combinations": max_combinations,
                 "partitioning": "equal_contiguous_synchronous_rows",
-                "backend": "numpy_partition_moments",
+                "backend": (
+                    next(iter(selected_backends))
+                    if len(selected_backends) == 1
+                    else "mixed_reference_native"
+                ),
                 "input": source,
             },
             input_fingerprint=fingerprint(matrix, namespace="pbo-input"),
@@ -986,6 +1130,37 @@ def probability_of_backtest_overfitting(
             "partition_sensitivity": tuple(sensitivity_rows),
         },
         warnings=tuple(warnings),
+    )
+
+
+def probability_of_backtest_overfitting(
+    data: object,
+    *,
+    strategy_columns: Sequence[str] | None = None,
+    partitions: int = 8,
+    statistic: PBOStatistic = "sharpe",
+    partition_sensitivity: Sequence[int] | None = None,
+    tie_break: PBOTieBreak = "raise",
+    max_combinations: int = 20_000,
+) -> AnalysisResult:
+    """Estimate PBO with combinatorially symmetric cross-validation (CSCV).
+
+    This consumes a synchronous ``T x N`` matrix of already-computed strategy
+    performance, partitions its rows into equal chronological groups, performs
+    every symmetric IS/OOS selection, and reports the selected strategy's OOS
+    relative rank and logit for every combination. It is deliberately distinct
+    from model-fitting CPCV in :mod:`lacuna.cv`.
+    """
+
+    return _probability_of_backtest_overfitting(
+        data,
+        strategy_columns=strategy_columns,
+        partitions=partitions,
+        statistic=statistic,
+        partition_sensitivity=partition_sensitivity,
+        tie_break=tie_break,
+        max_combinations=max_combinations,
+        backend="auto",
     )
 
 

@@ -2,11 +2,20 @@
 
 #[pyo3::pymodule(gil_used = false)]
 mod _native {
-    use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1};
+    use numpy::{IntoPyArray, PyArray1, PyReadonlyArray1, PyReadonlyArray2, PyUntypedArrayMethods};
     use pyo3::exceptions::PyValueError;
     use pyo3::prelude::*;
 
     type NullableFloatOutput<'py> = (Bound<'py, PyArray1<f64>>, Bound<'py, PyArray1<u8>>);
+    type PboOutput<'py> = (
+        Bound<'py, PyArray1<i64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<f64>>,
+        Bound<'py, PyArray1<u8>>,
+        Bound<'py, PyArray1<u8>>,
+    );
 
     fn copy_f64(array: &PyReadonlyArray1<'_, f64>, name: &str) -> PyResult<Vec<f64>> {
         let values = array.as_slice().map_err(|error| {
@@ -21,6 +30,24 @@ mod _native {
         let values = array.as_slice().map_err(|error| {
             PyValueError::new_err(format!(
                 "{name} must be a one-dimensional, aligned, C-contiguous int64 array: {error}"
+            ))
+        })?;
+        Ok(values.to_vec())
+    }
+
+    fn copy_f64_matrix(array: &PyReadonlyArray2<'_, f64>, name: &str) -> PyResult<Vec<f64>> {
+        let values = array.as_slice().map_err(|error| {
+            PyValueError::new_err(format!(
+                "{name} must be a two-dimensional, aligned, C-contiguous float64 array: {error}"
+            ))
+        })?;
+        Ok(values.to_vec())
+    }
+
+    fn copy_i64_matrix(array: &PyReadonlyArray2<'_, i64>, name: &str) -> PyResult<Vec<i64>> {
+        let values = array.as_slice().map_err(|error| {
+            PyValueError::new_err(format!(
+                "{name} must be a two-dimensional, aligned, C-contiguous int64 array: {error}"
             ))
         })?;
         Ok(values.to_vec())
@@ -102,6 +129,64 @@ mod _native {
             .detach(move || lacuna_core::bootstrap_means(&values, &indices, &offsets))
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
         Ok(result.into_pyarray(py))
+    }
+
+    /// Reduce built-in PBO statistics for checked partition combinations.
+    #[pyfunction]
+    // PyO3 extracts Python arguments into these owned guard values.
+    #[allow(clippy::needless_pass_by_value)]
+    fn pbo_partition_splits<'py>(
+        py: Python<'py>,
+        matrix: PyReadonlyArray2<'py, f64>,
+        combination_groups: PyReadonlyArray2<'py, i64>,
+        partitions: usize,
+        statistic: &str,
+    ) -> PyResult<PboOutput<'py>> {
+        let matrix_shape = matrix.shape();
+        let rows = matrix_shape[0];
+        let columns = matrix_shape[1];
+        let combination_shape = combination_groups.shape();
+        let groups_per_combination = combination_shape[1];
+        let values = copy_f64_matrix(&matrix, "matrix")?;
+        let raw_groups = copy_i64_matrix(&combination_groups, "combination_groups")?;
+        let groups = checked_usize(&raw_groups, "combination_groups")?;
+        let statistic = match statistic {
+            "mean" => lacuna_core::PboStatistic::Mean,
+            "sharpe" => lacuna_core::PboStatistic::Sharpe,
+            _ => {
+                return Err(PyValueError::new_err(
+                    "statistic must be 'mean' or 'sharpe'",
+                ));
+            }
+        };
+        let result = py
+            .detach(move || {
+                lacuna_core::pbo_partition_splits(
+                    &values,
+                    rows,
+                    columns,
+                    partitions,
+                    &groups,
+                    groups_per_combination,
+                    statistic,
+                )
+            })
+            .map_err(|error| PyValueError::new_err(error.to_string()))?;
+        let selected_strategy = result
+            .selected_strategy
+            .into_iter()
+            .map(i64::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|_| PyValueError::new_err("selected strategy index exceeds int64"))?;
+        Ok((
+            selected_strategy.into_pyarray(py),
+            result.in_sample_performance.into_pyarray(py),
+            result.out_of_sample_performance.into_pyarray(py),
+            result.out_of_sample_rank.into_pyarray(py),
+            result.logit.into_pyarray(py),
+            result.selection_tie.into_pyarray(py),
+            result.underperformed_median.into_pyarray(py),
+        ))
     }
 
     /// Mark training intervals that overlap any half-open test interval.

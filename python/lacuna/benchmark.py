@@ -14,6 +14,7 @@ import tracemalloc
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from typing import TypeAlias
 
 import numpy as np
@@ -21,6 +22,7 @@ import numpy.typing as npt
 import polars as pl
 
 from lacuna import bias, costs, events, signal
+from lacuna._advanced_inference import _PBOBackend, _probability_of_backtest_overfitting
 from lacuna.adapters import (
     AdaptedFrame,
     BacktestSchema,
@@ -73,6 +75,8 @@ _PRIVATE_MIGRATION_COST_CASES = {
 _PRIVATE_MIGRATION_VALIDATION_CASES = {
     "migration.validation.permutation.public",
     "migration.validation.pbo.public",
+    "migration.validation.pbo.reference",
+    "migration.validation.pbo.native",
 }
 
 
@@ -945,10 +949,10 @@ def _run_benchmarks(
         cases.extend(
             (name, *private_cost_cases[name]) for name in sorted(requested_private_cost_cases)
         )
-    requested_private_validation_cases = (
+    requested_private_validation_cases: set[str] = (
         set()
         if case_names is None
-        else case_names.intersection(_PRIVATE_MIGRATION_VALIDATION_CASES)
+        else set(case_names.intersection(_PRIVATE_MIGRATION_VALIDATION_CASES))
     )
     if "migration.validation.permutation.public" in requested_private_validation_cases:
         cases.append(
@@ -966,27 +970,52 @@ def _run_benchmarks(
                 "permuted_rows/second",
             )
         )
-    if "migration.validation.pbo.public" in requested_private_validation_cases:
+    requested_pbo_cases = requested_private_validation_cases.intersection(
+        {
+            "migration.validation.pbo.public",
+            "migration.validation.pbo.reference",
+            "migration.validation.pbo.native",
+        }
+    )
+    if requested_pbo_cases:
         pbo_partitions = 14 if resolved.periods >= 200 else 6
         pbo_periods = pbo_partitions * math.ceil(
             max(resolved.periods, pbo_partitions * 4) / pbo_partitions
         )
-        pbo_time = np.arange(pbo_periods, dtype=np.float64)[:, np.newaxis]
-        pbo_identity = np.arange(inference_strategies, dtype=np.float64)[np.newaxis, :]
-        pbo_matrix = np.sin(pbo_time * 0.13 + pbo_identity * 0.29) + pbo_identity * 0.005
-        cases.append(
-            (
-                "migration.validation.pbo.public",
-                lambda: probability_of_backtest_overfitting(
-                    pbo_matrix,
-                    partitions=pbo_partitions,
-                    statistic="sharpe",
-                    tie_break="first",
-                ),
-                math.comb(pbo_partitions, pbo_partitions // 2),
-                "combinations/second",
-            )
+        pbo_time: npt.NDArray[np.float64] = np.arange(
+            pbo_periods,
+            dtype=np.float64,
+        )[:, np.newaxis]
+        pbo_identity: npt.NDArray[np.float64] = np.arange(
+            inference_strategies,
+            dtype=np.float64,
+        )[np.newaxis, :]
+        pbo_matrix: npt.NDArray[np.float64] = (
+            np.sin(pbo_time * 0.13 + pbo_identity * 0.29) + pbo_identity * 0.005
         )
+        pbo_backends: dict[str, _PBOBackend] = {
+            "migration.validation.pbo.public": "auto",
+            "migration.validation.pbo.reference": "reference",
+            "migration.validation.pbo.native": "native",
+        }
+        for case_name in sorted(requested_pbo_cases):
+            backend = pbo_backends[case_name]
+            operation: BenchmarkCallable = partial(
+                _probability_of_backtest_overfitting,
+                pbo_matrix,
+                partitions=pbo_partitions,
+                statistic="sharpe",
+                tie_break="first",
+                backend=backend,
+            )
+            cases.append(
+                (
+                    case_name,
+                    operation,
+                    math.comb(pbo_partitions, pbo_partitions // 2),
+                    "combinations/second",
+                )
+            )
     native = native_status()
     if use_native and native.available:
         cases.extend(
