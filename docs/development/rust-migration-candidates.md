@@ -258,7 +258,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-06 | Shared resampling reduction, `O(RN)`/`O(RNM)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | F-01, Python-owned RNG |
 | R-07 | Built-in permutation schemes/statistics | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
 | R-08 | PBO/CSCV combination evaluation, `O(KNM)` | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | compact output, representative `M` |
-| R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | PROPOSED | one-plan Polars reference |
+| R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | one-plan Polars reference |
 | R-10 | Membership portion of turnover | POLARS_FIRST | P1 | Medium | High | Medium | PROPOSED | encoded IDs/self-join reference |
 | R-11 | Prior-only expanding/rolling regime quantiles | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | exact quantile reference, F-03a |
 | R-12 | Event-window alignment/path extraction | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | range/as-of reference |
@@ -440,9 +440,10 @@ and the explicit maximum-combination guard. Custom statistics stay on the refere
 
 ### R-09: grouped bucket and quantile assignment
 
-**Current path.** General bucket assignment sorts and partitions a Polars frame, then Python invokes
-NumPy assignment logic for each group and concatenates group frames. High-cardinality panels create
-many Python group objects even when each group is small.
+**Measured outcome.** General bucket assignment now uses one Polars plan for group validation,
+stable ordering, balanced and preserve-tie ranks, split-aware quantiles, equal-width and fixed-edge
+assignment, thresholds, explicit drops, and attrition. The prior group-partitioned NumPy path is
+retained as an independent test oracle.
 
 First attempt a single equivalent Polars expression for the supported `BucketSpec` policies. If it
 cannot preserve the exact tie, boundary, small-group, and out-of-range rules efficiently, use:
@@ -456,8 +457,12 @@ attrition, output naming, and sorted frame construction. Differential tests must
 boundary values, repeated values crossing requested quantiles, signed zero, nulls, group skew,
 string/integer identifiers, stable ordering, and fewer effective buckets than requested.
 
-`signal.quantiles` should reuse the same assignment primitive; subsequent return aggregation
-remains Polars.
+At 100,000 rows, 200 groups, and five buckets, the exact public checksum was preserved while the
+median fell from 142.19 ms to 61.87 ms (2.30 times faster) and traced Python peak memory fell by
+about 17.6%. The remaining assignment work is columnar Polars, so no Rust spike is justified.
+R-09 is `OPTIMIZED_NON_NATIVE`; reopen only if a new representative profile isolates a material
+residual outside Polars. `signal.quantiles` reuses this assignment primitive, while return
+aggregation remains Polars.
 
 ### R-10: membership turnover reducer
 
