@@ -260,7 +260,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-08 | PBO/CSCV combination evaluation, `O(KNM)` | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | compact output, representative `M` |
 | R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | one-plan Polars reference |
 | R-10 | Membership portion of turnover | KEEP_PYTHON | P1 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | endpoint self-joins |
-| R-11 | Prior-only expanding/rolling regime quantiles | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | exact quantile reference, F-03a |
+| R-11 | Prior-only expanding/rolling regime quantiles | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | exact Polars order statistics |
 | R-12 | Event-window alignment/path extraction | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | range/as-of reference |
 | R-13 | Event-response cluster resampling | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
 | R-14 | Diagnostic portfolio allocation core | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | columnar allocator reference |
@@ -484,15 +484,19 @@ sorted-intersection bottleneck.
 Only the expanding and rolling modes are candidates. Fixed thresholds are constant work and the
 retrospective mode uses one NumPy quantile calculation.
 
-The current prior-only loop filters finite history and calls `np.quantile` at each observation.
-For expanding mode this can approach quadratic work. A native implementation can maintain an exact
-order-statistic structure for expanding history and a deletion-capable structure for a rolling
-window.
+The prior-only loop has been replaced with rolling Polars order statistics and explicit NumPy
+linear interpolation. The interpolation retains NumPy's two arithmetic branches so thresholds are
+bit-identical, not merely close. It uses history strictly before the current observation,
+distinguishes null/NaN/infinity, enforces `min_history`, and emits the unchanged threshold, history
+count, and label fields. Fixed thresholds and retrospective quantiles retain their simpler paths.
 
-The contract must reproduce NumPy's declared quantile interpolation, use history strictly before
-the current observation, distinguish null/NaN/infinity, enforce `min_history`, and emit the exact
-lower/upper threshold, history count, and label. The observation-level result currently becomes
-JSON-style records, so F-03a must include the unchanged public projection in its measurement.
+For 100,000 rows, a 252-observation window, and about 1.03% nonfinite observations, median public
+latency fell from 5.28 seconds to 1.74 seconds (3.04 times faster) with the exact equivalence
+checksum. In an instrumented optimized call, all Polars collection—including validation, sorting,
+thresholds, classification, and counts—was 93 ms of 5.54 seconds (about 1.7%); immutable result
+projection and c14n-v1 evidence dominate the remaining work. An exact native order-statistic kernel
+therefore fails the 15% materiality screen. R-11 is `OPTIMIZED_NON_NATIVE`; reopen only if a changed
+result carrier or representative workload makes threshold calculation material again.
 
 ### R-12: event-window alignment and extraction
 
