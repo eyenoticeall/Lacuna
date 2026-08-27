@@ -132,7 +132,7 @@
       "input": "float64_array",
       "rows": 100000
     },
-    "public_latency_share": null,
+    "public_latency_share": 1.0,
     "public_operation": "lacuna.experiment.fingerprint",
     "public_rss_share": null,
     "reference_case": "migration.fingerprint.array.reference"

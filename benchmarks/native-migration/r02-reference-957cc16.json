@@ -1,0 +1,108 @@
+{
+  "admission": {
+    "correctness_match": null,
+    "latency_regression_fraction": null,
+    "material": false,
+    "reasons": [
+      "reference measured; no candidate backend was supplied"
+    ],
+    "rss_reduction_fraction": null,
+    "state": "MEASURED",
+    "throughput_ratio": null
+  },
+  "candidate": null,
+  "config": {
+    "bootstrap_resamples": 1000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 500,
+    "periods": 200,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "environment": {
+    "checksum_normalization": "backend excluded; finite floats rounded to 12 significant digits",
+    "copy_measurement": "null until the selected boundary reports exact byte counters",
+    "isolation": "one child process per measured backend",
+    "machine": "arm64",
+    "memory_measurement": "tracemalloc peak; native allocations may not be attributed",
+    "mkl_threads": 1,
+    "native_available": false,
+    "native_threads": 1,
+    "native_version": null,
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "polars": "1.44.0",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 222674944,
+    "processor": "arm",
+    "python": "3.13.12",
+    "timing_clock": "time.perf_counter",
+    "materiality_profile": "All non-fingerprint time is an 8.64% upper bound on the candidate reducer.",
+    "timing_caveat": "Cross-commit local macOS timings are developmental; pinned alternating Linux evidence is the release authority."
+  },
+  "generated_at": "2026-08-27T13:11:45.506697Z",
+  "reference": {
+    "backend": "polars",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.costs.stress.public",
+    "checksum": "a766ccb81eff9401fd12760f3fa9a09a5e1a807b5ab2259ca34deb2476552e28",
+    "incremental_peak_rss_bytes": 30523392,
+    "input_copy_bytes": null,
+    "maximum_seconds": 15.057672042006743,
+    "median_absolute_deviation_seconds": 0.7926825000031386,
+    "median_seconds": 11.63560220799991,
+    "minimum_seconds": 9.53555137499643,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 11.63560220799991,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 225312768,
+    "python_traced_peak_bytes": 91776817,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 77348.81133880776,
+    "throughput_unit": "scenario_rows/second",
+    "timings_seconds": [
+      11.014198709002812,
+      9.53555137499643,
+      15.057672042006743,
+      12.428284708003048,
+      12.208122834010283,
+      11.63560220799991,
+      10.127497749999748
+    ]
+  },
+  "run_url": null,
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "957cc16ce02eabb2450b05f18cd4502912363691",
+  "target": {
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": null,
+    "candidate_id": "R-02",
+    "effective_dimensions": {
+      "components": 3,
+      "periods": 200,
+      "rows": 100000,
+      "scenarios": 9
+    },
+    "public_latency_share": 0.0864,
+    "public_operation": "lacuna.costs.stress",
+    "public_rss_share": null,
+    "reference_case": "migration.costs.stress.public"
+  },
+  "version": 1
+}

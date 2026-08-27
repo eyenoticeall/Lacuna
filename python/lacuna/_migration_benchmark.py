@@ -321,8 +321,7 @@ def evaluate_admission(
     """Apply the mechanical materiality and v0.14 native admission thresholds."""
 
     material = (
-        reference.median_seconds >= 0.05
-        or (target.public_latency_share or 0.0) >= 0.15
+        (target.public_latency_share or 0.0) >= 0.15
         or (target.public_rss_share or 0.0) >= 0.15
         or target.asymptotic_or_unbounded
     )

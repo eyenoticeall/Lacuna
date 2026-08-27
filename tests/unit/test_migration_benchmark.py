@@ -54,6 +54,7 @@ def _target(**changes: object) -> MigrationBenchmarkTarget:
         "reference_case": "signal.ic.reference",
         "candidate_case": "signal.ic.native",
         "effective_dimensions": {"rows": 100_000, "groups": 200},
+        "public_latency_share": 0.25,
     }
     values.update(changes)
     return MigrationBenchmarkTarget(**values)  # type: ignore[arg-type]
@@ -91,7 +92,7 @@ def test_admission_accepts_memory_reduction_without_latency_regression() -> None
 
 def test_admission_rejects_fast_but_immaterial_micro_case() -> None:
     decision = evaluate_admission(
-        _target(),
+        _target(public_latency_share=None),
         _measurement(seconds=0.01),
         _measurement(seconds=0.001),
     )
