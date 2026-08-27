@@ -62,6 +62,14 @@ Fingerprint inputs must be canonical before hashing:
 - callable identity is represented by registered name and version, not memory address;
 - NaN and infinity are prohibited in canonical JSON.
 
+c14n-v1 fingerprints accept numeric NumPy arrays and Polars frames as logical equivalents of their
+existing nested-list and row-record representations. They encode them in bounded one-MiB batches,
+so inference callers do not first construct whole `.tolist()` or `.to_dicts()` trees. Key sorting,
+row order, scalar formatting, signed-zero normalization, date/time conversion, sensitive-key
+rejection, and SHA-256 prefixes/digests remain byte-identical. Physical array contiguity, Polars
+chunk layout, and dataframe column order do not change a logical fingerprint; row order does.
+`canonical_json()` retains its public string return and existing accepted-input contract.
+
 A fingerprint descriptor includes the hash algorithm and canonicalization version. Changing canonicalization rules changes that version. A BLAKE3 content fingerprint is a reasonable target, but the public contract should not imply that two equal fingerprints prove the semantic equivalence of unmodeled external state.
 
 ### Dataset fingerprints

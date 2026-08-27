@@ -610,8 +610,8 @@ def multiple_testing(
         warnings.append("The effective trial count is user-supplied and not estimated by Lacuna.")
     input_fingerprint = fingerprint(
         {
-            "trial_ids": frame.get_column("trial_id").to_list(),
-            "p_values": values.tolist(),
+            "trial_ids": frame.get_column("trial_id"),
+            "p_values": values,
         },
         namespace="multiple-testing-input",
     )

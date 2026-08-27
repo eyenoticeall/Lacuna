@@ -10,6 +10,7 @@ from lacuna._migration_benchmark import (
     MigrationBenchmarkArtifact,
     MigrationBenchmarkTarget,
     MigrationMeasurement,
+    _worker_payload,
     evaluate_admission,
     validate_artifact,
 )
@@ -154,3 +155,16 @@ def test_artifact_validator_rejects_unknown_schema_and_state() -> None:
 def test_target_rejects_invalid_profile_shares() -> None:
     with pytest.raises(MethodContractError):
         _target(public_latency_share=1.1)
+
+
+def test_private_fingerprint_cases_preserve_digest_without_public_benchmark_case() -> None:
+    config = BenchmarkConfig(periods=30, instruments=20, repetitions=1, warmups=0)
+    reference = _worker_payload("migration.fingerprint.array.reference", config, use_native=False)
+    candidate = _worker_payload("migration.fingerprint.array.streaming", config, use_native=True)
+    reference_measurement = reference["measurement"]
+    candidate_measurement = candidate["measurement"]
+    assert isinstance(reference_measurement, dict)
+    assert isinstance(candidate_measurement, dict)
+    assert reference_measurement["checksum"] == candidate_measurement["checksum"]
+    assert reference_measurement["backend"] == "python_materialized_reference"
+    assert candidate_measurement["backend"] == "python_streaming"

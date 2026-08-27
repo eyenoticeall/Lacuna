@@ -326,8 +326,8 @@ def permutation_test(
             seed=resolved_seed,
             input_fingerprint=fingerprint(
                 {
-                    "values": values.tolist(),
-                    "paired": paired.tolist() if paired is not None else None,
+                    "values": values,
+                    "paired": paired,
                 },
                 namespace="permutation-input",
             ),
@@ -519,7 +519,7 @@ def sharpe_inference(
                 "null_policy": null_policy,
                 "input": source,
             },
-            input_fingerprint=fingerprint(values.tolist(), namespace="sharpe-inference-input"),
+            input_fingerprint=fingerprint(values, namespace="sharpe-inference-input"),
         ),
         metrics={
             "observed_sharpe": observed_sharpe,
@@ -826,7 +826,7 @@ def probability_of_backtest_overfitting(
                 "partitioning": "equal_contiguous_synchronous_rows",
                 "input": source,
             },
-            input_fingerprint=fingerprint(matrix.tolist(), namespace="pbo-input"),
+            input_fingerprint=fingerprint(matrix, namespace="pbo-input"),
         ),
         metrics={
             "pbo": main_pbo,
@@ -1002,7 +1002,7 @@ def joint_stationary_bootstrap(
                 "input": source,
             },
             seed=resolved_seed,
-            input_fingerprint=fingerprint(matrix.tolist(), namespace="joint-bootstrap-input"),
+            input_fingerprint=fingerprint(matrix, namespace="joint-bootstrap-input"),
         ),
         metrics={
             "n_observations": int(matrix.shape[0]),
@@ -1101,7 +1101,7 @@ def reality_check(
                 "input": source,
             },
             seed=resolved_seed,
-            input_fingerprint=fingerprint(matrix.tolist(), namespace="reality-check-input"),
+            input_fingerprint=fingerprint(matrix, namespace="reality-check-input"),
         ),
         metrics={
             "statistic": observed,
@@ -1304,7 +1304,7 @@ def superior_predictive_ability(
                 "input": source,
             },
             seed=resolved_seed,
-            input_fingerprint=fingerprint(matrix.tolist(), namespace="spa-input"),
+            input_fingerprint=fingerprint(matrix, namespace="spa-input"),
         ),
         metrics={
             "statistic": observed,

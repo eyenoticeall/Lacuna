@@ -3,22 +3,45 @@
 from __future__ import annotations
 
 import argparse
+import gc
+import hashlib
 import json
 import math
 import os
+import platform
 import statistics
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+import time
+import tracemalloc
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Literal, cast
 
-from lacuna.benchmark import BenchmarkConfig, _run_benchmark_case_detailed
+import numpy as np
+import numpy.typing as npt
+import polars as pl
+
+from lacuna._frames import frame_records
+from lacuna.benchmark import (
+    BenchmarkConfig,
+    _current_rss_bytes,
+    _process_peak_rss_bytes,
+    _run_benchmark_case_detailed,
+)
 from lacuna.exceptions import MethodContractError
+from lacuna.experiment import fingerprint
+from lacuna.native import native_status
 
 MIGRATION_BENCHMARK_SCHEMA = "lacuna.native-migration-benchmark"
 MIGRATION_BENCHMARK_VERSION = 1
+_PRIVATE_FINGERPRINT_CASES = {
+    "migration.fingerprint.array.reference",
+    "migration.fingerprint.array.streaming",
+    "migration.fingerprint.frame.reference",
+    "migration.fingerprint.frame.streaming",
+}
 
 MigrationState = Literal[
     "PROPOSED",
@@ -640,10 +663,128 @@ def validate_artifact(payload: Mapping[str, object]) -> None:
         raise MethodContractError("migration benchmark artifact cannot be empty")
 
 
+def _private_fingerprint_case(
+    case_name: str,
+    config: BenchmarkConfig,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Measure full-call c14n-v1 paths without adding public benchmark-v6 cases."""
+
+    row_count = config.rows
+    operation: Callable[[], str]
+    if ".array." in case_name:
+        matrix: npt.NDArray[np.float64] = np.arange(row_count * 4, dtype=np.float64).reshape(
+            row_count, 4
+        )
+        work_items = row_count * 4
+        throughput_unit = "cells/second"
+        if case_name.endswith(".reference"):
+            operation = lambda: fingerprint(  # noqa: E731 - named benchmark operation
+                matrix.tolist(),
+                namespace="migration-fingerprint-array",
+            )
+            backend = "python_materialized_reference"
+        else:
+            operation = lambda: fingerprint(  # noqa: E731 - named benchmark operation
+                matrix,
+                namespace="migration-fingerprint-array",
+            )
+            backend = "python_streaming"
+    else:
+        frame = pl.DataFrame(
+            {
+                "time": np.arange(row_count, dtype=np.int64),
+                "instrument": np.arange(row_count, dtype=np.int64) % config.instruments,
+                "value": np.arange(row_count, dtype=np.float64) / 7.0,
+                "group": np.where(np.arange(row_count) % 2 == 0, "A", "B"),
+            }
+        )
+        work_items = row_count * frame.width
+        throughput_unit = "cells/second"
+        if case_name.endswith(".reference"):
+            operation = lambda: fingerprint(  # noqa: E731 - named benchmark operation
+                frame_records(frame),
+                namespace="migration-fingerprint-frame",
+            )
+            backend = "python_materialized_reference"
+        else:
+            operation = lambda: fingerprint(  # noqa: E731 - named benchmark operation
+                frame,
+                namespace="migration-fingerprint-frame",
+            )
+            backend = "python_streaming"
+
+    baseline_rss = _current_rss_bytes()
+    baseline_peak = _process_peak_rss_bytes()
+    for _ in range(config.warmups):
+        operation()
+    timings: list[float] = []
+    outputs: set[str] = set()
+    for _ in range(config.repetitions):
+        gc.collect()
+        started = time.perf_counter()
+        output = operation()
+        timings.append(time.perf_counter() - started)
+        outputs.add(output)
+    if len(outputs) != 1:
+        raise RuntimeError(f"private migration case {case_name!r} was not deterministic")
+
+    gc.collect()
+    tracemalloc.start()
+    memory_output = operation()
+    _, traced_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+    if memory_output not in outputs:
+        raise RuntimeError(f"private migration case {case_name!r} changed during memory tracing")
+    process_peak = _process_peak_rss_bytes()
+    incremental_peak = None
+    if process_peak is not None:
+        baseline = baseline_peak or baseline_rss
+        if baseline is not None:
+            incremental_peak = max(0, process_peak - baseline)
+    median_seconds = statistics.median(timings)
+    checksum = hashlib.sha256(memory_output.encode()).hexdigest()
+    native = native_status()
+    return (
+        {
+            "case_name": case_name,
+            "backend": backend,
+            "timings_seconds": timings,
+            "throughput": work_items / median_seconds,
+            "throughput_unit": throughput_unit,
+            "baseline_rss_bytes": baseline_rss,
+            "process_peak_rss_bytes": process_peak,
+            "incremental_peak_rss_bytes": incremental_peak,
+            "python_traced_peak_bytes": traced_peak,
+            "input_copy_bytes": None,
+            "output_copy_bytes": None,
+            "temporary_workspace_bytes": None,
+            "result_projection_bytes": None,
+            "checksum": checksum,
+        },
+        {
+            "python": sys.version.split()[0],
+            "platform": platform.platform(),
+            "machine": platform.machine(),
+            "processor": platform.processor() or None,
+            "polars": pl.__version__,
+            "numpy": np.__version__,
+            "native_available": native.available,
+            "native_version": native.version,
+            "process_peak_rss_bytes": process_peak,
+            "memory_measurement": "tracemalloc plus process peak RSS",
+            "timing_clock": "time.perf_counter",
+            "checksum_normalization": "exact c14n-v1 digest identity",
+        },
+    )
+
+
 def _worker_payload(
     case_name: str, config: BenchmarkConfig, *, use_native: bool
 ) -> dict[str, object]:
-    case, trace, environment = _run_benchmark_case_detailed(
+    if case_name in _PRIVATE_FINGERPRINT_CASES:
+        measurement, private_environment = _private_fingerprint_case(case_name, config)
+        return {"measurement": measurement, "environment": private_environment}
+    case, trace, public_environment = _run_benchmark_case_detailed(
         case_name,
         config,
         use_native=use_native,
@@ -665,7 +806,7 @@ def _worker_payload(
             "result_projection_bytes": None,
             "checksum": case.checksum,
         },
-        "environment": dict(environment),
+        "environment": dict(public_environment),
     }
 
 

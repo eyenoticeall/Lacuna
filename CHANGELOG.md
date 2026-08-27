@@ -28,6 +28,9 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Add private immutable execution-budget resolution and make bootstrap honor scoped memory limits
   before allocating fixed output or batches, while retaining deterministic replicate substreams,
   the existing public signature, and single-threaded native execution.
+- Stream c14n-v1 NumPy and Polars fingerprint inputs in bounded batches, preserving exact prefixes,
+  digests, scalar normalization, sensitive-key rejection, row order, and chunk-layout invariance
+  while removing whole-input `.tolist()` intermediates from inference fingerprints.
 
 ## [0.13.0] - 2026-08-27
 

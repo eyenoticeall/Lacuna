@@ -25,6 +25,12 @@ namespace and canonicalization version. Namespaces prevent the same bytes from s
 a dataset ID, trial ID, and result ID. A fingerprint proves equality of the modeled payload; it
 cannot prove semantic equality of state that was omitted.
 
+Numeric NumPy arrays and Polars frames use a bounded streaming implementation behind
+`fingerprint()`. The logical bytes are exactly those of the prior nested-list or sorted-key row
+record, including `-0.0` normalization, while physical strides, chunks, and column order are not
+identity inputs. This is still c14n-v1; it removes transient materialization rather than changing
+the identity format. Binary values remain unsupported and non-finite values still fail closed.
+
 ## Trial and attempt identity
 
 An `ExperimentRegistry` contains experiments within a declared family:

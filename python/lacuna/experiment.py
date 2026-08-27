@@ -9,14 +9,18 @@ import sqlite3
 import threading
 import uuid
 import weakref
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from enum import Enum, StrEnum
+from io import StringIO
 from numbers import Integral, Real
 from pathlib import Path
 from types import MappingProxyType
 from typing import cast
+
+import numpy as np
+import polars as pl
 
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, Finding, FindingState, JsonValue, ResultMetadata, Severity
@@ -33,6 +37,7 @@ _SENSITIVE_KEYS = {
     "secret",
     "token",
 }
+_STREAM_BATCH_TARGET_BYTES = 1024 * 1024
 
 
 class AttemptStatus(StrEnum):
@@ -88,6 +93,221 @@ def _canonicalize(value: object, *, path: str = "$") -> object:
     raise DataContractError(f"{path} contains unsupported value type {type(value).__name__}")
 
 
+def _validate_canonical(value: object, *, path: str = "$") -> None:
+    """Validate c14n-v1 in legacy traversal order without constructing a normalized tree."""
+
+    if isinstance(value, np.generic):
+        _validate_canonical(value.item(), path=path)
+        return
+    if isinstance(value, Enum):
+        _validate_canonical(value.value, path=path)
+        return
+    if isinstance(value, datetime):
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise DataContractError(f"{path} contains a timezone-naive datetime")
+        return
+    if isinstance(value, date | bool | str | Integral) or value is None:
+        return
+    if isinstance(value, Real):
+        if not math.isfinite(float(value)):
+            raise DataContractError(f"{path} contains NaN or infinity")
+        return
+    if isinstance(value, pl.DataFrame):
+        for index, row in enumerate(value.iter_rows(named=True)):
+            _validate_canonical(row, path=f"{path}[{index}]")
+        return
+    if isinstance(value, pl.Series):
+        for index, item in enumerate(value):
+            _validate_canonical(item, path=f"{path}[{index}]")
+        return
+    if isinstance(value, np.ndarray):
+        if value.ndim == 0:
+            _validate_canonical(value.item(), path=path)
+            return
+        if value.dtype.kind in "biuU":
+            return
+        if value.dtype.kind == "f":
+            nonfinite = ~np.isfinite(value)
+            if bool(nonfinite.any()):
+                first = tuple(int(index) for index in np.argwhere(nonfinite)[0])
+                location = "".join(f"[{index}]" for index in first)
+                raise DataContractError(f"{path}{location} contains NaN or infinity")
+            return
+        for index, item in enumerate(value):
+            _validate_canonical(item, path=f"{path}[{index}]")
+        return
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise DataContractError(f"{path} contains a non-string mapping key")
+            if _is_sensitive_key(key):
+                raise DataContractError(
+                    f"{path}.{key} looks credential-bearing and is not recorded"
+                )
+            _validate_canonical(item, path=f"{path}.{key}")
+        return
+    if isinstance(value, list | tuple):
+        for index, item in enumerate(value):
+            _validate_canonical(item, path=f"{path}[{index}]")
+        return
+    if isinstance(value, set | frozenset):
+        raise DataContractError(f"{path} contains an unordered set")
+    if callable(value):
+        raise DataContractError(f"{path} contains an opaque callable")
+    raise DataContractError(f"{path} contains unsupported value type {type(value).__name__}")
+
+
+def _scalar_chunk(value: object) -> str:
+    return json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+
+
+def _normalized_json(value: object) -> str:
+    return json.dumps(
+        value,
+        allow_nan=False,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def _iter_batched_list_chunks(values: Iterator[object]) -> Iterator[str]:
+    yield "["
+    first = True
+    for batch in values:
+        encoded = _normalized_json(batch)
+        interior = encoded[1:-1]
+        if not interior:
+            continue
+        if not first:
+            yield ","
+        yield interior
+        first = False
+    yield "]"
+
+
+def _array_batches(value: np.ndarray, *, path: str) -> Iterator[object]:
+    if len(value) == 0:
+        return
+    row_bytes = max(int(value[0].nbytes) if value.ndim > 1 else int(value.itemsize), 1)
+    rows_per_batch = max(1, _STREAM_BATCH_TARGET_BYTES // row_bytes)
+    for start in range(0, len(value), rows_per_batch):
+        batch = value[start : start + rows_per_batch]
+        if value.dtype.kind == "f":
+            nonfinite = ~np.isfinite(batch)
+            if bool(nonfinite.any()):
+                first = tuple(int(index) for index in np.argwhere(nonfinite)[0])
+                first = (first[0] + start, *first[1:])
+                location = "".join(f"[{index}]" for index in first)
+                raise DataContractError(f"{path}{location} contains NaN or infinity")
+            batch = np.where(batch == 0, 0.0, batch)
+            yield batch.tolist()
+        elif value.dtype.kind in "biuU":
+            yield batch.tolist()
+        else:
+            yield _canonicalize(batch.tolist())
+
+
+def _frame_batches(value: pl.DataFrame) -> Iterator[object]:
+    estimated_size = int(value.estimated_size())
+    estimated_row_bytes = max(estimated_size // max(value.height, 1), 1)
+    rows_per_batch = max(1, _STREAM_BATCH_TARGET_BYTES // estimated_row_bytes)
+    for batch in value.iter_slices(n_rows=rows_per_batch):
+        yield _canonicalize(batch.to_dicts())
+
+
+def _iter_sequence_chunks(values: Iterable[object], *, path: str) -> Iterator[str]:
+    yield "["
+    for index, item in enumerate(values):
+        if index:
+            yield ","
+        yield from _iter_canonical_chunks(item, path=f"{path}[{index}]")
+    yield "]"
+
+
+def _iter_canonical_chunks(value: object, *, path: str = "$") -> Iterator[str]:
+    """Emit exact c14n-v1 text in bounded chunks after validation."""
+
+    if isinstance(value, np.generic):
+        yield from _iter_canonical_chunks(value.item(), path=path)
+        return
+    if isinstance(value, Enum):
+        yield from _iter_canonical_chunks(value.value, path=path)
+        return
+    if isinstance(value, datetime):
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise DataContractError(f"{path} contains a timezone-naive datetime")
+        yield _scalar_chunk(value.astimezone(UTC).isoformat().replace("+00:00", "Z"))
+        return
+    if isinstance(value, date):
+        yield _scalar_chunk(value.isoformat())
+        return
+    if value is None or isinstance(value, bool | str):
+        yield _scalar_chunk(value)
+        return
+    if isinstance(value, Integral):
+        yield str(int(value))
+        return
+    if isinstance(value, Real):
+        numeric = float(value)
+        if not math.isfinite(numeric):
+            raise DataContractError(f"{path} contains NaN or infinity")
+        yield _scalar_chunk(0.0 if numeric == 0.0 else numeric)
+        return
+    if isinstance(value, pl.DataFrame):
+        yield from _iter_batched_list_chunks(_frame_batches(value))
+        return
+    if isinstance(value, np.ndarray):
+        if value.ndim == 0:
+            yield from _iter_canonical_chunks(value.item(), path=path)
+            return
+        yield from _iter_batched_list_chunks(_array_batches(value, path=path))
+        return
+    if isinstance(value, pl.Series):
+        yield from _iter_sequence_chunks(value, path=path)
+        return
+    if isinstance(value, Mapping):
+        _validate_canonical(value, path=path)
+        yield "{"
+        for index, key in enumerate(sorted(value)):
+            if index:
+                yield ","
+            yield _scalar_chunk(key)
+            yield ":"
+            yield from _iter_canonical_chunks(value[key], path=f"{path}.{key}")
+        yield "}"
+        return
+    if isinstance(value, list | tuple):
+        yield from _iter_sequence_chunks(value, path=path)
+        return
+    if isinstance(value, set | frozenset):
+        raise DataContractError(f"{path} contains an unordered set")
+    if callable(value):
+        raise DataContractError(f"{path} contains an opaque callable")
+    raise DataContractError(f"{path} contains unsupported value type {type(value).__name__}")
+
+
+def _streaming_canonical_json(value: object) -> str:
+    output = StringIO()
+    output.writelines(_iter_canonical_chunks(value))
+    return output.getvalue()
+
+
+def _streaming_fingerprint(value: object, *, namespace: str) -> str:
+    if not namespace or namespace.strip() != namespace:
+        raise MethodContractError("fingerprint namespace must be a non-empty trimmed string")
+    digest = hashlib.sha256()
+    digest.update(f"lacuna:c14n:{CANONICALIZATION_VERSION}:{namespace}\0".encode())
+    for chunk in _iter_canonical_chunks(value):
+        digest.update(chunk.encode())
+    return f"sha256:c14n-v{CANONICALIZATION_VERSION}:{digest.hexdigest()}"
+
+
 def canonical_json(value: object) -> str:
     """Encode supported values with deterministic key, time, float, and sequence semantics."""
 
@@ -100,11 +320,23 @@ def canonical_json(value: object) -> str:
     )
 
 
+def _contains_bulk_canonical_input(value: object) -> bool:
+    if isinstance(value, np.ndarray | pl.DataFrame | pl.Series):
+        return True
+    if isinstance(value, Mapping):
+        return any(_contains_bulk_canonical_input(item) for item in value.values())
+    if isinstance(value, list | tuple):
+        return any(_contains_bulk_canonical_input(item) for item in value)
+    return False
+
+
 def fingerprint(value: object, *, namespace: str) -> str:
     """Return a versioned SHA-256 identity over canonical JSON and an explicit namespace."""
 
     if not namespace or namespace.strip() != namespace:
         raise MethodContractError("fingerprint namespace must be a non-empty trimmed string")
+    if _contains_bulk_canonical_input(value):
+        return _streaming_fingerprint(value, namespace=namespace)
     payload = (
         f"lacuna:c14n:{CANONICALIZATION_VERSION}:{namespace}\0{canonical_json(value)}"
     ).encode()
