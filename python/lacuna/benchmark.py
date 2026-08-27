@@ -72,6 +72,7 @@ _PRIVATE_MIGRATION_COST_CASES = {
 }
 _PRIVATE_MIGRATION_VALIDATION_CASES = {
     "migration.validation.permutation.public",
+    "migration.validation.pbo.public",
 }
 
 
@@ -963,6 +964,27 @@ def _run_benchmarks(
                 ),
                 inference_matrix.shape[0] * resolved.bootstrap_resamples * 2,
                 "permuted_rows/second",
+            )
+        )
+    if "migration.validation.pbo.public" in requested_private_validation_cases:
+        pbo_partitions = 14 if resolved.periods >= 200 else 6
+        pbo_periods = pbo_partitions * math.ceil(
+            max(resolved.periods, pbo_partitions * 4) / pbo_partitions
+        )
+        pbo_time = np.arange(pbo_periods, dtype=np.float64)[:, np.newaxis]
+        pbo_identity = np.arange(inference_strategies, dtype=np.float64)[np.newaxis, :]
+        pbo_matrix = np.sin(pbo_time * 0.13 + pbo_identity * 0.29) + pbo_identity * 0.005
+        cases.append(
+            (
+                "migration.validation.pbo.public",
+                lambda: probability_of_backtest_overfitting(
+                    pbo_matrix,
+                    partitions=pbo_partitions,
+                    statistic="sharpe",
+                    tie_break="first",
+                ),
+                math.comb(pbo_partitions, pbo_partitions // 2),
+                "combinations/second",
             )
         )
     native = native_status()

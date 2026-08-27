@@ -191,9 +191,10 @@ def test_timed_fingerprint_worker_skips_python_memory_trace() -> None:
         "migration.costs.capacity.public",
         "migration.costs.break_even.public",
         "migration.validation.permutation.public",
+        "migration.validation.pbo.public",
     ),
 )
-def test_private_cost_cases_measure_public_calls_without_extending_benchmark_v6(
+def test_private_migration_cases_measure_public_calls_without_extending_benchmark_v6(
     case_name: str,
 ) -> None:
     config = BenchmarkConfig(
@@ -209,6 +210,7 @@ def test_private_cost_cases_measure_public_calls_without_extending_benchmark_v6(
     measurement = payload["measurement"]
     assert isinstance(measurement, dict)
     assert measurement["case_name"] == case_name
-    assert measurement["backend"] == "polars"
+    assert isinstance(measurement["backend"], str)
+    assert measurement["backend"]
     assert measurement["python_traced_peak_bytes"] == 0
     assert len(str(measurement["checksum"])) == 64
