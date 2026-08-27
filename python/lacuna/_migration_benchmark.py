@@ -404,7 +404,13 @@ def evaluate_admission(
     )
 
 
-def _worker_command(case_name: str, config: BenchmarkConfig, *, use_native: bool) -> list[str]:
+def _worker_command(
+    case_name: str,
+    config: BenchmarkConfig,
+    *,
+    use_native: bool,
+    instrumented: bool,
+) -> list[str]:
     command = [
         sys.executable,
         "-m",
@@ -417,11 +423,17 @@ def _worker_command(case_name: str, config: BenchmarkConfig, *, use_native: bool
     ]
     if use_native:
         command.append("--use-native")
+    if instrumented:
+        command.append("--instrumented")
     return command
 
 
 def _run_worker(
-    case_name: str, config: BenchmarkConfig, *, use_native: bool
+    case_name: str,
+    config: BenchmarkConfig,
+    *,
+    use_native: bool,
+    instrumented: bool = False,
 ) -> tuple[MigrationMeasurement, Mapping[str, object]]:
     environment = os.environ.copy()
     environment.update(
@@ -434,7 +446,12 @@ def _run_worker(
         }
     )
     completed = subprocess.run(
-        _worker_command(case_name, config, use_native=use_native),
+        _worker_command(
+            case_name,
+            config,
+            use_native=use_native,
+            instrumented=instrumented,
+        ),
         check=False,
         capture_output=True,
         env=environment,
@@ -530,6 +547,30 @@ def _aggregate_measurements(
     )
 
 
+def _add_instrumentation(
+    measurement: MigrationMeasurement,
+    instrumented: MigrationMeasurement,
+) -> MigrationMeasurement:
+    if (
+        measurement.case_name != instrumented.case_name
+        or measurement.backend != instrumented.backend
+        or measurement.checksum != instrumented.checksum
+    ):
+        raise RuntimeError("instrumented migration result does not match the timed result")
+    return replace(
+        measurement,
+        python_traced_peak_bytes=instrumented.python_traced_peak_bytes,
+        input_copy_bytes=instrumented.input_copy_bytes,
+        output_copy_bytes=instrumented.output_copy_bytes,
+        temporary_workspace_bytes=instrumented.temporary_workspace_bytes,
+        result_projection_bytes=instrumented.result_projection_bytes,
+        phase_seconds={
+            **instrumented.phase_seconds,
+            "public_call_total": measurement.median_seconds,
+        },
+    )
+
+
 def run_isolated_migration_benchmark(
     target: MigrationBenchmarkTarget,
     config: BenchmarkConfig,
@@ -578,6 +619,27 @@ def run_isolated_migration_benchmark(
         raise RuntimeError("reference migration benchmark did not run")
     reference = _aggregate_measurements(reference_runs)
     candidate = _aggregate_measurements(candidate_runs) if candidate_runs else None
+    reference_instrumented, reference_instrumented_environment = _run_worker(
+        target.reference_case,
+        single_run,
+        use_native=False,
+        instrumented=True,
+    )
+    reference = _add_instrumentation(reference, reference_instrumented)
+    if environment.get("python") != reference_instrumented_environment.get("python"):
+        raise RuntimeError("reference instrumentation used a different Python runtime")
+    if target.candidate_case is not None and candidate is not None:
+        candidate_instrumented, candidate_instrumented_environment = _run_worker(
+            target.candidate_case,
+            single_run,
+            use_native=True,
+            instrumented=True,
+        )
+        candidate = _add_instrumentation(candidate, candidate_instrumented)
+        if candidate_environment is not None and (
+            candidate_environment.get("python") != candidate_instrumented_environment.get("python")
+        ):
+            raise RuntimeError("candidate instrumentation used a different Python runtime")
     if candidate_environment is not None:
         for key in ("python", "platform", "machine", "polars", "numpy", "native_version"):
             if environment.get(key) != candidate_environment.get(key):
@@ -666,6 +728,8 @@ def validate_artifact(payload: Mapping[str, object]) -> None:
 def _private_fingerprint_case(
     case_name: str,
     config: BenchmarkConfig,
+    *,
+    instrumented: bool,
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Measure full-call c14n-v1 paths without adding public benchmark-v6 cases."""
 
@@ -728,13 +792,18 @@ def _private_fingerprint_case(
     if len(outputs) != 1:
         raise RuntimeError(f"private migration case {case_name!r} was not deterministic")
 
-    gc.collect()
-    tracemalloc.start()
-    memory_output = operation()
-    _, traced_peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    if memory_output not in outputs:
-        raise RuntimeError(f"private migration case {case_name!r} changed during memory tracing")
+    memory_output = next(iter(outputs))
+    traced_peak = 0
+    if instrumented:
+        gc.collect()
+        tracemalloc.start()
+        memory_output = operation()
+        _, traced_peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        if memory_output not in outputs:
+            raise RuntimeError(
+                f"private migration case {case_name!r} changed during memory tracing"
+            )
     process_peak = _process_peak_rss_bytes()
     incremental_peak = None
     if process_peak is not None:
@@ -779,15 +848,24 @@ def _private_fingerprint_case(
 
 
 def _worker_payload(
-    case_name: str, config: BenchmarkConfig, *, use_native: bool
+    case_name: str,
+    config: BenchmarkConfig,
+    *,
+    use_native: bool,
+    instrumented: bool = True,
 ) -> dict[str, object]:
     if case_name in _PRIVATE_FINGERPRINT_CASES:
-        measurement, private_environment = _private_fingerprint_case(case_name, config)
+        measurement, private_environment = _private_fingerprint_case(
+            case_name,
+            config,
+            instrumented=instrumented,
+        )
         return {"measurement": measurement, "environment": private_environment}
     case, trace, public_environment = _run_benchmark_case_detailed(
         case_name,
         config,
         use_native=use_native,
+        measure_python_memory=instrumented,
     )
     return {
         "measurement": {
@@ -817,6 +895,7 @@ def _main(arguments: Sequence[str] | None = None) -> int:
     worker.add_argument("--case", required=True)
     worker.add_argument("--config-json", required=True)
     worker.add_argument("--use-native", action="store_true")
+    worker.add_argument("--instrumented", action="store_true")
     parsed = parser.parse_args(arguments)
     if parsed.command != "worker":  # pragma: no cover - argparse enforces this
         return 2
@@ -828,6 +907,7 @@ def _main(arguments: Sequence[str] | None = None) -> int:
         cast(str, parsed.case),
         config,
         use_native=cast(bool, parsed.use_native),
+        instrumented=cast(bool, parsed.instrumented),
     )
     sys.stdout.write(json.dumps(payload, allow_nan=False, sort_keys=True))
     return 0

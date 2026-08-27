@@ -353,6 +353,7 @@ def _measure(
     throughput_unit: str,
     config: BenchmarkConfig,
     trace_sink: list[_BenchmarkTrace] | None = None,
+    measure_python_memory: bool = True,
 ) -> BenchmarkCase:
     baseline_rss_bytes = _current_rss_bytes()
     baseline_peak_rss_bytes = _process_peak_rss_bytes()
@@ -372,15 +373,17 @@ def _measure(
     if len(checksums) != 1:
         raise RuntimeError(f"benchmark case {name!r} produced non-deterministic evidence")
 
-    gc.collect()
-    tracemalloc.start()
-    memory_output = operation()
-    _, peak_bytes = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    memory_payload, memory_backend = _output_payload(memory_output)
-    memory_checksum = _checksum(memory_payload)
-    if memory_checksum not in checksums or memory_backend != backend:
-        raise RuntimeError(f"benchmark case {name!r} changed during memory measurement")
+    peak_bytes = 0
+    if measure_python_memory:
+        gc.collect()
+        tracemalloc.start()
+        memory_output = operation()
+        _, peak_bytes = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        memory_payload, memory_backend = _output_payload(memory_output)
+        memory_checksum = _checksum(memory_payload)
+        if memory_checksum not in checksums or memory_backend != backend:
+            raise RuntimeError(f"benchmark case {name!r} changed during memory measurement")
 
     median_seconds = statistics.median(timings)
     case = BenchmarkCase(
@@ -548,6 +551,7 @@ def _run_benchmarks(
     use_native: bool = True,
     case_names: frozenset[str] | None = None,
     trace_sink: list[_BenchmarkTrace] | None = None,
+    measure_python_memory: bool = True,
 ) -> BenchmarkSuite:
     """Measure released public workflows without enforcing machine-specific speed budgets."""
 
@@ -921,6 +925,7 @@ def _run_benchmarks(
             throughput_unit=unit,
             config=resolved,
             trace_sink=trace_sink,
+            measure_python_memory=measure_python_memory,
         )
         for name, operation, work_items, unit in cases
     )
@@ -952,6 +957,7 @@ def _run_benchmark_case_detailed(
     config: BenchmarkConfig,
     *,
     use_native: bool,
+    measure_python_memory: bool = True,
 ) -> tuple[BenchmarkCase, _BenchmarkTrace, Mapping[str, object]]:
     """Measure one prepared public case for an isolated migration worker."""
 
@@ -961,6 +967,7 @@ def _run_benchmark_case_detailed(
         use_native=use_native,
         case_names=frozenset({name}),
         trace_sink=traces,
+        measure_python_memory=measure_python_memory,
     )
     if len(suite.cases) != 1 or len(traces) != 1:
         raise RuntimeError(f"isolated benchmark case {name!r} did not produce one measurement")

@@ -168,3 +168,16 @@ def test_private_fingerprint_cases_preserve_digest_without_public_benchmark_case
     assert reference_measurement["checksum"] == candidate_measurement["checksum"]
     assert reference_measurement["backend"] == "python_materialized_reference"
     assert candidate_measurement["backend"] == "python_streaming"
+
+
+def test_timed_fingerprint_worker_skips_python_memory_trace() -> None:
+    config = BenchmarkConfig(periods=30, instruments=20, repetitions=1, warmups=0)
+    payload = _worker_payload(
+        "migration.fingerprint.array.streaming",
+        config,
+        use_native=True,
+        instrumented=False,
+    )
+    measurement = payload["measurement"]
+    assert isinstance(measurement, dict)
+    assert measurement["python_traced_peak_bytes"] == 0
