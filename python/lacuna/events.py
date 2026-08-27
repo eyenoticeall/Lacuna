@@ -13,6 +13,7 @@ import numpy.typing as npt
 import polars as pl
 
 from lacuna._attrition import attrition_record
+from lacuna._execution import resolve_execution_budget
 from lacuna._frames import (
     eager_frame,
     frame_records,
@@ -569,23 +570,56 @@ def event_response(
             _integer(windows.metadata.parameters["after"], name="after") + 1,
         )
     )
-    complete_paths: list[tuple[object, FloatArray]] = []
-    for path in frame.partition_by("event_id", maintain_order=True):
-        ordered = path.sort("offset")
-        if tuple(ordered.get_column("offset")) != expected_offsets:
-            continue
-        complete_paths.append(
-            (
-                ordered.get_column("aligned_anchor_time")[0],
-                ordered.get_column("response").to_numpy().astype(np.float64, copy=False),
-            )
+    ordered_paths = frame.sort(["aligned_anchor_time", "event_id", "offset"])
+    complete_events = (
+        ordered_paths.group_by("event_id", maintain_order=True)
+        .agg(
+            pl.col("aligned_anchor_time").first().alias("_anchor_time"),
+            pl.len().alias("_path_length"),
+            pl.col("offset").n_unique().alias("_unique_offsets"),
+            pl.col("offset").min().alias("_minimum_offset"),
+            pl.col("offset").max().alias("_maximum_offset"),
         )
-    clusters: dict[object, list[FloatArray]] = {}
-    for anchor_time, path in complete_paths:
-        clusters.setdefault(anchor_time, []).append(path)
-    cluster_paths = [np.stack(paths) for paths in clusters.values()]
-    n_clusters = len(cluster_paths)
-    n_complete = len(complete_paths)
+        .filter(
+            (pl.col("_path_length") == len(expected_offsets))
+            & (pl.col("_unique_offsets") == len(expected_offsets))
+            & (pl.col("_minimum_offset") == expected_offsets[0])
+            & (pl.col("_maximum_offset") == expected_offsets[-1])
+        )
+    )
+    n_complete = complete_events.height
+    complete_matrix: FloatArray
+    cluster_counts: npt.NDArray[np.int64]
+    cluster_sums: FloatArray
+    if n_complete:
+        complete_rows = ordered_paths.join(
+            complete_events.select("event_id"),
+            on="event_id",
+            how="semi",
+            maintain_order="left",
+        )
+        complete_matrix = (
+            complete_rows.get_column("response")
+            .to_numpy()
+            .astype(np.float64, copy=False)
+            .reshape(n_complete, len(expected_offsets))
+        )
+        anchors = complete_events.get_column("_anchor_time").to_list()
+        cluster_starts = [0]
+        cluster_starts.extend(
+            index for index in range(1, n_complete) if anchors[index] != anchors[index - 1]
+        )
+        cluster_counts = np.diff(np.asarray([*cluster_starts, n_complete], dtype=np.int64))
+        cluster_sums = np.add.reduceat(
+            complete_matrix,
+            np.asarray(cluster_starts, dtype=np.int64),
+            axis=0,
+        )
+    else:
+        complete_matrix = np.empty((0, len(expected_offsets)), dtype=np.float64)
+        cluster_counts = np.empty(0, dtype=np.int64)
+        cluster_sums = np.empty((0, len(expected_offsets)), dtype=np.float64)
+    n_clusters = int(cluster_counts.size)
     input_events = frame.get_column("event_id").n_unique()
     block_length = (
         max(2.0, round(n_clusters ** (1.0 / 3.0)))
@@ -658,19 +692,35 @@ def event_response(
     root_entropy = seed if seed is not None else secrets.randbits(128)
     child = np.random.SeedSequence(root_entropy).spawn(1)[0]
     rng = np.random.default_rng(child)
+    center: FloatArray = complete_matrix.mean(axis=0)
+    bootstrap: FloatArray = np.empty((resamples, len(expected_offsets)), dtype=np.float64)
+    index_bytes = resamples * n_clusters * np.dtype(np.int64).itemsize
+    execution_budget = resolve_execution_budget(
+        total_items=resamples,
+        required_fixed_allocation_bytes=(
+            index_bytes + bootstrap.nbytes + cluster_sums.nbytes + cluster_counts.nbytes
+        ),
+        per_item_workspace_bytes=(
+            n_clusters * (len(expected_offsets) + 1) * np.dtype(np.float64).itemsize
+        ),
+        backend="numpy_reference",
+        dispatch_reason=(
+            "Python-owned event RNG with bounded cluster sufficient-statistic reduction"
+        ),
+    )
     indices = stationary_bootstrap_indices(
         n_clusters,
         resamples=resamples,
         expected_block_length=block_length,
         rng=rng,
     )
-    complete_matrix: FloatArray = np.concatenate(cluster_paths, axis=0)
-    center: FloatArray = complete_matrix.mean(axis=0)
-    bootstrap: FloatArray = np.empty((resamples, len(expected_offsets)), dtype=np.float64)
-    for replicate, sample in enumerate(indices):
-        bootstrap[replicate] = np.concatenate(
-            [cluster_paths[int(index)] for index in sample], axis=0
-        ).mean(axis=0)
+    batch_size = execution_budget.selected_batch_size
+    for batch_start in range(0, resamples, batch_size):
+        batch_end = min(resamples, batch_start + batch_size)
+        samples = indices[batch_start:batch_end]
+        sample_sums = cluster_sums[samples].sum(axis=1)
+        sample_counts = cluster_counts[samples].sum(axis=1).astype(np.float64, copy=False)
+        bootstrap[batch_start:batch_end] = sample_sums / sample_counts[:, np.newaxis]
     alpha = 1.0 - confidence
     pointwise: FloatArray = np.quantile(bootstrap, [alpha / 2.0, 1.0 - alpha / 2.0], axis=0)
     deviations: FloatArray = bootstrap.std(axis=0, ddof=1)

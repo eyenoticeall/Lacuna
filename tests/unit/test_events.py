@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import numpy as np
 import polars as pl
 import pytest
 
-from lacuna.events import event_response, event_windows
-from lacuna.exceptions import DataContractError
-from lacuna.types import FindingState
+from lacuna._resampling import stationary_bootstrap_indices
+from lacuna.config import config
+from lacuna.events import EventWindowResult, event_response, event_windows
+from lacuna.exceptions import ConfigurationError, DataContractError
+from lacuna.types import AnalysisResult, FindingState, ResultMetadata
 
 
 def _prices(*, instruments: tuple[str, ...] = ("A",), periods: int = 30) -> pl.DataFrame:
@@ -350,3 +353,91 @@ def test_event_response_zero_variance_has_no_standardized_band() -> None:
 
     assert result.metrics["simultaneous_critical_value"] is None
     assert all(row["simultaneous_lower"] is None for row in result.table("event_response"))
+
+
+def _unequal_cluster_windows() -> EventWindowResult:
+    rows: list[dict[str, object]] = []
+    for cluster in range(20):
+        for member in range(1 + cluster % 3):
+            event_id = f"event-{cluster}-{member}"
+            for offset in (-1, 0, 1):
+                rows.append(
+                    {
+                        "event_id": event_id,
+                        "instrument": f"asset-{cluster}-{member}",
+                        "aligned_anchor_time": cluster,
+                        "offset": offset,
+                        "response": cluster * 0.001 + member * 0.01 + offset * 0.002,
+                    }
+                )
+    return EventWindowResult(
+        _frame=pl.DataFrame(rows),
+        evidence=AnalysisResult(
+            metadata=ResultMetadata(
+                method="events.event_windows",
+                parameters={"before": 1, "after": 1},
+            ),
+            metrics={"n_events": 39},
+        ),
+    )
+
+
+def test_event_response_cluster_sufficient_statistics_match_literal_paths_and_batches() -> None:
+    windows = _unequal_cluster_windows()
+    with config(memory_limit="24 KiB"):
+        bounded = event_response(windows, resamples=100, seed=29)
+    with config(memory_limit="1 MiB"):
+        unbounded = event_response(windows, resamples=100, seed=29)
+    assert bounded.metrics == unbounded.metrics
+    assert bounded.tables == unbounded.tables
+
+    frame = windows.frame
+    expected_offsets = (-1, 0, 1)
+    complete_paths: list[tuple[object, np.ndarray]] = []
+    for path in frame.partition_by("event_id", maintain_order=True):
+        ordered = path.sort("offset")
+        assert tuple(ordered.get_column("offset")) == expected_offsets
+        complete_paths.append(
+            (
+                ordered.get_column("aligned_anchor_time")[0],
+                ordered.get_column("response").to_numpy(),
+            )
+        )
+    clusters: dict[object, list[np.ndarray]] = {}
+    for anchor_time, path in complete_paths:
+        clusters.setdefault(anchor_time, []).append(path)
+    cluster_paths = [np.stack(paths) for paths in clusters.values()]
+    rng = np.random.default_rng(np.random.SeedSequence(29).spawn(1)[0])
+    indices = stationary_bootstrap_indices(
+        len(cluster_paths),
+        resamples=100,
+        expected_block_length=3.0,
+        rng=rng,
+    )
+    literal = np.stack(
+        [
+            np.concatenate([cluster_paths[int(index)] for index in sample], axis=0).mean(axis=0)
+            for sample in indices
+        ]
+    )
+    center = np.concatenate(cluster_paths, axis=0).mean(axis=0)
+    pointwise = np.quantile(literal, [0.025, 0.975], axis=0)
+    deviations = literal.std(axis=0, ddof=1)
+    standardized = np.abs((literal - center) / deviations)
+    critical = float(np.quantile(standardized.max(axis=1), 0.95))
+    rows = bounded.table("event_response")
+    for index, row in enumerate(rows):
+        assert row["inference_mean"] == pytest.approx(center[index], abs=1e-15)
+        assert row["pointwise_lower"] == pytest.approx(pointwise[0, index], abs=1e-15)
+        assert row["pointwise_upper"] == pytest.approx(pointwise[1, index], abs=1e-15)
+        assert row["simultaneous_lower"] == pytest.approx(
+            center[index] - critical * deviations[index],
+            abs=1e-15,
+        )
+        assert row["simultaneous_upper"] == pytest.approx(
+            center[index] + critical * deviations[index],
+            abs=1e-15,
+        )
+
+    with config(memory_limit="1 KiB"), pytest.raises(ConfigurationError, match="fixed output"):
+        event_response(windows, resamples=100, seed=29)
