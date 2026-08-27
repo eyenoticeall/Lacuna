@@ -14,6 +14,7 @@ import numpy as np
 
 import lacuna
 from lacuna import _native
+from lacuna._advanced_inference import _probability_of_backtest_overfitting
 from lacuna.schemas import (
     audit_result_v1_text,
     bundle_manifest_v1_text,
@@ -166,17 +167,29 @@ require(len(combinatorial.paths) == 1, "CPCV path reconstruction failed")
 
 inference_matrix = np.column_stack(
     (
-        np.sin(np.arange(12, dtype=np.float64)) + 1.0,
-        np.cos(np.arange(12, dtype=np.float64)),
-        np.sin(np.arange(12, dtype=np.float64) * 0.5) - 1.0,
+        np.sin(np.arange(24, dtype=np.float64)) + 1.0,
+        np.cos(np.arange(24, dtype=np.float64)),
+        np.sin(np.arange(24, dtype=np.float64) * 0.5) - 1.0,
     )
 )
 pbo = lacuna.validation.probability_of_backtest_overfitting(
     inference_matrix,
-    partitions=4,
+    partitions=12,
     statistic="mean",
 )
-require(pbo.metrics["n_combinations"] == 6, "CSCV/PBO inference failed")
+reference_pbo = _probability_of_backtest_overfitting(
+    inference_matrix,
+    partitions=12,
+    statistic="mean",
+    backend="reference",
+)
+require(pbo.metrics["n_combinations"] == 924, "CSCV/PBO inference failed")
+require(
+    pbo.metadata.parameters["backend"] == "rust_native",
+    "installed wheel did not dispatch the admitted PBO workload to Rust",
+)
+require(pbo.metrics == reference_pbo.metrics, "native/reference PBO metrics disagree")
+require(pbo.tables == reference_pbo.tables, "native/reference PBO tables disagree")
 permutation = lacuna.validation.permutation_test(
     inference_matrix[:, 0],
     permutations=100,

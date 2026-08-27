@@ -145,6 +145,8 @@ jobs:
           components: clippy,rustfmt
       - name: Check Rust formatting
         run: cargo fmt --all --check
+      - name: Verify reviewed Rust boundary dependencies and licenses
+        run: python .github/scripts/check_rust_boundary.py
       - name: Lint every Rust target
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Test the Rust workspace
@@ -378,6 +380,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
+      MKL_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
       POLARS_MAX_THREADS: "2"
     steps:
@@ -493,10 +497,107 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  abi3:
+    name: ABI3 / same Linux wheel / Python ${{ matrix.python-version }}
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - name: Check out smoke contracts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
+          python-version: ${{ matrix.python-version }}
+          enable-cache: false
+      - name: Download the one cp311-abi3 Linux wheel
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lacuna-linux-dist
+          path: dist
+      - name: Install the exact wheel without rebuilding
+        run: |
+          uv venv .abi-smoke --python ${{ matrix.python-version }}
+          uv pip install --python .abi-smoke/bin/python dist/lacuna_quant-*.whl
+      - name: Exercise typed arrays, grouped IC, PBO, and public parity
+        run: |
+          .abi-smoke/bin/python .github/scripts/wheel_smoke.py
+          .abi-smoke/bin/lacuna doctor --json --strict
+
+  package-regression:
+    name: Package / v0.13 import and wheel guard
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source and release history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable 2026-08-05
+        with:
+          toolchain: stable
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
+          python-version: "3.13"
+          enable-cache: true
+          cache-suffix: package-regression
+      - name: Resolve the frozen v0.13 source
+        id: baseline
+        run: |
+          baseline_dir="$(mktemp -d)"
+          git worktree add --detach "$baseline_dir" v0.13.0
+          echo "directory=$baseline_dir" >> "$GITHUB_OUTPUT"
+      - name: Build the v0.13 wheel on this runner
+        working-directory: ${{ steps.baseline.outputs.directory }}
+        run: |
+          uv sync --frozen --group dev
+          uv run --no-sync maturin build --release --locked --out "$GITHUB_WORKSPACE/baseline-dist"
+      - name: Download the candidate wheel built by CI
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: lacuna-linux-dist
+          path: candidate-dist
+      - name: Install baseline and candidate wheels in clean environments
+        run: |
+          uv venv .baseline-import --python 3.13
+          uv venv .candidate-import --python 3.13
+          uv pip install --python .baseline-import/bin/python baseline-dist/lacuna_quant-*.whl
+          uv pip install --python .candidate-import/bin/python candidate-dist/lacuna_quant-*.whl
+      - name: Enforce import latency and wheel-size budgets
+        run: >-
+          python .github/scripts/compare_package_metrics.py
+          --baseline-wheel baseline-dist/lacuna_quant-*.whl
+          --candidate-wheel candidate-dist/lacuna_quant-*.whl
+          --baseline-python .baseline-import/bin/python
+          --candidate-python .candidate-import/bin/python
+          --maximum-regression 0.15
+          --maximum-wheel-growth 0.20
+          --out package-regression.json
+      - name: Retain package regression evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-regression
+          path: package-regression.json
+          if-no-files-found: error
+          retention-days: 30
+
   gate:
     name: CI gate
     if: ${{ !cancelled() }}
-    needs: [quality, python, rust, rust-msrv, interoperability, extras, extensions, documentation, report-browser, benchmark-regression, package]
+    needs: [quality, python, rust, rust-msrv, interoperability, extras, extensions, documentation, report-browser, benchmark-regression, package, abi3, package-regression]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     permissions: {}
@@ -514,8 +615,10 @@ jobs:
           REPORT_BROWSER: ${{ needs.report-browser.result }}
           BENCHMARK_REGRESSION: ${{ needs.benchmark-regression.result }}
           PACKAGE: ${{ needs.package.result }}
+          ABI3: ${{ needs.abi3.result }}
+          PACKAGE_REGRESSION: ${{ needs.package-regression.result }}
         run: |
-          for result in "$QUALITY" "$PYTHON" "$RUST" "$RUST_MSRV" "$INTEROPERABILITY" "$EXTRAS" "$EXTENSIONS" "$DOCUMENTATION" "$REPORT_BROWSER" "$BENCHMARK_REGRESSION" "$PACKAGE"; do
+          for result in "$QUALITY" "$PYTHON" "$RUST" "$RUST_MSRV" "$INTEROPERABILITY" "$EXTRAS" "$EXTENSIONS" "$DOCUMENTATION" "$REPORT_BROWSER" "$BENCHMARK_REGRESSION" "$PACKAGE" "$ABI3" "$PACKAGE_REGRESSION"; do
             if [[ "$result" != "success" ]]; then
               printf 'A required CI layer finished with status: %s\n' "$result"
               exit 1

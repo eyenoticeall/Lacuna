@@ -442,6 +442,9 @@ def parser() -> argparse.ArgumentParser:
     source = commands.add_parser("source", help="verify version, changelog, API, and tag identity")
     source.add_argument("--tag", required=True)
     source.add_argument("--require-tag", action="store_true")
+    source.add_argument("--expected-core-version")
+    source.add_argument("--expected-options-version")
+    source.add_argument("--expected-commit")
     artifacts = commands.add_parser("artifacts", help="verify wheels and source distribution")
     artifacts.add_argument("--tag", required=True)
     artifacts.add_argument("--dist", type=Path, required=True)
@@ -453,6 +456,28 @@ def main() -> None:
     root = arguments.root.resolve()
     if arguments.command == "source":
         version = verify_source(root, arguments.tag, require_tag=arguments.require_tag)
+        extension_version = options_version(root, core_version=version)
+        if arguments.expected_core_version is not None and version != (
+            arguments.expected_core_version
+        ):
+            fail(f"core version is {version!r}, expected {arguments.expected_core_version!r}")
+        if arguments.expected_options_version is not None and extension_version != (
+            arguments.expected_options_version
+        ):
+            fail(
+                "options version is "
+                f"{extension_version!r}, expected {arguments.expected_options_version!r}"
+            )
+        if arguments.expected_commit is not None:
+            head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            if head != arguments.expected_commit:
+                fail(f"checked-out commit is {head}, expected {arguments.expected_commit}")
     else:
         version = verify_artifacts(root, arguments.dist.resolve(), arguments.tag)
     print(json.dumps({"release_version": version, "status": "verified"}, sort_keys=True))
