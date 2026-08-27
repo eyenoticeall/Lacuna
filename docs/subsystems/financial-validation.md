@@ -141,7 +141,8 @@ result = lc.validation.bootstrap(
 
 Scalar bootstrap returns the observed statistic, resample distribution summary, interval, method
 parameters, seed, raw/effective sample information, and warnings. Joint bootstrap instead reports
-per-strategy means, standard errors, and the long-run covariance table.
+per-strategy means, standard errors, and the long-run covariance table. Built-in mean reducers use
+private contiguous value/index/offset carriers; custom statistics remain on the Python path.
 
 ### IID bootstrap
 
@@ -217,7 +218,9 @@ The estimator and truncation/window rule are recorded. If no defensible estimato
 
 Replicate `i` derives its random stream from `(root_seed, method_version, i)`. Results do not depend on worker scheduling or thread count.
 
-Batch resamples to bound memory. Do not allocate the full index matrix when the statistic can be reduced in streaming batches.
+Batch resamples to bound memory. The private execution budget accounts for the fixed result matrix,
+sample-index bytes, and selected-value workspace before allocation. An explicit `memory_limit` is
+never ignored. Batch size does not change replicate identities, RNG consumption, or results.
 
 ## Result contracts
 
@@ -250,9 +253,12 @@ method metadata and warnings
 - interval overlap/purge scan is implemented in Rust with a Python reference;
 - deterministic bootstrap indices are generated in bounded Python batches and mean reductions are
   implemented in Rust with a NumPy reference;
-- CPCV, permutation, PBO, joint stationary bootstrap, Reality Check, and SPA currently use validated
-  NumPy/Python reference paths; benchmark artifact v5 retains their complete public-call cost before
-  any native optimization is considered.
+- joint stationary bootstrap, Reality Check, and SPA generate the existing per-replicate PCG64
+  substreams in Python and reduce equal-length index batches through a bounded NumPy
+  indexed-column-mean reference;
+- CPCV, permutation, and PBO currently use validated NumPy/Python reference paths. A multi-column
+  Rust reducer is admitted only after the optimized reference remains material in the private v0.14
+  full-call benchmark. No native RNG is used.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.
 

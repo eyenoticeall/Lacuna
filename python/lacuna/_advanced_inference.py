@@ -13,6 +13,8 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
+from lacuna._carriers import ResampleBatch
+from lacuna._execution import ResolvedExecutionBudget, resolve_execution_budget
 from lacuna._frames import (
     FrameDiagnostics,
     eager_frame,
@@ -23,6 +25,7 @@ from lacuna._frames import (
     require_numeric,
     require_time_key,
 )
+from lacuna._resampling import indexed_column_means_reference
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.experiment import fingerprint
@@ -885,18 +888,34 @@ def _joint_bootstrap_means(
     resamples: int,
     seed: int,
     method_version: int,
-) -> FloatArray:
+) -> tuple[FloatArray, ResolvedExecutionBudget]:
     means = np.empty((resamples, matrix.shape[1]), dtype=np.float64)
-    for replicate in range(resamples):
-        indices = _stationary_bootstrap_indices(
-            size=matrix.shape[0],
-            expected_block_length=expected_block_length,
-            seed=seed,
-            method_version=method_version,
-            replicate=replicate,
+    bytes_per_resample = matrix.shape[0] * (
+        np.dtype(np.intp).itemsize + matrix.shape[1] * np.dtype(np.float64).itemsize
+    )
+    budget = resolve_execution_budget(
+        total_items=resamples,
+        required_fixed_allocation_bytes=means.nbytes,
+        per_item_workspace_bytes=bytes_per_resample,
+        backend="numpy_reference",
+        dispatch_reason="joint indexed-column mean reference reduction",
+        configuration=get_config(),
+    )
+    for batch_start in range(0, resamples, budget.selected_batch_size):
+        batch_end = min(resamples, batch_start + budget.selected_batch_size)
+        samples = tuple(
+            _stationary_bootstrap_indices(
+                size=matrix.shape[0],
+                expected_block_length=expected_block_length,
+                seed=seed,
+                method_version=method_version,
+                replicate=replicate,
+            )
+            for replicate in range(batch_start, batch_end)
         )
-        means[replicate] = matrix[indices].mean(axis=0)
-    return means
+        batch = ResampleBatch.from_samples(matrix, samples)
+        means[batch_start:batch_end] = indexed_column_means_reference(batch)
+    return means, budget
 
 
 def _resampling_configuration(
@@ -940,7 +959,7 @@ def joint_stationary_bootstrap(
         resamples=resamples,
         seed=seed,
     )
-    distribution = _joint_bootstrap_means(
+    distribution, execution_budget = _joint_bootstrap_means(
         matrix,
         expected_block_length=block_length,
         resamples=resamples,
@@ -999,6 +1018,10 @@ def joint_stationary_bootstrap(
                 "joint_indices": True,
                 "rng": "numpy.PCG64/SeedSequence",
                 "substream_identity": "(seed, method_version=3, replicate)",
+                "backend": execution_budget.backend,
+                "batch_size": execution_budget.selected_batch_size,
+                "temporary_workspace_bytes": execution_budget.per_batch_workspace_bytes,
+                "native_threads": execution_budget.native_threads,
                 "input": source,
             },
             seed=resolved_seed,
@@ -1053,7 +1076,7 @@ def reality_check(
     root_n = math.sqrt(matrix.shape[0])
     winner = int(np.argmax(means))
     observed = max(0.0, root_n * float(means[winner]))
-    bootstrap_means = _joint_bootstrap_means(
+    bootstrap_means, execution_budget = _joint_bootstrap_means(
         matrix,
         expected_block_length=block_length,
         resamples=resamples,
@@ -1098,6 +1121,10 @@ def reality_check(
                 "finite_sample_p_value_correction": "(exceedances + 1) / (resamples + 1)",
                 "rng": "numpy.PCG64/SeedSequence",
                 "substream_identity": "(seed, method_version=4, replicate)",
+                "backend": execution_budget.backend,
+                "batch_size": execution_budget.selected_batch_size,
+                "temporary_workspace_bytes": execution_budget.per_batch_workspace_bytes,
+                "native_threads": execution_budget.native_threads,
                 "input": source,
             },
             seed=resolved_seed,
@@ -1225,7 +1252,7 @@ def superior_predictive_ability(
         "consistent": means * (means >= consistent_thresholds),
         "upper": means,
     }
-    bootstrap_means = _joint_bootstrap_means(
+    bootstrap_means, execution_budget = _joint_bootstrap_means(
         matrix,
         expected_block_length=block_length,
         resamples=resamples,
@@ -1301,6 +1328,10 @@ def superior_predictive_ability(
                 "finite_sample_p_value_correction": "(exceedances + 1) / (resamples + 1)",
                 "rng": "numpy.PCG64/SeedSequence",
                 "substream_identity": "(seed, method_version=5, replicate)",
+                "backend": execution_budget.backend,
+                "batch_size": execution_budget.selected_batch_size,
+                "temporary_workspace_bytes": execution_budget.per_batch_workspace_bytes,
+                "native_threads": execution_budget.native_threads,
                 "input": source,
             },
             seed=resolved_seed,

@@ -85,6 +85,8 @@ def test_bootstrap_honors_scoped_memory_limit_without_changing_rng_streams() -> 
         )
 
     assert bounded.metadata.parameters["batch_size"] == 2
+    assert bounded.metadata.parameters["native_threads"] == 1
+    assert bounded.metadata.parameters["temporary_workspace_bytes"] == 640
     assert bounded.table("resample_distribution") == unrestricted.table("resample_distribution")
 
 

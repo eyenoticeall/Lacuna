@@ -28,6 +28,7 @@ from lacuna._advanced_inference import (
     sharpe_inference,
     superior_predictive_ability,
 )
+from lacuna._carriers import ResampleBatch
 from lacuna._execution import resolve_execution_budget
 from lacuna._frames import (
     FrameDiagnostics,
@@ -40,6 +41,7 @@ from lacuna._frames import (
     require_unique,
 )
 from lacuna._native_arrays import readonly_float64, readonly_int64
+from lacuna._resampling import indexed_column_means_reference
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.experiment import (
@@ -182,8 +184,7 @@ def _bootstrap_indices(
 
 
 def _native_mean_batch(
-    values: FloatArray,
-    indices: Sequence[npt.NDArray[np.intp]],
+    batch: ResampleBatch,
 ) -> FloatArray | None:
     try:
         from lacuna import _native
@@ -191,11 +192,9 @@ def _native_mean_batch(
         return None
     if not hasattr(_native, "bootstrap_means"):
         return None
-    flattened = np.concatenate(indices).astype(np.int64, copy=False)
-    offsets = np.arange(0, flattened.size + 1, values.size, dtype=np.int64)
-    native_values = readonly_float64(values, name="values").values
-    native_indices = readonly_int64(flattened, name="indices").values
-    native_offsets = readonly_int64(offsets, name="offsets").values
+    native_values = readonly_float64(batch.values[:, 0], name="values").values
+    native_indices = readonly_int64(batch.indices, name="indices").values
+    native_offsets = readonly_int64(batch.offsets, name="offsets").values
     return _native.bootstrap_means(native_values, native_indices, native_offsets)
 
 
@@ -298,18 +297,22 @@ def bootstrap(
             )
             for replicate in range(batch_start, batch_end)
         ]
+        resample_batch = ResampleBatch.from_samples(values.reshape(-1, 1), index_batch)
         native_means = (
-            _native_mean_batch(values, index_batch)
-            if statistic_name == "mean" and use_native
-            else None
+            _native_mean_batch(resample_batch) if statistic_name == "mean" and use_native else None
         )
         if native_means is not None:
             distribution[batch_start:batch_end] = native_means
             backend = "rust_native"
         else:
-            distribution[batch_start:batch_end] = [
-                statistic_function(values[indices]) for indices in index_batch
-            ]
+            if statistic_name == "mean":
+                distribution[batch_start:batch_end] = indexed_column_means_reference(
+                    resample_batch
+                )[:, 0]
+            else:
+                distribution[batch_start:batch_end] = [
+                    statistic_function(values[indices]) for indices in index_batch
+                ]
     if not np.isfinite(distribution).all():
         raise DataContractError("one or more bootstrap replicates produced a non-finite statistic")
 
@@ -376,6 +379,8 @@ def bootstrap(
                 "rng": "numpy.PCG64/SeedSequence",
                 "substream_identity": "(seed, method_version=1, replicate)",
                 "batch_size": batch_size,
+                "temporary_workspace_bytes": execution_budget.per_batch_workspace_bytes,
+                "native_threads": execution_budget.native_threads,
                 "input": source,
             },
             seed=resolved_seed,

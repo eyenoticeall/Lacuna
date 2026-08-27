@@ -7,6 +7,7 @@ import numpy as np
 import polars as pl
 import pytest
 
+import lacuna as lc
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.validation import (
     joint_stationary_bootstrap,
@@ -209,6 +210,29 @@ def test_joint_stationary_bootstrap_preserves_cross_strategy_structure() -> None
         second_mean = rows[replicate * 2 + 1]["mean"]
         assert second_mean == pytest.approx(2.0 * first_mean + 3.0)
     assert result.metadata.parameters["joint_indices"] is True
+
+
+def test_joint_bootstrap_batch_budget_preserves_rng_and_distribution() -> None:
+    first = np.sin(np.arange(30, dtype=np.float64))
+    matrix = np.column_stack((first, 2.0 * first + 3.0))
+    unrestricted = joint_stationary_bootstrap(
+        matrix,
+        expected_block_length=4,
+        resamples=100,
+        seed=19,
+        store_distribution=True,
+    )
+    with lc.config(memory_limit="3KiB"):
+        bounded = joint_stationary_bootstrap(
+            matrix,
+            expected_block_length=4,
+            resamples=100,
+            seed=19,
+            store_distribution=True,
+        )
+
+    assert bounded.metadata.parameters["batch_size"] == 2
+    assert bounded.table("bootstrap_distribution") == unrestricted.table("bootstrap_distribution")
 
 
 def test_reality_check_handles_no_edge_and_detects_a_clear_edge() -> None:

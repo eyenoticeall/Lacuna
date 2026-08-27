@@ -13,6 +13,7 @@ from lacuna.exceptions import DataContractError, MethodContractError
 
 FloatMatrix: TypeAlias = npt.NDArray[np.float64]
 UInt8Matrix: TypeAlias = npt.NDArray[np.uint8]
+Int64Vector: TypeAlias = npt.NDArray[np.int64]
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,6 +100,68 @@ class CostComponentBatch:
                 else None
             )
         return totals
+
+
+@dataclass(frozen=True, slots=True)
+class ResampleBatch:
+    """A value matrix and flattened, offset-delimited resample indices."""
+
+    values: FloatMatrix
+    indices: Int64Vector
+    offsets: Int64Vector
+
+    def __post_init__(self) -> None:
+        values = cast(FloatMatrix, np.asarray(self.values))
+        indices = cast(Int64Vector, np.asarray(self.indices))
+        offsets = cast(Int64Vector, np.asarray(self.offsets))
+        if values.dtype != np.dtype(np.float64) or values.ndim != 2:
+            raise DataContractError("resample values must be a two-dimensional float64 array")
+        if indices.dtype != np.dtype(np.int64) or indices.ndim != 1:
+            raise DataContractError("resample indices must be a one-dimensional int64 array")
+        if offsets.dtype != np.dtype(np.int64) or offsets.ndim != 1:
+            raise DataContractError("resample offsets must be a one-dimensional int64 array")
+        if not values.flags.c_contiguous or not indices.flags.c_contiguous:
+            raise DataContractError("resample values and indices must be C-contiguous")
+        if not offsets.flags.c_contiguous:
+            raise DataContractError("resample offsets must be C-contiguous")
+        if values.shape[0] < 1 or values.shape[1] < 1:
+            raise DataContractError("resample values must contain at least one row and column")
+        if bool((~np.isfinite(values)).any()):
+            raise DataContractError("resample values must be finite")
+        if offsets.size < 2 or offsets[0] != 0 or offsets[-1] != indices.size:
+            raise DataContractError("resample offsets must span the complete index buffer")
+        if bool((np.diff(offsets) <= 0).any()):
+            raise DataContractError("resample offsets must define non-empty increasing samples")
+        if bool((indices < 0).any()) or bool((indices >= values.shape[0]).any()):
+            raise DataContractError("resample indices must point inside the value matrix")
+        values.setflags(write=False)
+        indices.setflags(write=False)
+        offsets.setflags(write=False)
+        object.__setattr__(self, "values", values)
+        object.__setattr__(self, "indices", indices)
+        object.__setattr__(self, "offsets", offsets)
+
+    @classmethod
+    def from_samples(
+        cls,
+        values: FloatMatrix,
+        samples: Sequence[npt.NDArray[np.intp]],
+    ) -> ResampleBatch:
+        """Build a contiguous carrier without Python objects in the stored representation."""
+
+        if not samples:
+            raise DataContractError("resample batches must contain at least one sample")
+        lengths = np.asarray([sample.size for sample in samples], dtype=np.int64)
+        offsets = np.empty(lengths.size + 1, dtype=np.int64)
+        offsets[0] = 0
+        np.cumsum(lengths, out=offsets[1:])
+        indices = np.concatenate(samples).astype(np.int64, copy=False)
+        matrix = np.ascontiguousarray(values, dtype=np.float64)
+        return cls(values=matrix, indices=indices, offsets=offsets)
+
+    @property
+    def resamples(self) -> int:
+        return int(self.offsets.size - 1)
 
 
 __all__: list[str] = []
