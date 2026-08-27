@@ -41,7 +41,7 @@ stable ABI cannot represent safely.
 ## Release gate
 
 1. Working tree and lockfiles are clean.
-2. Ruff formatting/lint and strict mypy pass.
+2. Pinned, checksummed actionlint validation plus Ruff formatting/lint and strict mypy pass.
 3. Python unit, reference, property, statistical, integration, and regression suites pass as applicable.
 4. Rust formatting, Clippy, tests, fuzz targets, and benchmarks pass as applicable.
 5. Documentation builds in strict mode.

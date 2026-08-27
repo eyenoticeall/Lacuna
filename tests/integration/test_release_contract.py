@@ -8,6 +8,8 @@ ROOT = Path(__file__).parents[2]
 VERIFIER = ROOT / ".github/scripts/verify_release.py"
 RUSTSEC_INSTALL = "cargo install cargo-audit --locked --version 0.22.2"
 RUSTSEC_AUDIT = "cargo audit --deny warnings --file Cargo.lock"
+ACTIONLINT_ARCHIVE = "actionlint_1.7.12_linux_amd64.tar.gz"
+ACTIONLINT_SHA256 = "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
 
 
 def test_release_source_contract_accepts_the_declared_release() -> None:
@@ -35,3 +37,10 @@ def test_ci_and_release_rehearsal_pin_the_strict_rustsec_audit() -> None:
         workflow = (ROOT / ".github/workflows" / workflow_name).read_text(encoding="utf-8")
         assert RUSTSEC_INSTALL in workflow
         assert RUSTSEC_AUDIT in workflow
+
+
+def test_ci_pins_and_checksums_the_actions_validator() -> None:
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert ACTIONLINT_ARCHIVE in workflow
+    assert ACTIONLINT_SHA256 in workflow
+    assert "actionlint .github/workflows/*.yml" in workflow

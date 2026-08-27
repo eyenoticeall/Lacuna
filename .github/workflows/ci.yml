@@ -42,6 +42,17 @@ jobs:
           cache-suffix: quality
       - name: Install quality dependencies from the lockfile
         run: uv sync --frozen --group dev --no-install-project
+      - name: Validate GitHub Actions syntax and expressions
+        run: |
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            --output /tmp/actionlint-1.7.12.tar.gz \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
+          printf '%s  %s\n' \
+            '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8' \
+            '/tmp/actionlint-1.7.12.tar.gz' | sha256sum --check
+          mkdir -p /tmp/actionlint-1.7.12
+          tar -xzf /tmp/actionlint-1.7.12.tar.gz -C /tmp/actionlint-1.7.12
+          /tmp/actionlint-1.7.12/actionlint .github/workflows/*.yml
       - name: Check Python formatting
         run: uv run --no-sync ruff format --check .
       - name: Lint Python

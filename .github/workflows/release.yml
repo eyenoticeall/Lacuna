@@ -254,7 +254,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      LACUNA_SOURCE_COMMIT: ${{ env.RELEASE_SHA }}
+      LACUNA_SOURCE_COMMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.commit_sha || github.sha }}
       MKL_NUM_THREADS: "1"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
