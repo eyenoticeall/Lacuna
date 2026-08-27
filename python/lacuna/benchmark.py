@@ -78,6 +78,10 @@ _PRIVATE_MIGRATION_VALIDATION_CASES = {
     "migration.validation.pbo.reference",
     "migration.validation.pbo.native",
 }
+_PRIVATE_MIGRATION_CV_CASES = {
+    "migration.cv.cpcv.reference",
+    "migration.cv.cpcv.native",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1053,6 +1057,26 @@ def _run_benchmarks(
                     "combinations/second",
                 )
             )
+    requested_private_cv_cases = (
+        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_CV_CASES)
+    )
+    for case_name in sorted(requested_private_cv_cases):
+        cases.append(
+            (
+                case_name,
+                partial(
+                    CombinatorialPurgedKFold(
+                        n_groups=6,
+                        n_test_groups=2,
+                        embargo=2,
+                        use_native=case_name.endswith(".native"),
+                    ).split,
+                    interval_frame,
+                ),
+                interval_count * math.comb(6, 2),
+                "role_evaluations/second",
+            )
+        )
     native = native_status()
     if use_native and native.available:
         cases.extend(
