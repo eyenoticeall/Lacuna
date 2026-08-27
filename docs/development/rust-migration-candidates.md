@@ -262,7 +262,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-10 | Membership portion of turnover | KEEP_PYTHON | P1 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | endpoint self-joins |
 | R-11 | Prior-only expanding/rolling regime quantiles | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | exact Polars order statistics |
 | R-12 | Event-window alignment/path extraction | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars range/as-of plan |
-| R-13 | Event-response cluster resampling | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
+| R-13 | Event-response cluster resampling | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | cluster sufficient statistics |
 | R-14 | Diagnostic portfolio allocation core | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | columnar allocator reference |
 | R-15 | Universe membership transitions | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | encoded-ID self-join reference |
 | R-16 | c14n-v1 semantic frame fingerprint | MIGRATE_AFTER_PROFILE | P0 | High | High | Low | PROPOSED | F-02a exact Python streaming |
@@ -519,14 +519,23 @@ rejection, same-time events, and exact next-observation behavior.
 
 ### R-13: event-response resampling
 
-Do not create an event-specific RNG or scheduler. Express complete paths as a contiguous response
-matrix with anchor-cluster offsets and reuse R-06 to generate stationary cluster samples and reduce
-pointwise means. Return the replicate-by-offset distribution or the sufficient data for pointwise
-and simultaneous bands.
+No event-specific RNG or scheduler was introduced. Complete paths are represented as a contiguous
+response matrix, and each ordered anchor-time cluster is preaggregated into pointwise sums and an
+event count. The existing stationary-cluster indices remain Python-generated and are reduced in
+bounded NumPy batches. Unequal cluster sizes are therefore weighted exactly; batch size does not
+change RNG consumption or results.
+
+At 20,000 events, 40 anchor-time clusters, four offsets, and 1,000 resamples, the exact public
+equivalence checksum was preserved while median latency fell from 746.68 ms to 18.60 ms (40.1 times
+faster). Incremental RSS fell by 98.3% and traced Python peak memory fell by 75.6%. The optimized
+call is below the 50 ms admission tier, and R-06 already established that Python-owned index
+generation leaves no material shared reducer for Rust. R-13 is `OPTIMIZED_NON_NATIVE`; reopen only
+with a newly material cluster/offset shape.
 
 Python retains complete-path eligibility, minimum-cluster policy, descriptive results, confidence
-construction, findings, and attrition. Tests must preserve cluster sampling rather than event-row
-sampling, jointly resample every offset, and remain identical across thread counts.
+construction, findings, and attrition. Tests compare against literal complete-path concatenation,
+preserve cluster rather than event-row sampling, jointly resample every offset, exercise unequal
+cluster sizes, verify batch-size invariance, and reject an explicit memory limit before allocation.
 
 ### R-14 and R-15: conditional columnar candidates
 

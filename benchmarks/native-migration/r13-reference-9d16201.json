@@ -1,0 +1,106 @@
+{
+  "admission": {
+    "correctness_match": null,
+    "latency_regression_fraction": null,
+    "material": true,
+    "reasons": [
+      "reference measured; no candidate backend was supplied"
+    ],
+    "rss_reduction_fraction": null,
+    "state": "MEASURED",
+    "throughput_ratio": null
+  },
+  "candidate": null,
+  "config": {
+    "bootstrap_resamples": 1000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 500,
+    "periods": 200,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "environment": {
+    "checksum_normalization": "backend excluded; finite floats rounded to 12 significant digits",
+    "copy_measurement": "exact logical boundary and compact-carrier bytes when candidate telemetry is available; null for uninstrumented backends",
+    "isolation": "one child process per measured backend",
+    "machine": "arm64",
+    "memory_measurement": "tracemalloc peak; native allocations may not be attributed",
+    "mkl_threads": 1,
+    "native_available": true,
+    "native_threads": 1,
+    "native_version": "0.13.0",
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "polars": "1.44.0",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 235307008,
+    "processor": "arm",
+    "python": "3.13.12",
+    "timing_clock": "time.perf_counter"
+  },
+  "generated_at": "2026-08-27T15:37:00.810134Z",
+  "reference": {
+    "backend": "polars",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.events.response.public",
+    "checksum": "1246eca426da13e567445e3536a68b218c5397b0688cec7e72a3bc5738f9bbc0",
+    "incremental_peak_rss_bytes": 1622016,
+    "input_copy_bytes": null,
+    "maximum_seconds": 0.022555125004146248,
+    "median_absolute_deviation_seconds": 0.00027912600489798933,
+    "median_seconds": 0.0186038340034429,
+    "minimum_seconds": 0.01832470799854491,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 0.0186038340034429,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 235782144,
+    "python_traced_peak_bytes": 1843998,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 8600377.748500109,
+    "throughput_unit": "cluster_offset_resamples/second",
+    "timings_seconds": [
+      0.020122833011555485,
+      0.0186038340034429,
+      0.01832470799854491,
+      0.01853274999302812,
+      0.01859570799570065,
+      0.019172500004060566,
+      0.022555125004146248
+    ]
+  },
+  "run_url": null,
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "9d16201dd8c9fac4e7cf8bf3c30cc2aaedc9c0d6",
+  "target": {
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": null,
+    "candidate_id": "R-13",
+    "effective_dimensions": {
+      "clusters": 40,
+      "events": 20000,
+      "offsets": 4,
+      "resamples": 1000
+    },
+    "public_latency_share": 1.0,
+    "public_operation": "events.event_response",
+    "public_rss_share": null,
+    "reference_case": "migration.events.response.public"
+  },
+  "version": 1
+}
