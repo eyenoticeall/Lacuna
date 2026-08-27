@@ -81,6 +81,9 @@ _PRIVATE_MIGRATION_VALIDATION_CASES = {
 _PRIVATE_MIGRATION_CV_CASES = {
     "migration.cv.cpcv.reference",
 }
+_PRIVATE_MIGRATION_SIGNAL_CASES = {
+    "migration.signal.turnover.multilag",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1074,6 +1077,23 @@ def _run_benchmarks(
                 ),
                 interval_count * math.comb(6, 2),
                 "role_evaluations/second",
+            )
+        )
+    requested_private_signal_cases = (
+        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_SIGNAL_CASES)
+    )
+    if "migration.signal.turnover.multilag" in requested_private_signal_cases:
+        cases.append(
+            (
+                "migration.signal.turnover.multilag",
+                partial(
+                    signal.turnover,
+                    observations,
+                    quantiles=resolved.quantiles,
+                    lags=resolved.horizons,
+                ),
+                resolved.rows * len(resolved.horizons) * resolved.quantiles,
+                "membership_cells/second",
             )
         )
     native = native_status()
