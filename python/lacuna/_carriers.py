@@ -223,6 +223,7 @@ class CompactFoldBuffer:
             raise DataContractError("all CPCV role buffers must describe the same fold count")
 
         fold_count = next(iter(offset_sizes)) - 1
+        assignment_counts: npt.NDArray[np.uint8] = np.empty(self.row_count, dtype=np.uint8)
         for fold in range(fold_count):
             role_slices = [
                 self._slice(vectors[f"{role}_indices"], vectors[f"{role}_offsets"], fold)
@@ -231,10 +232,12 @@ class CompactFoldBuffer:
             for role, role_slice in zip(role_names, role_slices, strict=True):
                 if bool((np.diff(role_slice) <= 0).any()):
                     raise DataContractError(f"{role} indices must be unique and source ordered")
-            assigned = np.concatenate(role_slices)
-            if assigned.size != self.row_count or not np.array_equal(
-                np.sort(assigned), np.arange(self.row_count, dtype=np.int64)
-            ):
+            if sum(role_slice.size for role_slice in role_slices) != self.row_count:
+                raise DataContractError("every source row must have exactly one role in every fold")
+            assignment_counts.fill(0)
+            for role_slice in role_slices:
+                assignment_counts[role_slice] += 1
+            if not bool(np.all(assignment_counts == 1)):
                 raise DataContractError("every source row must have exactly one role in every fold")
 
         paths = vectors["path_fold_by_group"]
@@ -271,16 +274,16 @@ class CompactFoldBuffer:
             raise ValueError("unknown fold role")
         indices = cast(Int64Vector, getattr(self, f"{name}_indices"))
         offsets = cast(Int64Vector, getattr(self, f"{name}_offsets"))
-        return tuple(int(value) for value in self._slice(indices, offsets, fold))
+        return cast(tuple[int, ...], tuple(self._slice(indices, offsets, fold).tolist()))
 
     def path(self, position: int) -> tuple[int, ...]:
         """Project one checked path-incidence slice into the public tuple representation."""
 
         if not 0 <= position < self.path_count:
             raise IndexError("path index is out of range")
-        return tuple(
-            int(value)
-            for value in self._slice(self.path_fold_by_group, self.path_offsets, position)
+        return cast(
+            tuple[int, ...],
+            tuple(self._slice(self.path_fold_by_group, self.path_offsets, position).tolist()),
         )
 
 
