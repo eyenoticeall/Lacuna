@@ -72,7 +72,7 @@ waived.
 
 ## Stable-release decision
 
-Every internal row now has released or release-gated evidence. `1.0.0` remains blocked solely by the
+Every internal row now has released evidence. `1.0.0` remains blocked solely by the
 independent-use row: repository tests cannot prove that real users can apply Lacuna on independent
 research stacks. The earlier maintainer waiver that permitted the initial public release does not
 silently waive the technical specification's v1 definition.

@@ -32,10 +32,11 @@ python -m pip install "lacuna-quant[statistics,report,pandas]"
 python -m pip install lacuna-options
 ```
 
-The current releases are [`lacuna-quant` 0.13.0](https://pypi.org/project/lacuna-quant/) and
-[`lacuna-options` 0.2.0](https://pypi.org/project/lacuna-options/). The same checksummed,
+The current releases are
+[`lacuna-quant` 0.14.0](https://pypi.org/project/lacuna-quant/0.14.0/) and
+[`lacuna-options` 0.2.1](https://pypi.org/project/lacuna-options/0.2.1/). The same checksummed,
 provenance-attested files are attached to the
-[`v0.13.0` GitHub release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.13.0).
+[`v0.14.0` GitHub release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.14.0).
 
 !!! warning "Distribution name"
 

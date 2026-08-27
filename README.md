@@ -26,12 +26,12 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> **v0.13.0 is the current release.** It completes the planned factor-research sequence: explicit
-> signal transformations and multi-lag stability in v0.10, validated decay inference, diagnostic
-> portfolio projections, and event studies in v0.11, and semantics-first factor-panel ingestion in
-> v0.12. Version 0.13 moves distribution to PyPI without changing the `lacuna` import API or
-> analytical methods. Lacuna remains alpha software and its pre-1.0 APIs may evolve through
-> documented migrations.
+> **v0.14.0 is the current release.** It is an admission-gated performance and memory-hardening
+> release that preserves the complete v0.13 public API and c14n-v1 identities. Grouped rank IC and
+> built-in PBO/CSCV ship as measured, single-threaded Rust paths; the other evaluated candidates
+> improved through exact NumPy or Polars implementations or closed without native code.
+> `lacuna-options` 0.2.1 supports core versions 0.13 and 0.14 without an API change. Lacuna remains
+> alpha software and its pre-1.0 APIs may evolve through documented migrations.
 
 > [!NOTE]
 > Install the core project from PyPI as `lacuna-quant`; Python code continues to use
@@ -116,7 +116,7 @@ contract; additional Rust kernels require end-to-end profiling and differential 
 
 ## What works now
 
-| Area | Implemented on main for the v0.14 release target |
+| Area | Implemented in the current v0.14 release |
 |---|---|
 | Labels and timing | Explicit observation, availability, entry, and label-end times; half-open intervals; trading-observation horizons; censoring, adjustment, and delisting evidence |
 | Factor diagnostics | Group-aware Pearson/Spearman IC; balanced, tie-preserving, split-aware, threshold, equal-width, and fixed-edge buckets; bucket returns and attrition |
@@ -131,8 +131,8 @@ contract; additional Rust kernels require end-to-end profiling and differential 
 | Evidence and reporting | Immutable `AnalysisResult` evidence; signal/strategy/options audit profiles; deterministic JSON and Markdown; core HTML and optional evidence-native Plotly HTML |
 | Reproducibility | Deterministic `.lacuna` archives, published schemas, privacy redaction, SHA-256 integrity, and bounded non-executing verification |
 | Interoperability | Eager/lazy Polars, NumPy, Arrow, optional pandas and named MultiIndexes, generic factor/vendor/backtest schemas, DuckDB Arrow streams, and scikit-learn CV |
-| Native acceleration | Single-threaded Rust grouped-rank IC, bootstrap-mean, interval-purge, and admitted PBO reducers with checked bulk-array boundaries and callable references |
-| Options extension | Independently versioned `lacuna-options` 0.2.0, with a 0.2.1 release target widening core compatibility through v0.14 without API changes |
+| Native acceleration | Single-threaded Rust grouped-rank IC, bootstrap-mean, interval-purge, and shipped PBO reducers with checked bulk-array boundaries and callable references |
+| Options extension | Independently versioned `lacuna-options` 0.2.1, compatible with core 0.13 and 0.14 without API changes |
 
 Lacuna intentionally does **not** generate alpha, source market data, compound a portfolio, resolve
 overlapping holdings, simulate orders or fills, route trades, or run live strategies. It also does
@@ -440,12 +440,11 @@ lacuna audit \
 
 ## Roadmap and maturity
 
-The planned `0.1`–`0.13` milestones are implemented, compatibility-fixtured, and released. The
-current `0.13` line adds verified PyPI distribution while retaining the complete factor-research
-sequence and Lacuna's explicit no-backtester boundary. The v0.14 implementation is complete but
-release-gated: grouped IC and PBO remain provisional until pinned Linux, same-wheel ABI, target
-wheel, and exact-SHA non-publishing preflight evidence promote every migration decision to a
-terminal state.
+The planned `0.1`–`0.14` milestones are implemented, compatibility-fixtured, and released. The
+current `0.14` line retains the complete factor-research sequence and Lacuna's explicit
+no-backtester boundary while hardening performance, memory use, native boundaries, and release
+evidence. Grouped IC and PBO cleared pinned Linux, same-wheel ABI, target-wheel, and exact-SHA
+preflight gates; every evaluated migration candidate has a terminal, evidence-linked decision.
 
 Every repository-controlled item in the v1 readiness ledger has implementation evidence. `1.0.0`
 remains blocked by one intentionally external requirement: real users must apply Lacuna to
@@ -471,8 +470,8 @@ The technical specification is backed by implementation-oriented documentation:
 - [factor-research migration from Alphalens Reloaded](https://github.com/eyenoticeall/Lacuna/blob/main/docs/getting-started/alphalens-migration.md);
 - [coding-agent playbooks and review checklist](https://github.com/eyenoticeall/Lacuna/blob/main/docs/agents/index.md).
 
-The documentation distinguishes released v0.1–v0.13 behavior, release-gated v0.14 work, and later
-contracts. Contributors and coding agents should begin with
+The documentation distinguishes released v0.1–v0.14 behavior from later contracts. Contributors
+and coding agents should begin with
 [AGENTS.md](https://github.com/eyenoticeall/Lacuna/blob/main/AGENTS.md), then read the relevant
 methodology and subsystem pages before changing a method.
 
