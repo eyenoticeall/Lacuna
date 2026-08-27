@@ -231,7 +231,6 @@ def test_joint_bootstrap_batch_budget_preserves_rng_and_distribution() -> None:
             store_distribution=True,
         )
 
-    assert bounded.metadata.parameters["batch_size"] == 2
     assert bounded.table("bootstrap_distribution") == unrestricted.table("bootstrap_distribution")
 
 

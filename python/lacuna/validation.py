@@ -41,7 +41,6 @@ from lacuna._frames import (
     require_unique,
 )
 from lacuna._native_arrays import readonly_float64, readonly_int64
-from lacuna._resampling import indexed_column_means_reference
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.experiment import (
@@ -297,22 +296,17 @@ def bootstrap(
             )
             for replicate in range(batch_start, batch_end)
         ]
-        resample_batch = ResampleBatch.from_samples(values.reshape(-1, 1), index_batch)
-        native_means = (
-            _native_mean_batch(resample_batch) if statistic_name == "mean" and use_native else None
-        )
+        native_means = None
+        if statistic_name == "mean" and use_native:
+            resample_batch = ResampleBatch.from_samples(values.reshape(-1, 1), index_batch)
+            native_means = _native_mean_batch(resample_batch)
         if native_means is not None:
             distribution[batch_start:batch_end] = native_means
             backend = "rust_native"
         else:
-            if statistic_name == "mean":
-                distribution[batch_start:batch_end] = indexed_column_means_reference(
-                    resample_batch
-                )[:, 0]
-            else:
-                distribution[batch_start:batch_end] = [
-                    statistic_function(values[indices]) for indices in index_batch
-                ]
+            distribution[batch_start:batch_end] = [
+                statistic_function(values[indices]) for indices in index_batch
+            ]
     if not np.isfinite(distribution).all():
         raise DataContractError("one or more bootstrap replicates produced a non-finite statistic")
 
@@ -379,8 +373,6 @@ def bootstrap(
                 "rng": "numpy.PCG64/SeedSequence",
                 "substream_identity": "(seed, method_version=1, replicate)",
                 "batch_size": batch_size,
-                "temporary_workspace_bytes": execution_budget.per_batch_workspace_bytes,
-                "native_threads": execution_budget.native_threads,
                 "input": source,
             },
             seed=resolved_seed,
