@@ -256,7 +256,9 @@ method metadata and warnings
 - joint stationary bootstrap, Reality Check, and SPA generate the existing per-replicate PCG64
   substreams in Python and reduce equal-length index batches through a bounded NumPy
   indexed-column-mean reference;
-- CPCV, permutation, and PBO currently use validated NumPy/Python reference paths. A multi-column
+- built-in Pearson permutation reuses invariant centered norms and performs one NumPy dot product
+  per transformed sample; transformation streams and custom callables remain unchanged;
+- CPCV and PBO currently use validated NumPy/Python reference paths. A multi-column
   Rust reducer is admitted only after the optimized reference remains material in the private v0.14
   full-call benchmark. No native RNG is used.
 

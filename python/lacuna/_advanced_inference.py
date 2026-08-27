@@ -161,9 +161,13 @@ def _permutation_statistic(
         def pearson(values: FloatArray, paired: FloatArray | None) -> float:
             if paired is None:
                 raise MethodContractError("Pearson permutation requires paired_with")
-            if values.std(ddof=1) == 0.0 or paired.std(ddof=1) == 0.0:
+            left = values - values.mean()
+            right = paired - paired.mean()
+            left_sum_squares = float(np.dot(left, left))
+            right_sum_squares = float(np.dot(right, right))
+            if left_sum_squares == 0.0 or right_sum_squares == 0.0:
                 raise DataContractError("Pearson statistic is undefined for a constant input")
-            return float(np.corrcoef(values, paired)[0, 1])
+            return float(np.dot(left, right) / math.sqrt(left_sum_squares * right_sum_squares))
 
         return "pearson", pearson
     raise MethodContractError("statistic must be 'mean', 'pearson', or a callable")
@@ -275,6 +279,16 @@ def permutation_test(
         raise DataContractError("observed permutation statistic is not finite")
     resolved_seed = _resolved_seed(seed)
     distribution: FloatArray = np.empty(permutations, dtype=np.float64)
+    paired_centered: FloatArray | None = None
+    paired_sum_squares: float | None = None
+    invariant_value_sum_squares: float | None = None
+    if statistic_name == "pearson":
+        assert paired is not None
+        paired_centered = paired - paired.mean()
+        paired_sum_squares = float(np.dot(paired_centered, paired_centered))
+        if scheme != "sign_flip":
+            centered_values = values - values.mean()
+            invariant_value_sum_squares = float(np.dot(centered_values, centered_values))
     for replicate in range(permutations):
         rng = _replicate_rng(resolved_seed, 2, replicate)
         permuted = _permuted_values(
@@ -284,7 +298,20 @@ def permutation_test(
             block_length=block_length,
             rng=rng,
         )
-        distribution[replicate] = statistic_function(permuted, paired)
+        if paired_centered is not None and paired_sum_squares is not None:
+            if invariant_value_sum_squares is None:
+                centered_permuted = permuted - permuted.mean()
+                value_sum_squares = float(np.dot(centered_permuted, centered_permuted))
+                numerator = float(np.dot(centered_permuted, paired_centered))
+            else:
+                value_sum_squares = invariant_value_sum_squares
+                numerator = float(np.dot(permuted, paired_centered))
+            denominator = math.sqrt(value_sum_squares * paired_sum_squares)
+            if denominator == 0.0:
+                raise DataContractError("Pearson statistic is undefined for a constant input")
+            distribution[replicate] = numerator / denominator
+        else:
+            distribution[replicate] = statistic_function(permuted, paired)
     if not np.isfinite(distribution).all():
         raise DataContractError(
             "one or more permutation replicates produced a non-finite statistic"
@@ -322,6 +349,13 @@ def permutation_test(
                 "null_policy": null_policy,
                 "rng": "numpy.PCG64/SeedSequence",
                 "substream_identity": "(seed, method_version=2, replicate)",
+                "backend": (
+                    "numpy_pearson_reducer"
+                    if statistic_name == "pearson"
+                    else "python_callable"
+                    if callable(statistic)
+                    else "numpy_reference"
+                ),
                 "input": source,
             },
             seed=resolved_seed,
@@ -888,9 +922,7 @@ def _joint_bootstrap_means(
     method_version: int,
 ) -> tuple[FloatArray, ResolvedExecutionBudget]:
     means = np.empty((resamples, matrix.shape[1]), dtype=np.float64)
-    selected_workspace = (
-        matrix.shape[0] * matrix.shape[1] * np.dtype(np.float64).itemsize
-    )
+    selected_workspace = matrix.shape[0] * matrix.shape[1] * np.dtype(np.float64).itemsize
     budget = resolve_execution_budget(
         total_items=resamples,
         required_fixed_allocation_bytes=means.nbytes + selected_workspace,

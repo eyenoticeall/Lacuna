@@ -59,6 +59,28 @@ def test_unrestricted_permutation_detects_strong_pairwise_association() -> None:
     assert result.metrics["p_value"] <= 0.01
 
 
+def test_pearson_permutation_matches_literal_corrcoef_stream() -> None:
+    values = np.asarray([1.0, -2.0, 4.0, 0.5, 3.0, -1.0, 2.5])
+    paired = np.asarray([-0.5, 1.0, 3.0, -2.0, 2.0, 0.25, 4.0])
+    result = permutation_test(
+        np.column_stack((values, paired)),
+        paired_with="paired",
+        statistic="pearson",
+        scheme="unrestricted",
+        permutations=100,
+        seed=23,
+        store_distribution=True,
+    )
+
+    expected = []
+    for replicate in range(100):
+        rng = np.random.default_rng(np.random.SeedSequence([23, 2, replicate]))
+        permuted = values[rng.permutation(values.size)]
+        expected.append(float(np.corrcoef(permuted, paired)[0, 1]))
+    observed = [row["statistic"] for row in result.table("permutation_distribution")]
+    assert observed == pytest.approx(expected, abs=1e-15)
+
+
 def test_stratified_and_block_permutation_contracts_are_explicit() -> None:
     frame = pl.DataFrame(
         {
