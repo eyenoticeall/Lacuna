@@ -49,6 +49,7 @@ Check codes are stable within the `0.9.x` public API series; messages may become
 |---|---|---|
 | `PACKAGE_VERSION` | source version is not a supported release identity | install an official matching release |
 | `DISTRIBUTION_METADATA` | metadata is absent in a source tree, or disagrees with the package | accept the source-tree warning or reinstall one wheel |
+| `DISTRIBUTION_NAME_COLLISION` | another distribution named `lacuna` also owns the import package | uninstall `lacuna` and keep `lacuna-quant` |
 | `PYTHON_RUNTIME` | Python is below 3.11 or outside the tested 3.11-3.14 minors | select a release-tested Python |
 | `PLATFORM_WHEEL` | current system/architecture is outside the published wheel matrix | use a published target or an explicit source build |
 | `RUNTIME_DEPENDENCIES` | NumPy/Polars metadata differs from the imported runtime | rebuild the environment from one resolver state |

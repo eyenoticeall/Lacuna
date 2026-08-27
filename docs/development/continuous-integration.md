@@ -151,8 +151,8 @@ The separate `Release` workflow consumes a version-matching core tag only after 
 `CI gate` succeeded. It builds and target-smoke-tests the complete stable-ABI core wheel matrix,
 builds and jointly smoke-tests the independently versioned universal options distribution, validates
 both source distributions and every packaged resource as one set, generates checksums and provenance,
-and creates a GitHub prerelease for SemVer candidate tags or a normal release for stable tags. Any future
-PyPI trusted-publishing job must be isolated in its own
-environment and permission boundary after a non-conflicting distribution name is selected. RC1 does
-not publish to PyPI, and neither does `0.1.0`. See [Release engineering](release.md) for the tag and
-artifact contract.
+and creates a GitHub prerelease for SemVer candidate tags or a normal release for stable tags. It
+then publishes only the verified `lacuna-quant` and `lacuna-options` subsets through sequential,
+OIDC-only jobs in the `pypi` environment and requires a clean exact-version installation from the
+registry. See [Release engineering](release.md) for the publisher identity, permission, retry, tag,
+and artifact contracts.

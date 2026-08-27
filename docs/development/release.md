@@ -105,7 +105,9 @@ version/tag from the exact tested commit
     ↓
 signed/attested artifacts
     ↓
-GitHub Release and optional registry publication
+GitHub Release
+    ↓
+PyPI Trusted Publishing and registry-install smoke
 ```
 
 Do not rebuild release artifacts from a different source state after approval.
@@ -127,20 +129,41 @@ universal `lacuna-options` wheel and source distribution, installs that wheel wi
 target-smoke-tested Linux core wheel, and runs the extension smoke contract.
 
 A separate job downloads the complete matrix, rejects missing or unexpected filenames/tags/names/
-versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.9.0` tag
-with extension `0.1.3`, the release set is exactly four core wheels, one extension wheel, two source
-distributions, and the checksum manifest.
+versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.13.0`
+tag with extension `0.2.0`, the release set is exactly four `lacuna-quant` wheels, one
+`lacuna-options` wheel, two source distributions, and the checksum manifest.
 
-Only the final publication job has `contents: write`, attestation, and OIDC permissions. Build jobs
-remain read-only. GitHub receives the verified artifacts and checksum manifest; SemVer prerelease
-tags are explicitly marked as prereleases, while stable tags create normal releases. GitHub
-provenance attestations are generated from the checksum manifest for all seven distributions.
+Only the GitHub publication job has `contents: write` and GitHub attestation permissions. The two
+PyPI publication jobs have only `actions: read`, `contents: read`, and `id-token: write`; build and
+verification jobs remain read-only. GitHub receives the verified artifacts and checksum manifest;
+SemVer prerelease tags are explicitly marked as prereleases, while stable tags create normal
+releases. GitHub provenance attestations are generated from the checksum manifest for all seven
+distributions.
 
-Registry publication is deliberately disabled for current releases. The PyPI distribution name `lacuna` is
-already owned by an unrelated project, so this repository must not configure a trusted publisher or
-upload credentials for that name. Choose and review a distinct distribution name before adding a
-PyPI job; the Python import package can remain `lacuna`. The initial release is distributed through
-its checksummed, attested GitHub Release artifacts.
+Core publishes to PyPI as `lacuna-quant`; the Python import package and CLI remain `lacuna`. The
+PyPI name `lacuna` belongs to an unrelated project and is a prohibited release target. The optional
+extension publishes independently as `lacuna-options` and depends on
+`lacuna-quant>=0.13,<0.14` from its `0.2.0` release onward.
+
+Registry publication uses PyPI Trusted Publishing only—no long-lived API token is stored. Both
+PyPI projects authorize repository `eyenoticeall/Lacuna`, workflow `release.yml`, and GitHub
+environment `pypi`. Publication begins only after the complete release set passes archive
+verification and is attached to GitHub:
+
+1. isolate and publish the five verified `lacuna-quant` distributions;
+2. isolate and publish the two verified `lacuna-options` distributions after core succeeds;
+3. wait for index propagation, then install both exact versions from `https://pypi.org/simple` in a
+   clean Python 3.13 environment;
+4. rerun the native, schema, CLI, diagnostics, and extension wheel-smoke contracts.
+
+The publisher uses `skip-existing` only to make an interrupted immutable upload retryable; the
+post-publication smoke remains mandatory. PyPI does not permit overwriting a published filename or
+version. Never add `password`, repository token, or arbitrary artifact paths to the publish jobs.
+
+Users migrating from GitHub wheels distributed under the old metadata name `lacuna` must uninstall
+that distribution before installing `lacuna-quant`. Both distributions own the import path
+`lacuna`, so a dual installation is invalid and the `DISTRIBUTION_NAME_COLLISION` doctor check
+fails it explicitly.
 
 Stable and candidate tags use Cargo/SemVer spelling:
 

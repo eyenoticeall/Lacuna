@@ -12,10 +12,11 @@ The initial `0.1.x` contract provides:
 - deterministic absolute-delta buckets; and
 - structured empirical implied-volatility residual evidence.
 
-Install the matching Lacuna core wheel and the extension wheel from the same GitHub Release:
+Install the extension from PyPI. Its dependency resolves the compatible `lacuna-quant` core while
+Python imports remain `lacuna_options` and `lacuna`:
 
 ```bash
-python -m pip install ./lacuna-0.12.0-*.whl ./lacuna_options-0.1.6-py3-none-any.whl
+python -m pip install lacuna-options
 ```
 
 ```python
@@ -30,6 +31,7 @@ The package does not claim a universal implied-volatility solver, Greeks model, 
 arbitrage-free calibration. Those depend on explicit model, day-count, exercise, settlement,
 dividend, and numerical policies and belong in later separately versioned capabilities.
 
-Version `0.1.6` preserves the exact `0.1.x` Python surface while expanding its compatible core range
-to include additive Lacuna `0.12.x` releases. Validated chain evidence is recognized by the required
-`options_evidence` capability in Lacuna's standardized options audit profile.
+Version `0.2.0` preserves the exact `0.1.x` Python surface while moving dependency metadata to
+`lacuna-quant>=0.13,<0.14`. The `0.2` fixture explicitly inherits the complete `0.1` contract.
+Validated chain evidence is recognized by the required `options_evidence` capability in Lacuna's
+standardized options audit profile.

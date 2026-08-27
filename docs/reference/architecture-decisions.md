@@ -20,6 +20,8 @@ This page expands the decision summary in the technical specification into imple
 | ADR-012 | Plugin discovery never authorizes execution | Installed metadata is safe to enumerate; loading is an explicit trust decision |
 | ADR-013 | Evidence bundles are deterministic data, never code | Portable reports are checksummed, bounded, and verified without extraction or execution |
 | ADR-014 | Cross-phase audits use categorical coverage | Unlike evidence remains visible without one misleading universal score |
+| ADR-015 | Diagnostic portfolio projections are not a backtester | Explicit cohort weights remain outside portfolio state and execution simulation |
+| ADR-016 | PyPI identity differs from Python import identity | Users install `lacuna-quant`; code continues to import `lacuna` |
 
 ## ADR-001 — Python public API
 
@@ -310,6 +312,46 @@ interpretation error are release gates.
 **Revisit when:** a separately scoped backtesting package is proposed with explicit state,
 execution, accounting, and cost contracts. It must consume Lacuna evidence without moving those
 responsibilities into `lacuna.signal`.
+
+## ADR-016 — PyPI identity differs from Python import identity
+
+**Status:** accepted on 2026-08-27.
+
+**Context:** the PyPI project `lacuna` is active and unrelated to this repository. Reusing that
+name would misdirect users and extension dependency resolution, while renaming the established
+Python package would create broad migration cost without improving analytical clarity.
+
+**Decision:** publish core as the distribution `lacuna-quant` while preserving the Python import
+package and CLI as `lacuna`. Publish the optional extension as `lacuna-options`; from extension
+`0.2.0`, its dependency is `lacuna-quant>=0.13,<0.14`. Registry publication uses PyPI Trusted
+Publishing from the tag-only `release.yml` workflow and `pypi` GitHub environment.
+
+**Consequences:**
+
+- package installers, metadata diagnostics, release archives, and dependency bounds use
+  `lacuna-quant`, while user code continues to use `import lacuna`;
+- this repository never uploads to, depends on, or presents the unrelated PyPI `lacuna` project as
+  Lacuna;
+- old GitHub wheels distributed as `lacuna` must be uninstalled before migration because two
+  distributions cannot safely own the same import path;
+- installation diagnostics fail when both distribution identities are present;
+- only the already verified GitHub release distributions reach PyPI, core publishes before the
+  dependent extension, and a clean registry-only install is release-blocking;
+- no long-lived PyPI token is stored, and publish jobs receive only read access plus OIDC identity.
+
+**Rejected alternatives:** requesting transfer of an active unrelated project does not satisfy
+PyPI name-conflict policy; renaming the Python import would break every caller for a packaging-only
+concern; storing an API token would add a durable credential where OIDC is available; a shim named
+`lacuna` would collide with and misrepresent the unrelated project.
+
+**Validation:** release source verification fixes the two distribution identities, archive
+verification fixes normalized filenames and metadata names, options metadata fixes the compatible
+core bound, clean-wheel tests preserve import/native/CLI identity, and post-publication smoke
+installs both exact versions from PyPI.
+
+**Revisit when:** PyPI deprecates Trusted Publishing or the project intentionally undertakes a
+major-version import rename. Any replacement must preserve an explicit migration and collision
+policy.
 
 ## Recording future decisions
 

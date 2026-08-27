@@ -13,6 +13,7 @@
   <p>
     <a href="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml"><img src="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>&nbsp;&nbsp;
     <a href="https://github.com/eyenoticeall/Lacuna/releases/latest"><img src="https://img.shields.io/github/v/release/eyenoticeall/Lacuna?display_name=tag&amp;sort=semver&amp;style=flat" alt="Latest release" /></a>&nbsp;&nbsp;
+    <a href="https://pypi.org/project/lacuna-quant/"><img src="https://img.shields.io/pypi/v/lacuna-quant?label=PyPI&amp;logo=pypi&amp;logoColor=white&amp;style=flat" alt="PyPI" /></a>&nbsp;&nbsp;
     <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&amp;logoColor=white&amp;style=flat" alt="Python 3.11+" /></a>&nbsp;&nbsp;
     <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024-000000?logo=rust&amp;logoColor=white&amp;style=flat" alt="Rust 2024" /></a>&nbsp;&nbsp;
     <a href="docs/development/data-boundary.md"><img src="https://img.shields.io/badge/Arrow-compatible-2563EB?logo=apachearrow&amp;logoColor=white&amp;style=flat" alt="Arrow compatible" /></a>&nbsp;&nbsp;
@@ -25,16 +26,17 @@
 Lacuna is the validation and diagnostics layer between a quantitative research idea and confidence in its backtest. Bring a signal, a return stream, or an experiment history; Lacuna's job is to uncover weak evidence, leakage, instability, and unrealistic assumptions before capital is at risk.
 
 > [!IMPORTANT]
-> **v0.12.0 is the current release.** It completes the planned factor-research sequence: explicit
+> **v0.13.0 is the current release.** It completes the planned factor-research sequence: explicit
 > signal transformations and multi-lag stability in v0.10, validated decay inference, diagnostic
 > portfolio projections, and event studies in v0.11, and semantics-first factor-panel ingestion in
-> v0.12. Lacuna remains alpha software and its pre-1.0 APIs may evolve through documented migrations.
+> v0.12. Version 0.13 moves distribution to PyPI without changing the `lacuna` import API or
+> analytical methods. Lacuna remains alpha software and its pre-1.0 APIs may evolve through
+> documented migrations.
 
 > [!NOTE]
-> [`v0.12.0` is distributed through GitHub Releases](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.12.0)
-> as checksummed, provenance-attested core wheels, a source distribution, and the optional
-> `lacuna-options` package. The PyPI name `lacuna` belongs to an unrelated project—install Lacuna
-> from this repository's release assets, not `pip install lacuna`.
+> Install the core project from PyPI as `lacuna-quant`; Python code continues to use
+> `import lacuna`. The PyPI project named `lacuna` is unrelated and must not be installed beside
+> `lacuna-quant` because both own the same import-package path.
 
 ## Why Lacuna?
 
@@ -78,7 +80,7 @@ differential evidence.
 
 ## What works now
 
-| Area | Implemented in v0.12.0 |
+| Area | Implemented in v0.13.0 |
 |---|---|
 | Labels and timing | Explicit observation, availability, entry, and label-end times; half-open intervals; trading-observation horizons; censoring, adjustment, and delisting evidence |
 | Factor diagnostics | Group-aware Pearson/Spearman IC; balanced, tie-preserving, split-aware, threshold, equal-width, and fixed-edge buckets; bucket returns and attrition |
@@ -94,7 +96,7 @@ differential evidence.
 | Reproducibility | Deterministic `.lacuna` archives, published schemas, privacy redaction, SHA-256 integrity, and bounded non-executing verification |
 | Interoperability | Eager/lazy Polars, NumPy, Arrow, optional pandas and named MultiIndexes, generic factor/vendor/backtest schemas, DuckDB Arrow streams, and scikit-learn CV |
 | Native acceleration | Rust grouped-rank IC, bootstrap-mean reduction, and interval purging with reference, differential, integration, and Criterion coverage |
-| Options extension | Independently versioned `lacuna-options` 0.1.6 with chain validation, carry forwards, log-forward moneyness, delta buckets, and empirical IV residuals |
+| Options extension | Independently versioned `lacuna-options` 0.2.0 with chain validation, carry forwards, log-forward moneyness, delta buckets, and empirical IV residuals |
 
 Lacuna intentionally does **not** generate alpha, source market data, compound a portfolio, resolve
 overlapping holdings, simulate orders or fills, route trades, or run live strategies. It also does
@@ -103,13 +105,11 @@ defaults.
 
 ## Install and quick start
 
-Lacuna currently ships from GitHub rather than PyPI. Download the wheel matching your platform from
-the [v0.12.0 release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.12.0), verify it against
-the accompanying `SHA256SUMS`, and install that local file:
+Install Lacuna from PyPI. The distribution is named `lacuna-quant`; the import package and command
+remain `lacuna`:
 
 ```bash
-LACUNA_WHEEL=/absolute/path/to/lacuna-0.12.0-cp311-abi3-your-platform.whl
-python -m pip install "$LACUNA_WHEEL"
+python -m pip install lacuna-quant
 lacuna doctor --strict
 ```
 
@@ -118,6 +118,23 @@ macOS arm64, and Windows x86-64 targets. Optional dependencies are grouped as `s
 `report`, `pandas`, `duckdb`, and `ml`; see [`pyproject.toml`](pyproject.toml) for their exact bounds.
 The decay-fit and interactive-report calls below require SciPy, Jinja2, and Plotly from the
 `statistics` and `report` groups.
+
+```bash
+python -m pip install "lacuna-quant[statistics,report,pandas]"
+python -m pip install lacuna-options
+```
+
+If you previously installed a GitHub Release wheel whose distribution metadata was `lacuna`, remove
+it before installing from PyPI. Installing both distributions leaves ownership of `import lacuna`
+ambiguous, and `lacuna doctor` reports that state as a failure.
+
+```bash
+python -m pip uninstall lacuna lacuna-options
+python -m pip install --upgrade lacuna-quant lacuna-options
+```
+
+The same seven checksummed, provenance-attested distributions remain attached to the
+[`v0.13.0` GitHub Release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.13.0).
 
 For development, Lacuna uses [uv](https://docs.astral.sh/uv/) for Python environments and Cargo for
 the Rust workspace:

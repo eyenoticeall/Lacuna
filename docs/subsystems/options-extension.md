@@ -1,8 +1,8 @@
 # Options-research extension
 
-**Status:** implemented as the separately versioned `lacuna-options` 0.1 package for the Lacuna
-0.6 milestone. Patch `0.1.6` expands compatibility through additive Lacuna core `0.12.x`; it is
-released beside core but is not a core dependency.
+**Status:** implemented as the separately versioned `lacuna-options` package for the Lacuna 0.6
+milestone. Version `0.2.0` migrates dependency identity to the PyPI core distribution
+`lacuna-quant`; it remains optional and is not a core dependency.
 
 The extension provides empirical option-chain normalization and transparent derived coordinates.
 It deliberately begins below the level of a pricing library: callers provide market/model fields,
@@ -10,32 +10,33 @@ and the extension validates their meaning before producing evidence.
 
 ## Package and compatibility boundary
 
-The distribution and import names are distinct:
+Both distributions deliberately keep their established import packages:
 
 ```text
-distribution: lacuna-options
-import:       lacuna_options
-version:      0.1.x (independent of Lacuna core 0.12.x)
+core distribution:      lacuna-quant
+core import:            lacuna
+extension distribution: lacuna-options
+extension import:       lacuna_options
+extension version:      0.2.x (independent of Lacuna core 0.13.x)
 ```
 
-Install both artifacts from the same GitHub Release because the core distribution name on PyPI is
-unrelated to this project:
+Install from PyPI:
 
 ```bash
-python -m pip install \
-  ./lacuna-0.12.0-cp311-abi3-<platform>.whl \
-  ./lacuna_options-0.1.6-py3-none-any.whl
+python -m pip install lacuna-options
 ```
 
-The extension supports `lacuna>=0.5,<0.13`. Its `0.1.x` exports and signatures are frozen in
-`extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`. Core and extension versions do not
-advance in lockstep: a later extension patch can improve its own compatible contract without a core
-release, while a future core incompatibility must update the dependency range and migration notes.
+The extension supports `lacuna-quant>=0.13,<0.14`. Its exact original exports and signatures are
+frozen in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; the `v0.2` fixture
+inherits that complete contract and records the distribution migration. Core and extension
+versions do not advance in lockstep: a later extension patch can improve its own compatible
+contract without a core release, while a future core incompatibility must update the dependency
+range and migration notes.
 
-`0.1.6` changes only dependency metadata and integration evidence: core `0.12` is additive, the
-extension's source/API contract is unchanged, and real validated-chain evidence continues through
-the required standardized options-profile capability. The patch release is still required because
-an installed distribution's dependency range is part of its compatibility contract.
+`0.2.0` changes distribution dependency metadata and integration evidence, not analytical
+semantics. The minor increment makes the incompatible package-resolution boundary visible: older
+`0.1.x` releases depend on the historical distribution named `lacuna`, while `0.2.x` safely depends
+on `lacuna-quant`.
 
 Core remains importable without this package. Conversely, `lacuna_options` depends on the core data
 boundary, exceptions, and evidence types instead of duplicating them.

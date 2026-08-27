@@ -1,7 +1,7 @@
 {
   "format": "lacuna.public-reference-coverage",
   "manifest_version": 1,
-  "package_series": "0.12",
+  "package_series": "0.13",
   "root": {
     "module": "lacuna",
     "reference": "docs/reference/python-api-surface.md",

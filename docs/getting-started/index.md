@@ -3,10 +3,32 @@
 ## Requirements
 
 - Python 3.11 or newer
-- a stable Rust toolchain with Cargo
-- uv
+- `pip` or another Python package installer
+
+## Install a release
+
+The distribution is `lacuna-quant`; the import package and command are `lacuna`:
+
+```bash
+python -m pip install lacuna-quant
+lacuna doctor --strict
+```
+
+Install optional method families through extras, and install the separately versioned options
+extension only when needed:
+
+```bash
+python -m pip install "lacuna-quant[statistics,report,pandas]"
+python -m pip install lacuna-options
+```
+
+Do not install the PyPI project named `lacuna`; it is unrelated. If migrating from a historical
+Lacuna GitHub wheel whose distribution metadata was `lacuna`, remove it before installing
+`lacuna-quant` so two distributions do not own the same `lacuna` import path.
 
 ## Set up the repository
+
+Repository development additionally requires a stable Rust toolchain, Cargo, and uv.
 
 ```bash
 uv sync --group dev --group docs
@@ -14,9 +36,10 @@ uv run lacuna doctor
 ```
 
 `uv sync` builds the mixed Python/Rust package in the local environment. The doctor command checks
-package and native-core identity, Python and wheel support, dependency metadata, packaged schemas,
-and runtime configuration. Every result has a stable code and an actionable message. Use
-`lacuna doctor --json --strict` in automation; strict mode also rejects warnings.
+package and native-core identity, distribution-name collisions, Python and wheel support, dependency
+metadata, packaged schemas, and runtime configuration. Every result has a stable code and an
+actionable message. Use `lacuna doctor --json --strict` in automation; strict mode also rejects
+warnings.
 
 ## Run quality checks
 

@@ -144,7 +144,8 @@ The repository currently implements the v0.1 signal-validation path, v0.2 robust
 v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
 milestone, the v0.6 optional-integration milestone, the v0.7 portable-evidence milestone, and the
 v0.8 standardized-audit, v0.9 operational-hardening, v0.10 factor-diagnostic, v0.11
-decay/projection/event, and v0.12 factor-panel interoperability milestones:
+decay/projection/event, v0.12 factor-panel interoperability, and v0.13 PyPI-distribution
+milestones:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -179,6 +180,8 @@ decay/projection/event, and v0.12 factor-panel interoperability milestones:
   independent protocol-major/capability negotiation;
 - a separately packaged and independently versioned `lacuna-options` extension for normalized
   chains, carry forwards, log-forward moneyness, delta buckets, and empirical surface residuals.
+- a PyPI-safe `lacuna-quant` distribution that preserves `import lacuna`, plus OIDC-only Trusted
+  Publishing and clean post-registry core/extension installation smoke;
 - deterministic `.lacuna` evidence archives with a published manifest schema, bounded non-executing
   verification, privacy redaction, and SHA-256 member/artifact-set integrity.
 - versioned signal/strategy/options audit profiles that recognize every released method family,
@@ -190,7 +193,7 @@ decay/projection/event, and v0.12 factor-panel interoperability milestones:
 DataFusion, framework-specific adapters, automatic execution
 planning, model-based option pricing/
 calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
-through documented migrations; the published `0.1.x` through `0.12.x` contracts govern their
+through documented migrations; the published `0.1.x` through `0.13.x` contracts govern their
 respective release lines.
 
 ## Detailed guides
