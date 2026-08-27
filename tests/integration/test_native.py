@@ -106,6 +106,78 @@ def test_native_pbo_boundary_rejects_strides_negative_groups_and_bad_statistics(
         _native.pbo_partition_splits(contiguous, groups, 4, "median")
 
 
+def test_native_cpcv_boundary_returns_compact_source_ordered_roles() -> None:
+    output = _native.cpcv_fold_assembly(
+        np.asarray([0, 0, 1, 1, 2, 2, 3, 3], dtype=np.int64),
+        np.arange(8, dtype=np.int64),
+        np.arange(8, dtype=np.int64),
+        np.arange(1, 9, dtype=np.int64),
+        np.asarray([1, 3, 5, 7], dtype=np.int64),
+        np.asarray([[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]], dtype=np.int64),
+        1,
+    )
+
+    assert len(output) == 10
+    assert all(value.dtype == np.int64 and value.ndim == 1 for value in output)
+    (
+        train,
+        train_offsets,
+        test,
+        test_offsets,
+        purged,
+        purge_offsets,
+        embargoed,
+        _,
+        paths,
+        path_offsets,
+    ) = output
+    assert train[train_offsets[0] : train_offsets[1]].tolist() == [5, 6, 7]
+    assert test[test_offsets[0] : test_offsets[1]].tolist() == [0, 1, 2, 3]
+    assert purged[purge_offsets[0] : purge_offsets[1]].tolist() == []
+    assert embargoed.tolist()[0] == 4
+    assert paths.tolist() == [0, 0, 1, 2, 1, 3, 3, 4, 2, 4, 5, 5]
+    assert path_offsets.tolist() == [0, 4, 8, 12]
+
+
+def test_native_cpcv_boundary_rejects_strides_negative_codes_and_misalignment() -> None:
+    row_groups = np.asarray([0, 0, 1, 1], dtype=np.int64)
+    periods = np.arange(4, dtype=np.int64)
+    starts = np.arange(8, dtype=np.int64)[::2]
+    ends = np.arange(1, 5, dtype=np.int64)
+    group_ends = np.asarray([1, 3], dtype=np.int64)
+    combinations = np.asarray([[0]], dtype=np.int64)
+    with pytest.raises(ValueError, match="C-contiguous"):
+        _native.cpcv_fold_assembly(
+            row_groups,
+            periods,
+            starts,
+            ends,
+            group_ends,
+            combinations,
+            0,
+        )
+    with pytest.raises(ValueError, match="non-negative"):
+        _native.cpcv_fold_assembly(
+            np.asarray([0, -1, 1, 1], dtype=np.int64),
+            periods,
+            np.arange(4, dtype=np.int64),
+            ends,
+            group_ends,
+            combinations,
+            0,
+        )
+    with pytest.raises(ValueError, match="CPCV dimensions"):
+        _native.cpcv_fold_assembly(
+            row_groups,
+            periods[:-1],
+            np.arange(4, dtype=np.int64),
+            ends,
+            group_ends,
+            combinations,
+            0,
+        )
+
+
 @pytest.mark.parametrize("statistic", ["mean", "sharpe"])
 def test_native_pbo_matches_partition_moment_reference(statistic: str) -> None:
     rng = np.random.default_rng(14_008)

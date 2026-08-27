@@ -198,6 +198,50 @@ def test_cpcv_purges_and_embargoes_each_test_group() -> None:
     assert first.train_indices == (5, 6, 7)
 
 
+def test_complete_native_cpcv_matches_reference_and_preserves_source_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("lacuna.cv._CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD", 0)
+    frame = pl.DataFrame(
+        {
+            "observation_time": [4, 0, 7, 2, 6, 1, 5, 3],
+            "label_start": [4, 0, 7, 2, 6, 1, 5, 3],
+            "label_end": [7, 2, 8, 5, 8, 4, 6, 4],
+        }
+    )
+    reference = CombinatorialPurgedKFold(
+        n_groups=4,
+        n_test_groups=2,
+        embargo=1,
+        use_native=False,
+    ).split(frame)
+    native = CombinatorialPurgedKFold(
+        n_groups=4,
+        n_test_groups=2,
+        embargo=1,
+        use_native=True,
+    ).split(frame)
+
+    assert native.folds == reference.folds
+    assert native.paths == reference.paths
+    assert native.evidence.metrics == reference.evidence.metrics
+    assert native.evidence.metadata.parameters["backend"] == "rust_native"
+    for name in ("groups", "combinations", "folds", "paths"):
+        assert native.evidence.table(name) == reference.evidence.table(name)
+
+
+def test_complete_native_cpcv_propagates_contract_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def invalid_native(*args: object) -> object:
+        raise ValueError("invalid native offsets")
+
+    monkeypatch.setattr("lacuna.cv._CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD", 0)
+    monkeypatch.setattr("lacuna._native.cpcv_fold_assembly", invalid_native)
+    with pytest.raises(DataContractError, match="invalid native offsets"):
+        CombinatorialPurgedKFold(n_groups=3, use_native=True).split(_intervals())
+
+
 def test_cpcv_rejects_combinatorial_explosion() -> None:
     with pytest.raises(MethodContractError, match="max_combinations"):
         CombinatorialPurgedKFold(n_groups=20, n_test_groups=10, max_combinations=10_000)

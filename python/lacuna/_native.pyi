@@ -29,6 +29,26 @@ def pbo_partition_splits(
     npt.NDArray[np.uint8],
     npt.NDArray[np.uint8],
 ]: ...
+def cpcv_fold_assembly(
+    row_groups: npt.NDArray[np.int64],
+    row_periods: npt.NDArray[np.int64],
+    starts: npt.NDArray[np.int64],
+    ends: npt.NDArray[np.int64],
+    group_end_periods: npt.NDArray[np.int64],
+    combination_groups: npt.NDArray[np.int64],
+    embargo: int,
+) -> tuple[
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+    npt.NDArray[np.int64],
+]: ...
 def interval_purge(
     train_starts: npt.NDArray[np.int64],
     train_ends: npt.NDArray[np.int64],

@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from lacuna._carriers import CostComponentBatch, ResampleBatch
+from lacuna._carriers import CompactFoldBuffer, CostComponentBatch, ResampleBatch
 from lacuna.exceptions import DataContractError
 
 
@@ -62,3 +62,44 @@ def test_resample_batch_flattens_samples_and_validates_offsets() -> None:
             indices=np.array([0, 1], dtype=np.int64),
             offsets=np.array([0, 2, 1], dtype=np.int64),
         )
+
+
+def _compact_fold_buffer(**overrides: object) -> CompactFoldBuffer:
+    values: dict[str, object] = {
+        "row_count": 4,
+        "group_count": 2,
+        "train_indices": np.array([2, 3], dtype=np.int64),
+        "train_offsets": np.array([0, 2], dtype=np.int64),
+        "test_indices": np.array([0, 1], dtype=np.int64),
+        "test_offsets": np.array([0, 2], dtype=np.int64),
+        "purged_indices": np.array([], dtype=np.int64),
+        "purged_offsets": np.array([0, 0], dtype=np.int64),
+        "embargoed_indices": np.array([], dtype=np.int64),
+        "embargoed_offsets": np.array([0, 0], dtype=np.int64),
+        "path_fold_by_group": np.array([0, 0], dtype=np.int64),
+        "path_offsets": np.array([0, 2], dtype=np.int64),
+    }
+    values.update(overrides)
+    return CompactFoldBuffer(**values)  # type: ignore[arg-type]
+
+
+def test_compact_fold_buffer_projects_checked_roles_and_paths() -> None:
+    buffer = _compact_fold_buffer()
+
+    assert buffer.fold_count == 1
+    assert buffer.path_count == 1
+    assert buffer.role(0, "train") == (2, 3)
+    assert buffer.role(0, "purged") == ()
+    assert buffer.path(0) == (0, 0)
+    assert buffer.train_indices.flags.writeable is False
+
+
+def test_compact_fold_buffer_rejects_role_overlap_and_malformed_paths() -> None:
+    with pytest.raises(DataContractError, match="exactly one role"):
+        _compact_fold_buffer(
+            train_indices=np.array([1, 2, 3], dtype=np.int64),
+            train_offsets=np.array([0, 3], dtype=np.int64),
+        )
+
+    with pytest.raises(DataContractError, match="exactly one fold per group"):
+        _compact_fold_buffer(path_offsets=np.array([0, 1, 2], dtype=np.int64))
