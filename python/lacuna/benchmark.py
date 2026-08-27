@@ -21,7 +21,7 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from lacuna import bias, costs, events, signal
+from lacuna import bias, costs, events, regime, signal
 from lacuna._advanced_inference import _PBOBackend, _probability_of_backtest_overfitting
 from lacuna.adapters import (
     AdaptedFrame,
@@ -83,6 +83,9 @@ _PRIVATE_MIGRATION_CV_CASES = {
 }
 _PRIVATE_MIGRATION_SIGNAL_CASES = {
     "migration.signal.turnover.multilag",
+}
+_PRIVATE_MIGRATION_REGIME_CASES = {
+    "migration.regime.quantiles.rolling",
 }
 
 
@@ -1094,6 +1097,33 @@ def _run_benchmarks(
                 ),
                 resolved.rows * len(resolved.horizons) * resolved.quantiles,
                 "membership_cells/second",
+            )
+        )
+    requested_private_regime_cases = (
+        set() if case_names is None else case_names.intersection(_PRIVATE_MIGRATION_REGIME_CASES)
+    )
+    if "migration.regime.quantiles.rolling" in requested_private_regime_cases:
+        regime_positions: IntArray = np.arange(resolved.rows, dtype=np.int64)
+        regime_values = np.sin(regime_positions.astype(np.float64) * 0.017)
+        regime_values[::97] = np.nan
+        regime_frame = pl.DataFrame(
+            {
+                "time": regime_positions,
+                "value": regime_values,
+            }
+        )
+        cases.append(
+            (
+                "migration.regime.quantiles.rolling",
+                partial(
+                    regime.quantile_regimes,
+                    regime_frame,
+                    method="rolling",
+                    min_history=63,
+                    window=252,
+                ),
+                resolved.rows * 252,
+                "history_cells/second",
             )
         )
     native = native_status()
