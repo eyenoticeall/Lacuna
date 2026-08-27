@@ -132,7 +132,7 @@ jobs:
   rust:
     name: Rust
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -147,6 +147,10 @@ jobs:
         run: cargo fmt --all --check
       - name: Verify reviewed Rust boundary dependencies and licenses
         run: python .github/scripts/check_rust_boundary.py
+      - name: Install the pinned RustSec audit client
+        run: cargo install cargo-audit --locked --version 0.22.2
+      - name: Reject vulnerable, unmaintained, unsound, or yanked Rust dependencies
+        run: cargo audit --deny warnings --file Cargo.lock
       - name: Lint every Rust target
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Test the Rust workspace

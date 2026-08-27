@@ -51,7 +51,9 @@ stable ABI cannot represent safely.
 9. Each wheel installs in a clean environment and passes an import/native smoke test.
 10. Source distribution contains Rust sources, Python sources, stubs, the MIT license, and required docs.
 11. Changelog is complete and target APIs are not presented as shipped.
-12. Security advisories and dependency changes are reviewed.
+12. Security advisories and dependency changes are reviewed. CI and the exact-SHA rehearsal install
+    pinned `cargo-audit` 0.22.2 and reject vulnerable, unmaintained, unsound, or yanked entries in
+    the locked Rust graph against the current RustSec advisory database.
 13. Each independently versioned extension passes its own format/type/test/API gate and clean joint
     installation with the exact core wheel.
 

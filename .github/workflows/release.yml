@@ -177,6 +177,10 @@ jobs:
           --cov-branch
           --cov-fail-under=85
           --junitxml=release-options-junit.xml
+      - name: Audit the locked Rust graph against current RustSec advisories
+        run: |
+          cargo install cargo-audit --locked --version 0.22.2
+          cargo audit --deny warnings --file Cargo.lock
       - name: Run Rust format, dependency, lint, test, and benchmark-compile gates
         run: |
           cargo fmt --all --check
