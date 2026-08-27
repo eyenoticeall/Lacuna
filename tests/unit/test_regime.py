@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import numpy as np
 import polars as pl
 import pytest
 
@@ -47,6 +48,65 @@ def test_rolling_quantiles_limit_history_and_are_seed_free() -> None:
     rows = result.table("regimes")
     assert rows[-1]["history_count"] == 3  # type: ignore[index]
     assert rows[-1]["threshold_upper"] == pytest.approx(6.5)  # type: ignore[index]
+
+
+@pytest.mark.parametrize(
+    ("method", "window"),
+    (("expanding", None), ("rolling", 7)),
+)
+def test_trailing_quantiles_match_literal_numpy_linear_reference(
+    method: str,
+    window: int | None,
+) -> None:
+    values = np.array(
+        [0.0, -0.0, 1.0, 1.0, np.nan, 4.0, -2.0, 8.0, 3.0, np.nan, 5.0, 13.0],
+        dtype=np.float64,
+    )
+    permutation = np.array([8, 1, 10, 4, 0, 11, 3, 7, 2, 9, 6, 5])
+    source = pl.concat(
+        [
+            pl.DataFrame({"time": permutation[:6], "value": values[permutation[:6]]}),
+            pl.DataFrame({"time": permutation[6:], "value": values[permutation[6:]]}),
+        ],
+        rechunk=False,
+    ).with_columns(
+        pl.when(pl.col("time") == 4).then(None).otherwise(pl.col("value")).alias("value")
+    )
+
+    result = quantile_regimes(
+        source,
+        method=method,  # type: ignore[arg-type]
+        lower_quantile=0.2,
+        upper_quantile=0.8,
+        min_history=3,
+        window=window,
+    )
+    rows = result.table("regimes")
+    assert rows is not None
+    for position, row in enumerate(rows):
+        start = 0 if method == "expanding" else max(0, position - int(window or 0))
+        finite_history = values[start:position]
+        finite_history = finite_history[np.isfinite(finite_history)]
+        assert row["history_count"] == finite_history.size  # type: ignore[index]
+        if finite_history.size < 3:
+            assert row["threshold_lower"] is None  # type: ignore[index]
+            assert row["threshold_upper"] is None  # type: ignore[index]
+            assert row["regime"] == "unknown"  # type: ignore[index]
+            continue
+        lower, upper = np.quantile(finite_history, (0.2, 0.8))
+        assert float(row["threshold_lower"]).hex() == float(lower).hex()  # type: ignore[index]
+        assert float(row["threshold_upper"]).hex() == float(upper).hex()  # type: ignore[index]
+        observed = values[position]
+        expected = (
+            "unknown"
+            if not np.isfinite(observed)
+            else "low"
+            if observed <= lower
+            else "high"
+            if observed >= upper
+            else "middle"
+        )
+        assert row["regime"] == expected  # type: ignore[index]
 
 
 def test_retrospective_quantiles_are_explicitly_descriptive() -> None:

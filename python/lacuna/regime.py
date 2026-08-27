@@ -76,6 +76,95 @@ def _portable_records(frame: pl.DataFrame) -> tuple[JsonValue, ...]:
     return frame_records(normalized)
 
 
+def _trailing_quantile_frame(
+    ordered: pl.DataFrame,
+    *,
+    value: str,
+    method: Literal["expanding", "rolling"],
+    lower_quantile: float,
+    upper_quantile: float,
+    min_history: int,
+    window: int | None,
+    low_label: str,
+    middle_label: str,
+    high_label: str,
+    unknown_label: str,
+) -> pl.DataFrame:
+    """Compute exact, strictly prior NumPy-linear thresholds in one Polars plan."""
+
+    window_size = ordered.height if method == "expanding" else int(window or 0)
+    finite_value = pl.col(value).cast(pl.Float64).fill_nan(None)
+    prior_count = (
+        finite_value.is_not_null()
+        .cast(pl.Int64)
+        .rolling_sum(window_size=window_size, min_samples=1)
+        .shift(1)
+        .fill_null(0)
+        .alias("history_count")
+    )
+
+    def prior_order_statistic(quantile: float, interpolation: str, name: str) -> pl.Expr:
+        return (
+            finite_value.rolling_quantile(
+                quantile=quantile,
+                interpolation=interpolation,  # type: ignore[arg-type]
+                window_size=window_size,
+                min_samples=min_history,
+            )
+            .shift(1)
+            .alias(name)
+        )
+
+    with_order_statistics = ordered.with_columns(
+        prior_order_statistic(lower_quantile, "lower", "_lower_left"),
+        prior_order_statistic(lower_quantile, "higher", "_lower_right"),
+        prior_order_statistic(upper_quantile, "lower", "_upper_left"),
+        prior_order_statistic(upper_quantile, "higher", "_upper_right"),
+        prior_count,
+    )
+
+    def numpy_linear_quantile(quantile: float, left: str, right: str, name: str) -> pl.Expr:
+        index = (pl.col("history_count") - 1).cast(pl.Float64) * quantile
+        weight = index - index.floor()
+        difference = pl.col(right) - pl.col(left)
+        return (
+            pl.when(weight >= 0.5)
+            .then(pl.col(right) - difference * (1.0 - weight))
+            .otherwise(pl.col(left) + difference * weight)
+            .alias(name)
+        )
+
+    with_thresholds = with_order_statistics.with_columns(
+        numpy_linear_quantile(
+            lower_quantile,
+            "_lower_left",
+            "_lower_right",
+            "threshold_lower",
+        ),
+        numpy_linear_quantile(
+            upper_quantile,
+            "_upper_left",
+            "_upper_right",
+            "threshold_upper",
+        ),
+    ).drop("_lower_left", "_lower_right", "_upper_left", "_upper_right")
+    eligible = (
+        pl.col(value).cast(pl.Float64).is_finite().fill_null(False)
+        & pl.col("threshold_lower").is_not_null()
+        & pl.col("threshold_upper").is_not_null()
+    )
+    return with_thresholds.with_columns(
+        pl.when(~eligible)
+        .then(pl.lit(unknown_label))
+        .when(pl.col(value) <= pl.col("threshold_lower"))
+        .then(pl.lit(low_label))
+        .when(pl.col(value) >= pl.col("threshold_upper"))
+        .then(pl.lit(high_label))
+        .otherwise(pl.lit(middle_label))
+        .alias("regime")
+    )
+
+
 def quantile_regimes(
     data: object,
     *,
@@ -158,10 +247,6 @@ def quantile_regimes(
     if bool(np.isinf(values).any()):
         raise DataContractError("regime value contains infinity")
 
-    lower_values: list[float | None] = []
-    upper_values: list[float | None] = []
-    history_counts: list[int] = []
-    regimes: list[str] = []
     retrospective_history = values[np.isfinite(values)]
     retrospective_lower = (
         float(np.quantile(retrospective_history, lower_quantile))
@@ -173,45 +258,43 @@ def quantile_regimes(
         if retrospective_history.size
         else None
     )
-    for position, observed in enumerate(values):
-        if method == "fixed":
-            history_count = 0
-            lower = lower_threshold
-            upper = upper_threshold
-        elif method == "retrospective":
-            history_count = int(retrospective_history.size)
-            lower = retrospective_lower
-            upper = retrospective_upper
-        else:
-            start = 0 if method == "expanding" else max(0, position - int(window or 0))
-            history = values[start:position]
-            finite_history = history[np.isfinite(history)]
-            history_count = int(finite_history.size)
-            if history_count >= min_history:
-                lower = float(np.quantile(finite_history, lower_quantile))
-                upper = float(np.quantile(finite_history, upper_quantile))
-            else:
-                lower = None
-                upper = None
-        lower_values.append(lower)
-        upper_values.append(upper)
-        history_counts.append(history_count)
-        if not math.isfinite(float(observed)) or lower is None or upper is None:
-            regimes.append(unknown_label)
-        elif observed <= lower:
-            regimes.append(low_label)
-        elif observed >= upper:
-            regimes.append(high_label)
-        else:
-            regimes.append(middle_label)
-
-    output = ordered.with_columns(
-        pl.Series("threshold_lower", lower_values, dtype=pl.Float64),
-        pl.Series("threshold_upper", upper_values, dtype=pl.Float64),
-        pl.Series("history_count", history_counts, dtype=pl.Int64),
-        pl.Series("regime", regimes, dtype=pl.String),
-    )
-    unknown_count = regimes.count(unknown_label)
+    if method in {"expanding", "rolling"}:
+        output = _trailing_quantile_frame(
+            ordered,
+            value=value,
+            method=method,
+            lower_quantile=lower_quantile,
+            upper_quantile=upper_quantile,
+            min_history=min_history,
+            window=window,
+            low_label=low_label,
+            middle_label=middle_label,
+            high_label=high_label,
+            unknown_label=unknown_label,
+        )
+    else:
+        history_count = 0 if method == "fixed" else int(retrospective_history.size)
+        lower = lower_threshold if method == "fixed" else retrospective_lower
+        upper = upper_threshold if method == "fixed" else retrospective_upper
+        output = ordered.with_columns(
+            pl.lit(lower, dtype=pl.Float64).alias("threshold_lower"),
+            pl.lit(upper, dtype=pl.Float64).alias("threshold_upper"),
+            pl.lit(history_count, dtype=pl.Int64).alias("history_count"),
+        ).with_columns(
+            pl.when(
+                ~pl.col(value).cast(pl.Float64).is_finite().fill_null(False)
+                | pl.col("threshold_lower").is_null()
+                | pl.col("threshold_upper").is_null()
+            )
+            .then(pl.lit(unknown_label))
+            .when(pl.col(value) <= pl.col("threshold_lower"))
+            .then(pl.lit(low_label))
+            .when(pl.col(value) >= pl.col("threshold_upper"))
+            .then(pl.lit(high_label))
+            .otherwise(pl.lit(middle_label))
+            .alias("regime")
+        )
+    unknown_count = int(output.select((pl.col("regime") == unknown_label).sum()).item())
     findings: list[Finding] = []
     if method == "retrospective":
         findings.append(
