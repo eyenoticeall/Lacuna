@@ -9,8 +9,10 @@ from lacuna._migration_benchmark import (
     MigrationAdmission,
     MigrationBenchmarkArtifact,
     MigrationBenchmarkTarget,
+    MigrationCorrectness,
     MigrationMeasurement,
     _worker_payload,
+    compare_equivalence_payloads,
     evaluate_admission,
     validate_artifact,
 )
@@ -70,6 +72,61 @@ def test_admission_requires_correctness_before_performance() -> None:
     assert decision.correctness_match is False
 
 
+def test_tolerance_comparison_preserves_structure_and_records_numerical_error() -> None:
+    correctness = compare_equivalence_payloads(
+        {"rows": [{"value": 0.0260484546546, "state": "PASS"}], "backend": "numpy"},
+        {"rows": [{"value": 0.0260484546545, "state": "PASS"}], "backend": "rust"},
+        reference_checksum="reference",
+        candidate_checksum="candidate",
+        absolute_tolerance=1e-12,
+        relative_tolerance=1e-12,
+    )
+    assert correctness.match is True
+    assert correctness.exact_checksum_match is False
+    assert correctness.numeric_values_compared == 1
+    assert correctness.maximum_absolute_error == pytest.approx(1e-13, rel=1e-3)
+    assert correctness.first_mismatch_path is None
+
+    decision = evaluate_admission(
+        _target(absolute_tolerance=1e-12, relative_tolerance=1e-12),
+        _measurement(seconds=0.2, checksum="reference"),
+        _measurement(seconds=0.05, checksum="candidate"),
+        correctness=correctness,
+    )
+    assert decision.state == "ADMITTED"
+    assert decision.correctness_match is True
+
+
+@pytest.mark.parametrize(
+    ("reference", "candidate", "path", "reason"),
+    (
+        ({"rows": [1]}, {"rows": [1, 2]}, "root.rows", "sequence lengths differ"),
+        ({"value": 1}, {"value": 1.0}, "root.value", "value types differ"),
+        ({"value": True}, {"value": 1}, "root.value", "value types differ"),
+        ({"value": -0.0}, {"value": 0.0}, "root.value", "signed-zero values differ"),
+        ({"value": float("inf")}, {"value": float("inf")}, "root.value", "non-finite"),
+        ({"value": 1.0}, {"value": 1.01}, "root.value", "numerical values differ"),
+    ),
+)
+def test_tolerance_comparison_rejects_structural_and_out_of_tolerance_differences(
+    reference: dict[str, object],
+    candidate: dict[str, object],
+    path: str,
+    reason: str,
+) -> None:
+    correctness = compare_equivalence_payloads(
+        reference,
+        candidate,
+        reference_checksum="reference",
+        candidate_checksum="candidate",
+        absolute_tolerance=1e-12,
+        relative_tolerance=1e-12,
+    )
+    assert correctness.match is False
+    assert correctness.first_mismatch_path == path
+    assert reason in correctness.reason
+
+
 def test_admission_accepts_material_transfer_inclusive_speedup() -> None:
     decision = evaluate_admission(
         _target(),
@@ -124,6 +181,17 @@ def test_artifact_is_finite_versioned_and_validated() -> None:
             latency_regression_fraction=-0.5,
             reasons=("speed",),
         ),
+        correctness=MigrationCorrectness(
+            match=True,
+            exact_checksum_match=True,
+            absolute_tolerance=0.0,
+            relative_tolerance=0.0,
+            numeric_values_compared=1,
+            maximum_absolute_error=0.0,
+            maximum_relative_error=0.0,
+            first_mismatch_path=None,
+            reason="exact",
+        ),
         generated_at=datetime(2026, 8, 27, tzinfo=UTC),
         source_commit="abc123",
         run_url=None,
@@ -132,6 +200,43 @@ def test_artifact_is_finite_versioned_and_validated() -> None:
     payload = artifact.to_dict()
     assert payload["schema"] == MIGRATION_BENCHMARK_SCHEMA
     validate_artifact(payload)
+
+
+def test_artifact_validator_rejects_tolerance_outcome_disagreement() -> None:
+    reference = _measurement(seconds=0.2, checksum="reference")
+    candidate = _measurement(seconds=0.1, checksum="candidate")
+    artifact = MigrationBenchmarkArtifact(
+        target=_target(absolute_tolerance=1e-12),
+        config=BenchmarkConfig(repetitions=7, warmups=2),
+        reference=reference,
+        candidate=candidate,
+        admission=MigrationAdmission(
+            state="ADMITTED",
+            material=True,
+            correctness_match=True,
+            throughput_ratio=2.0,
+            rss_reduction_fraction=0.0,
+            latency_regression_fraction=-0.5,
+            reasons=("speed",),
+        ),
+        correctness=MigrationCorrectness(
+            match=False,
+            exact_checksum_match=False,
+            absolute_tolerance=1e-12,
+            relative_tolerance=0.0,
+            numeric_values_compared=1,
+            maximum_absolute_error=1.0,
+            maximum_relative_error=1.0,
+            first_mismatch_path="root.value",
+            reason="different",
+        ),
+        generated_at=datetime(2026, 8, 27, tzinfo=UTC),
+        source_commit="abc123",
+        run_url=None,
+        environment={"python": "3.13"},
+    )
+    with pytest.raises(MethodContractError, match="outcomes differ"):
+        validate_artifact(artifact.to_dict())
 
 
 def test_artifact_validator_rejects_unknown_schema_and_state() -> None:

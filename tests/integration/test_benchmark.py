@@ -136,5 +136,7 @@ def test_native_migration_sidecar_isolates_reference_and_candidate() -> None:
     payload = artifact.to_dict()
     validate_artifact(payload)
     assert artifact.candidate is not None
+    assert artifact.correctness is not None
+    assert artifact.correctness.match is True
     assert artifact.reference.checksum == artifact.candidate.checksum
     assert artifact.environment["native_threads"] == 1

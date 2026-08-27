@@ -76,6 +76,8 @@ def _run(arguments: argparse.Namespace) -> int:
         public_rss_share=arguments.public_rss_share,
         asymptotic_or_unbounded=arguments.asymptotic_or_unbounded,
         bounded_memory_advantage=arguments.bounded_memory_advantage,
+        absolute_tolerance=arguments.absolute_tolerance,
+        relative_tolerance=arguments.relative_tolerance,
     )
     artifact = run_isolated_migration_benchmark(
         target,
@@ -136,6 +138,8 @@ def main() -> int:
     run.add_argument("--public-rss-share", type=float)
     run.add_argument("--asymptotic-or-unbounded", action="store_true")
     run.add_argument("--bounded-memory-advantage", action="store_true")
+    run.add_argument("--absolute-tolerance", type=float, default=0.0)
+    run.add_argument("--relative-tolerance", type=float, default=0.0)
     run.add_argument("--out", type=Path)
     run.add_argument("--overwrite", action="store_true")
 

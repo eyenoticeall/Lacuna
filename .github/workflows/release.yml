@@ -295,6 +295,7 @@ jobs:
           --dimension horizons=3
           --dimension 'group_shape="cyclic:3,250,1250,5000"'
           --public-latency-share 1.0
+          --absolute-tolerance 1e-14
           --out native-admission/r01.json
       - name: Reproduce PBO admission
         run: >-
@@ -311,6 +312,8 @@ jobs:
           --dimension partitions=14
           --dimension combinations=3432
           --public-latency-share 1.0
+          --absolute-tolerance 1e-12
+          --relative-tolerance 1e-12
           --out native-admission/r08.json
       - name: Require exact-source native admission evidence
         run: |

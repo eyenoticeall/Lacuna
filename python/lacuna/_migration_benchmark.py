@@ -68,6 +68,8 @@ class MigrationBenchmarkTarget:
     public_rss_share: float | None = None
     asymptotic_or_unbounded: bool = False
     bounded_memory_advantage: bool = False
+    absolute_tolerance: float = 0.0
+    relative_tolerance: float = 0.0
 
     def __post_init__(self) -> None:
         if not self.candidate_id or not self.public_operation or not self.reference_case:
@@ -78,6 +80,12 @@ class MigrationBenchmarkTarget:
         ):
             if share is not None and (not math.isfinite(share) or not 0.0 <= share <= 1.0):
                 raise MethodContractError(f"{name} must be a finite fraction in [0, 1]")
+        for name, tolerance in (
+            ("absolute_tolerance", self.absolute_tolerance),
+            ("relative_tolerance", self.relative_tolerance),
+        ):
+            if not math.isfinite(tolerance) or tolerance < 0.0:
+                raise MethodContractError(f"{name} must be finite and non-negative")
         for key, value in self.effective_dimensions.items():
             if not key:
                 raise MethodContractError("effective dimension names must be non-empty")
@@ -136,6 +144,36 @@ class MigrationMeasurement:
 
 
 @dataclass(frozen=True, slots=True)
+class MigrationCorrectness:
+    """Exact-structure and tolerance-aware numerical comparison evidence."""
+
+    match: bool
+    exact_checksum_match: bool
+    absolute_tolerance: float
+    relative_tolerance: float
+    numeric_values_compared: int
+    maximum_absolute_error: float | None
+    maximum_relative_error: float | None
+    first_mismatch_path: str | None
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """Return finite JSON-compatible correctness evidence."""
+
+        return {
+            "match": self.match,
+            "exact_checksum_match": self.exact_checksum_match,
+            "absolute_tolerance": self.absolute_tolerance,
+            "relative_tolerance": self.relative_tolerance,
+            "numeric_values_compared": self.numeric_values_compared,
+            "maximum_absolute_error": self.maximum_absolute_error,
+            "maximum_relative_error": self.maximum_relative_error,
+            "first_mismatch_path": self.first_mismatch_path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class MigrationAdmission:
     """Mechanical v0.14 materiality and native-admission decision."""
 
@@ -174,6 +212,7 @@ class MigrationBenchmarkArtifact:
     source_commit: str
     run_url: str | None
     environment: Mapping[str, object]
+    correctness: MigrationCorrectness | None = None
     schema: str = MIGRATION_BENCHMARK_SCHEMA
     version: int = MIGRATION_BENCHMARK_VERSION
 
@@ -196,11 +235,14 @@ class MigrationBenchmarkArtifact:
                 "public_rss_share": self.target.public_rss_share,
                 "asymptotic_or_unbounded": self.target.asymptotic_or_unbounded,
                 "bounded_memory_advantage": self.target.bounded_memory_advantage,
+                "absolute_tolerance": self.target.absolute_tolerance,
+                "relative_tolerance": self.target.relative_tolerance,
             },
             "config": _config_payload(self.config),
             "environment": dict(self.environment),
             "reference": self.reference.to_dict(),
             "candidate": None if self.candidate is None else self.candidate.to_dict(),
+            "correctness": None if self.correctness is None else self.correctness.to_dict(),
             "admission": self.admission.to_dict(),
         }
 
@@ -330,10 +372,184 @@ def _measurement_from_worker(payload: Mapping[str, object]) -> MigrationMeasurem
     )
 
 
+@dataclass(slots=True)
+class _ComparisonStats:
+    numeric_values_compared: int = 0
+    maximum_absolute_error: float = 0.0
+    maximum_relative_error: float = 0.0
+    first_mismatch_path: str | None = None
+    mismatch_reason: str | None = None
+
+
+def _mapping_without_backend(value: Mapping[object, object]) -> dict[str, object]:
+    normalized = {str(key): item for key, item in value.items() if str(key) != "backend"}
+    if len(normalized) != sum(1 for key in value if str(key) != "backend"):
+        raise MethodContractError("equivalence payload contains colliding stringified keys")
+    return normalized
+
+
+def _compare_equivalence_values(
+    reference: object,
+    candidate: object,
+    *,
+    path: str,
+    absolute_tolerance: float,
+    relative_tolerance: float,
+    stats: _ComparisonStats,
+) -> None:
+    if stats.first_mismatch_path is not None:
+        return
+    if isinstance(reference, Mapping) and isinstance(candidate, Mapping):
+        reference_mapping = _mapping_without_backend(reference)
+        candidate_mapping = _mapping_without_backend(candidate)
+        reference_keys = set(reference_mapping)
+        candidate_keys = set(candidate_mapping)
+        if reference_keys != candidate_keys:
+            stats.first_mismatch_path = path
+            missing = sorted(reference_keys - candidate_keys)
+            unexpected = sorted(candidate_keys - reference_keys)
+            stats.mismatch_reason = (
+                f"mapping keys differ; missing={missing!r}, unexpected={unexpected!r}"
+            )
+            return
+        for key in sorted(reference_keys):
+            _compare_equivalence_values(
+                reference_mapping[key],
+                candidate_mapping[key],
+                path=f"{path}.{key}",
+                absolute_tolerance=absolute_tolerance,
+                relative_tolerance=relative_tolerance,
+                stats=stats,
+            )
+        return
+    if isinstance(reference, list | tuple) and isinstance(candidate, list | tuple):
+        if len(reference) != len(candidate):
+            stats.first_mismatch_path = path
+            stats.mismatch_reason = (
+                f"sequence lengths differ; reference={len(reference)}, candidate={len(candidate)}"
+            )
+            return
+        for index, (reference_item, candidate_item) in enumerate(
+            zip(reference, candidate, strict=True)
+        ):
+            _compare_equivalence_values(
+                reference_item,
+                candidate_item,
+                path=f"{path}[{index}]",
+                absolute_tolerance=absolute_tolerance,
+                relative_tolerance=relative_tolerance,
+                stats=stats,
+            )
+        return
+    if isinstance(reference, float) and isinstance(candidate, float):
+        stats.numeric_values_compared += 1
+        if not math.isfinite(reference) or not math.isfinite(candidate):
+            stats.first_mismatch_path = path
+            stats.mismatch_reason = "non-finite numerical evidence is not comparable"
+            return
+        absolute_error = abs(reference - candidate)
+        scale = max(abs(reference), abs(candidate))
+        relative_error = absolute_error / scale if scale else 0.0
+        stats.maximum_absolute_error = max(stats.maximum_absolute_error, absolute_error)
+        stats.maximum_relative_error = max(stats.maximum_relative_error, relative_error)
+        if (
+            reference == 0.0
+            and candidate == 0.0
+            and math.copysign(1.0, reference) != math.copysign(1.0, candidate)
+        ):
+            stats.first_mismatch_path = path
+            stats.mismatch_reason = "signed-zero values differ"
+            return
+        if not math.isclose(
+            reference,
+            candidate,
+            rel_tol=relative_tolerance,
+            abs_tol=absolute_tolerance,
+        ):
+            stats.first_mismatch_path = path
+            stats.mismatch_reason = (
+                f"numerical values differ; reference={reference!r}, candidate={candidate!r}"
+            )
+        return
+    if type(reference) is not type(candidate):
+        stats.first_mismatch_path = path
+        stats.mismatch_reason = (
+            f"value types differ; reference={type(reference).__name__}, "
+            f"candidate={type(candidate).__name__}"
+        )
+        return
+    if reference != candidate:
+        stats.first_mismatch_path = path
+        stats.mismatch_reason = (
+            f"structural values differ; reference={reference!r}, candidate={candidate!r}"
+        )
+
+
+def compare_equivalence_payloads(
+    reference: Mapping[str, object],
+    candidate: Mapping[str, object],
+    *,
+    reference_checksum: str,
+    candidate_checksum: str,
+    absolute_tolerance: float,
+    relative_tolerance: float,
+) -> MigrationCorrectness:
+    """Compare complete evidence trees without weakening structural or checksum evidence."""
+
+    for name, tolerance in (
+        ("absolute_tolerance", absolute_tolerance),
+        ("relative_tolerance", relative_tolerance),
+    ):
+        if not math.isfinite(tolerance) or tolerance < 0.0:
+            raise MethodContractError(f"{name} must be finite and non-negative")
+    stats = _ComparisonStats()
+    _compare_equivalence_values(
+        reference,
+        candidate,
+        path="root",
+        absolute_tolerance=absolute_tolerance,
+        relative_tolerance=relative_tolerance,
+        stats=stats,
+    )
+    match = stats.first_mismatch_path is None
+    exact_checksum_match = reference_checksum == candidate_checksum
+    if match and stats.maximum_absolute_error == 0.0:
+        reason = "complete evidence is structurally and numerically exact"
+    elif match and exact_checksum_match:
+        reason = (
+            "structure is exact, every finite numerical value is within tolerance, and the "
+            "normalized equivalence checksums match"
+        )
+    elif match:
+        reason = (
+            "structure is exact and every finite numerical value is within tolerance; normalized "
+            "equivalence checksums differ"
+        )
+    else:
+        reason = stats.mismatch_reason or "evidence differs"
+    return MigrationCorrectness(
+        match=match,
+        exact_checksum_match=exact_checksum_match,
+        absolute_tolerance=absolute_tolerance,
+        relative_tolerance=relative_tolerance,
+        numeric_values_compared=stats.numeric_values_compared,
+        maximum_absolute_error=(
+            stats.maximum_absolute_error if stats.numeric_values_compared else None
+        ),
+        maximum_relative_error=(
+            stats.maximum_relative_error if stats.numeric_values_compared else None
+        ),
+        first_mismatch_path=stats.first_mismatch_path,
+        reason=reason,
+    )
+
+
 def evaluate_admission(
     target: MigrationBenchmarkTarget,
     reference: MigrationMeasurement,
     candidate: MigrationMeasurement | None,
+    *,
+    correctness: MigrationCorrectness | None = None,
 ) -> MigrationAdmission:
     """Apply the mechanical materiality and v0.14 native admission thresholds."""
 
@@ -353,7 +569,9 @@ def evaluate_admission(
             reasons=("reference measured; no candidate backend was supplied",),
         )
 
-    correctness_match = reference.checksum == candidate.checksum
+    correctness_match = (
+        correctness.match if correctness is not None else reference.checksum == candidate.checksum
+    )
     throughput_ratio = reference.median_seconds / candidate.median_seconds
     latency_regression = (
         candidate.median_seconds - reference.median_seconds
@@ -369,6 +587,14 @@ def evaluate_admission(
         ) / reference.incremental_peak_rss_bytes
 
     if not correctness_match:
+        reason = "reference and candidate equivalence checksums differ"
+        if correctness is not None:
+            mismatch = (
+                f" at {correctness.first_mismatch_path}"
+                if correctness.first_mismatch_path is not None
+                else ""
+            )
+            reason = f"reference and candidate evidence differ{mismatch}: {correctness.reason}"
         return MigrationAdmission(
             state="NOT_MIGRATING",
             material=material,
@@ -376,7 +602,7 @@ def evaluate_admission(
             throughput_ratio=throughput_ratio,
             rss_reduction_fraction=rss_reduction,
             latency_regression_fraction=latency_regression,
-            reasons=("reference and candidate equivalence checksums differ",),
+            reasons=(reason,),
         )
     if not material:
         return MigrationAdmission(
@@ -450,7 +676,7 @@ def _run_worker(
     *,
     use_native: bool,
     instrumented: bool = False,
-) -> tuple[MigrationMeasurement, Mapping[str, object]]:
+) -> tuple[MigrationMeasurement, Mapping[str, object], Mapping[str, object] | None]:
     environment = os.environ.copy()
     environment.update(
         {
@@ -482,11 +708,17 @@ def _run_worker(
     payload = cast(dict[str, object], decoded)
     measurement_value = payload.get("measurement")
     environment_value = payload.get("environment")
+    equivalence_payload_value = payload.get("equivalence_payload")
     if not isinstance(measurement_value, dict) or not isinstance(environment_value, dict):
         raise MethodContractError("isolated migration worker output is incomplete")
+    if equivalence_payload_value is not None and not isinstance(equivalence_payload_value, dict):
+        raise MethodContractError("isolated migration equivalence payload must be an object")
     return (
         _measurement_from_worker(cast(dict[str, object], measurement_value)),
         cast(dict[str, object], environment_value),
+        cast(dict[str, object], equivalence_payload_value)
+        if equivalence_payload_value is not None
+        else None,
     )
 
 
@@ -615,7 +847,7 @@ def run_isolated_migration_benchmark(
         order = ("reference", "candidate") if repetition % 2 == 0 else ("candidate", "reference")
         for backend in order:
             if backend == "reference":
-                measurement, measured_environment = _run_worker(
+                measurement, measured_environment, _ = _run_worker(
                     target.reference_case,
                     single_run,
                     use_native=False,
@@ -623,7 +855,7 @@ def run_isolated_migration_benchmark(
                 reference_runs.append(measurement)
                 environment = environment or measured_environment
             elif target.candidate_case is not None:
-                measurement, measured_environment = _run_worker(
+                measurement, measured_environment, _ = _run_worker(
                     target.candidate_case,
                     single_run,
                     use_native=True,
@@ -635,7 +867,12 @@ def run_isolated_migration_benchmark(
         raise RuntimeError("reference migration benchmark did not run")
     reference = _aggregate_measurements(reference_runs)
     candidate = _aggregate_measurements(candidate_runs) if candidate_runs else None
-    reference_instrumented, reference_instrumented_environment = _run_worker(
+    candidate_equivalence_payload: Mapping[str, object] | None = None
+    (
+        reference_instrumented,
+        reference_instrumented_environment,
+        reference_equivalence_payload,
+    ) = _run_worker(
         target.reference_case,
         single_run,
         use_native=False,
@@ -645,7 +882,11 @@ def run_isolated_migration_benchmark(
     if environment.get("python") != reference_instrumented_environment.get("python"):
         raise RuntimeError("reference instrumentation used a different Python runtime")
     if target.candidate_case is not None and candidate is not None:
-        candidate_instrumented, candidate_instrumented_environment = _run_worker(
+        (
+            candidate_instrumented,
+            candidate_instrumented_environment,
+            candidate_equivalence_payload,
+        ) = _run_worker(
             target.candidate_case,
             single_run,
             use_native=True,
@@ -660,7 +901,19 @@ def run_isolated_migration_benchmark(
         for key in ("python", "platform", "machine", "polars", "numpy", "native_version"):
             if environment.get(key) != candidate_environment.get(key):
                 raise RuntimeError(f"reference/candidate worker environment differs for {key}")
-    admission = evaluate_admission(target, reference, candidate)
+    correctness: MigrationCorrectness | None = None
+    if candidate is not None:
+        if reference_equivalence_payload is None or candidate_equivalence_payload is None:
+            raise RuntimeError("candidate admission requires complete equivalence payloads")
+        correctness = compare_equivalence_payloads(
+            reference_equivalence_payload,
+            candidate_equivalence_payload,
+            reference_checksum=reference.checksum,
+            candidate_checksum=candidate.checksum,
+            absolute_tolerance=target.absolute_tolerance,
+            relative_tolerance=target.relative_tolerance,
+        )
+    admission = evaluate_admission(target, reference, candidate, correctness=correctness)
     return MigrationBenchmarkArtifact(
         target=target,
         config=config,
@@ -670,6 +923,7 @@ def run_isolated_migration_benchmark(
         generated_at=datetime.now(UTC),
         source_commit=source_commit,
         run_url=run_url,
+        correctness=correctness,
         environment={
             **environment,
             "openblas_threads": 1,
@@ -707,6 +961,7 @@ def validate_artifact(payload: Mapping[str, object]) -> None:
     target = payload.get("target")
     config = payload.get("config")
     candidate = payload.get("candidate")
+    correctness = payload.get("correctness")
     admission = payload.get("admission")
     if (
         not isinstance(target, Mapping)
@@ -714,6 +969,76 @@ def validate_artifact(payload: Mapping[str, object]) -> None:
         or not isinstance(admission, Mapping)
     ):
         raise MethodContractError("migration target, config, and admission must be objects")
+    for name in ("absolute_tolerance", "relative_tolerance"):
+        value = target.get(name, 0.0)
+        if (
+            not isinstance(value, int | float)
+            or isinstance(value, bool)
+            or not math.isfinite(float(value))
+            or float(value) < 0.0
+        ):
+            raise MethodContractError(f"migration target {name} must be finite and non-negative")
+    if correctness is not None:
+        if not isinstance(correctness, Mapping):
+            raise MethodContractError("migration correctness must be an object or null")
+        if not isinstance(correctness.get("match"), bool) or not isinstance(
+            correctness.get("exact_checksum_match"), bool
+        ):
+            raise MethodContractError("migration correctness match fields must be booleans")
+        count = correctness.get("numeric_values_compared")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise MethodContractError(
+                "migration correctness numeric_values_compared must be non-negative"
+            )
+        for name in (
+            "absolute_tolerance",
+            "relative_tolerance",
+            "maximum_absolute_error",
+            "maximum_relative_error",
+        ):
+            value = correctness.get(name)
+            if value is None and name.startswith("maximum_"):
+                continue
+            if (
+                not isinstance(value, int | float)
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or float(value) < 0.0
+            ):
+                raise MethodContractError(f"migration correctness {name} is invalid")
+        if float(cast(int | float, correctness["absolute_tolerance"])) != float(
+            cast(int | float, target.get("absolute_tolerance", 0.0))
+        ) or float(cast(int | float, correctness["relative_tolerance"])) != float(
+            cast(int | float, target.get("relative_tolerance", 0.0))
+        ):
+            raise MethodContractError("migration target and correctness tolerances differ")
+        mismatch_path = correctness.get("first_mismatch_path")
+        if mismatch_path is not None and not isinstance(mismatch_path, str):
+            raise MethodContractError("migration correctness mismatch path must be text or null")
+        reason = correctness.get("reason")
+        if not isinstance(reason, str) or not reason:
+            raise MethodContractError("migration correctness reason must be non-empty")
+        if admission.get("correctness_match") is not correctness.get("match"):
+            raise MethodContractError("migration correctness and admission outcomes differ")
+        if candidate is not None:
+            reference = payload.get("reference")
+            if not isinstance(reference, Mapping) or not isinstance(candidate, Mapping):
+                raise MethodContractError("migration correctness requires backend measurements")
+            exact_checksum_match = reference.get("checksum") == candidate.get("checksum")
+            if correctness.get("exact_checksum_match") is not exact_checksum_match:
+                raise MethodContractError(
+                    "migration correctness checksum outcome does not match measurements"
+                )
+        match = cast(bool, correctness["match"])
+        if match and mismatch_path is not None:
+            raise MethodContractError("matching migration correctness cannot have a mismatch path")
+        if not match and not mismatch_path:
+            raise MethodContractError("failed migration correctness requires a mismatch path")
+        if count > 0 and (
+            correctness.get("maximum_absolute_error") is None
+            or correctness.get("maximum_relative_error") is None
+        ):
+            raise MethodContractError("numerical correctness requires maximum error evidence")
     state = admission.get("state")
     if state not in {
         "PROPOSED",
@@ -739,6 +1064,16 @@ def validate_artifact(payload: Mapping[str, object]) -> None:
             raise MethodContractError(
                 "admission evidence requires seven repetitions and two warmups"
             )
+        if admission.get("correctness_match") is not True:
+            raise MethodContractError("an admitted migration requires a correctness match")
+        if correctness is None:
+            reference = payload.get("reference")
+            if not isinstance(reference, Mapping) or not isinstance(candidate, Mapping):
+                raise MethodContractError("legacy admitted evidence requires measurements")
+            if reference.get("checksum") != candidate.get("checksum"):
+                raise MethodContractError(
+                    "tolerance-aware admitted evidence requires a correctness record"
+                )
     encoded = json.dumps(dict(payload), allow_nan=False, sort_keys=True)
     if not encoded:
         raise MethodContractError("migration benchmark artifact cannot be empty")
@@ -749,7 +1084,7 @@ def _private_fingerprint_case(
     config: BenchmarkConfig,
     *,
     instrumented: bool,
-) -> tuple[dict[str, object], dict[str, object]]:
+) -> tuple[dict[str, object], dict[str, object], dict[str, object] | None]:
     """Measure full-call c14n-v1 paths without adding public benchmark-v6 cases."""
 
     row_count = config.rows
@@ -863,6 +1198,7 @@ def _private_fingerprint_case(
             "timing_clock": "time.perf_counter",
             "checksum_normalization": "exact c14n-v1 digest identity",
         },
+        {"fingerprint": memory_output} if instrumented else None,
     )
 
 
@@ -874,13 +1210,17 @@ def _worker_payload(
     instrumented: bool = True,
 ) -> dict[str, object]:
     if case_name in _PRIVATE_FINGERPRINT_CASES:
-        measurement, private_environment = _private_fingerprint_case(
+        measurement, private_environment, private_equivalence_payload = _private_fingerprint_case(
             case_name,
             config,
             instrumented=instrumented,
         )
-        return {"measurement": measurement, "environment": private_environment}
-    case, trace, public_environment = _run_benchmark_case_detailed(
+        return {
+            "measurement": measurement,
+            "environment": private_environment,
+            "equivalence_payload": private_equivalence_payload,
+        }
+    case, trace, public_environment, equivalence_payload = _run_benchmark_case_detailed(
         case_name,
         config,
         use_native=use_native,
@@ -917,6 +1257,7 @@ def _worker_payload(
             "checksum": case.checksum,
         },
         "environment": dict(public_environment),
+        "equivalence_payload": equivalence_payload if instrumented else None,
     }
 
 

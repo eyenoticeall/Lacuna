@@ -437,6 +437,7 @@ def _measure(
     throughput_unit: str,
     config: BenchmarkConfig,
     trace_sink: list[_BenchmarkTrace] | None = None,
+    equivalence_payload_sink: list[Mapping[str, object]] | None = None,
     measure_python_memory: bool = True,
 ) -> BenchmarkCase:
     baseline_rss_bytes = _current_rss_bytes()
@@ -454,6 +455,8 @@ def _measure(
         payload, backend = _output_payload(output)
         timings.append(elapsed)
         checksums.add(_checksum(payload))
+        if equivalence_payload_sink is not None and not equivalence_payload_sink:
+            equivalence_payload_sink.append(payload)
     if len(checksums) != 1:
         raise RuntimeError(f"benchmark case {name!r} produced non-deterministic evidence")
 
@@ -635,6 +638,7 @@ def _run_benchmarks(
     use_native: bool = True,
     case_names: frozenset[str] | None = None,
     trace_sink: list[_BenchmarkTrace] | None = None,
+    equivalence_payload_sink: list[Mapping[str, object]] | None = None,
     measure_python_memory: bool = True,
 ) -> BenchmarkSuite:
     """Measure released public workflows without enforcing machine-specific speed budgets."""
@@ -1346,6 +1350,7 @@ def _run_benchmarks(
             throughput_unit=unit,
             config=resolved,
             trace_sink=trace_sink,
+            equivalence_payload_sink=equivalence_payload_sink,
             measure_python_memory=measure_python_memory,
         )
         for name, operation, work_items, unit in cases
@@ -1379,20 +1384,22 @@ def _run_benchmark_case_detailed(
     *,
     use_native: bool,
     measure_python_memory: bool = True,
-) -> tuple[BenchmarkCase, _BenchmarkTrace, Mapping[str, object]]:
+) -> tuple[BenchmarkCase, _BenchmarkTrace, Mapping[str, object], Mapping[str, object]]:
     """Measure one prepared public case for an isolated migration worker."""
 
     traces: list[_BenchmarkTrace] = []
+    equivalence_payloads: list[Mapping[str, object]] = []
     suite = _run_benchmarks(
         config,
         use_native=use_native,
         case_names=frozenset({name}),
         trace_sink=traces,
+        equivalence_payload_sink=equivalence_payloads,
         measure_python_memory=measure_python_memory,
     )
-    if len(suite.cases) != 1 or len(traces) != 1:
+    if len(suite.cases) != 1 or len(traces) != 1 or len(equivalence_payloads) != 1:
         raise RuntimeError(f"isolated benchmark case {name!r} did not produce one measurement")
-    return suite.cases[0], traces[0], suite.environment
+    return suite.cases[0], traces[0], suite.environment, equivalence_payloads[0]
 
 
 def run_benchmarks(

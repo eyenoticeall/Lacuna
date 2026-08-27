@@ -182,7 +182,9 @@ explicitly rather than presenting it as total process memory.
 
 Generated timestamps and timings are volatile. Checksums exclude result creation timestamps and
 must remain stable across repetitions on the same method/backend. A checksum mismatch fails the
-benchmark run because comparing timings for different evidence would be meaningless.
+same-backend benchmark run because comparing timings for nondeterministic evidence would be
+meaningless. Cross-backend admission retains both exact checksums but does not misuse checksum
+equality as a floating-point tolerance test.
 
 Report warm and cold behavior separately when caches or dynamic loading matter.
 
@@ -194,6 +196,12 @@ effective case dimensions rather than presenting every workload as the top-level
 Each measured backend includes all raw timings, median absolute deviation, baseline and incremental
 process RSS, Python-traced peak memory, input/output copy bytes, workspace and legacy-projection
 bytes, checksum/tolerance results, and configured/observed Polars, BLAS, and native thread counts.
+The correctness record compares complete evidence trees: mapping keys, value types, sequence
+lengths and ordering, states, findings, warnings, and signed zero are exact; only finite float
+values use the explicitly recorded method-specific absolute and relative tolerances. It also
+records whether the exact checksums matched, how many numerical values were compared, maximum
+absolute and relative error, and the first mismatch path. Backend provenance is excluded from this
+semantic comparison just as it is from benchmark-v6 equivalence checksums.
 
 Admission runs create inputs before timing, isolate each case in a child process, execute two
 warm-ups and seven alternating reference/candidate measurements, and retain a separate instrumented
