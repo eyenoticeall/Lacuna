@@ -8,7 +8,7 @@ This handbook translates Lacuna's product specification into engineering rules. 
 |---|---|
 | Any public API | [Python API](python-api.md), [API surface](../reference/python-api-surface.md), [Results and evidence](../concepts/evidence-model.md) |
 | Dataframe or schema handling | [Data boundary](data-boundary.md), [Data and time](../concepts/data-model.md) |
-| Rust or performance work | [Native core](native-core.md), [Performance](performance.md) |
+| Rust or performance work | [Native core](native-core.md), [Rust migration register](rust-migration-candidates.md), [v0.14 decisions](rust-migration-decisions.md), [Performance](performance.md) |
 | New statistical method | [Contributing a method](contributing-a-method.md), [Testing](testing.md) |
 | Package or dependency change | [Repository layout](repository-layout.md), [Architecture](../concepts/architecture.md) |
 | CI or required checks | [Continuous integration](continuous-integration.md), [Testing](testing.md) |

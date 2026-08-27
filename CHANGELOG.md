@@ -11,6 +11,13 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   pages with the published `lacuna-quant` 0.13.0 and `lacuna-options` 0.2.0 releases.
 - Use repository-absolute README assets and handbook links so future PyPI descriptions retain
   working brand imagery and navigation.
+- Add an evidence-gated Rust migration candidate register covering native-boundary prerequisites,
+  prioritized analytical kernels, explicit non-candidates, benchmark shapes, compatibility rules,
+  and phased implementation order.
+- Rectify the register into an admission-gated v0.14 program with terminal evidence states, a
+  separate operational decision ledger, byte-identical c14n-v1 and public-carrier boundaries, and
+  an accepted architecture decision preserving `abi3-py311`, Python-owned RNG, and single-threaded
+  native execution.
 
 ## [0.13.0] - 2026-08-27
 

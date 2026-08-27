@@ -22,6 +22,7 @@ This page expands the decision summary in the technical specification into imple
 | ADR-014 | Cross-phase audits use categorical coverage | Unlike evidence remains visible without one misleading universal score |
 | ADR-015 | Diagnostic portfolio projections are not a backtester | Explicit cohort weights remain outside portfolio state and execution simulation |
 | ADR-016 | PyPI identity differs from Python import identity | Users install `lacuna-quant`; code continues to import `lacuna` |
+| ADR-017 | Native performance work is admission-gated | v0.14 preserves Python semantics, stable ABI wheels, and reference fallbacks |
 
 ## ADR-001 — Python public API
 
@@ -354,6 +355,56 @@ installs both exact versions from PyPI.
 **Revisit when:** PyPI deprecates Trusted Publishing or the project intentionally undertakes a
 major-version import rename. Any replacement must preserve an explicit migration and collision
 policy.
+
+## ADR-017 — Native performance work is admission-gated
+
+**Status:** accepted on 2026-08-27.
+
+**Context:** Lacuna 0.13 already contains three small Rust analytical kernels, but their Python
+boundary converts through owned sequences and several larger public operations still perform
+observation-, scenario-, fold-, or resample-scaled Python work. Moving every plausible loop to Rust
+would duplicate mature Polars/NumPy behavior, risk temporal and statistical contracts, and increase
+wheel complexity without proving an end-to-end benefit.
+
+**Decision:** v0.14 treats Rust migration as an evidence program rather than a Rust quota. Every
+candidate is compared with an already optimized Python, NumPy, or Polars reference and ships
+natively only after transfer-inclusive correctness, latency, and memory gates pass on the same
+runner. Python remains authoritative for methodology, validation, random-stream identity,
+configuration, provenance, findings, errors, and public result construction.
+
+The v0.14 native boundary preserves `abi3-py311`, copies normalized typed input into Rust-owned
+memory before releasing the interpreter lock, and remains single-threaded. Internal contiguous
+carriers are permitted, but public v0.13 result types, AnalysisResult schema 1, method versions,
+canonicalization v1, and deterministic NumPy-generated random streams remain unchanged.
+
+**Consequences:**
+
+- each candidate retains a callable reference implementation and terminal evidence decision;
+- algorithmic and Polars improvements precede native design and can be the final implementation;
+- missing native modules may use the existing documented fallback, but native contract failures
+  are never swallowed and recomputed silently;
+- a typed-buffer dependency must pass MSRV, license, stable-ABI, wheel-size, and Python 3.11–3.14
+  same-wheel tests before dependent kernels proceed;
+- v0.14 adds no Rayon pool, native RNG, public carrier redesign, or canonicalization-v2 identity;
+- Arrow C Data/C Stream borrowing is deferred to a separate lifetime, unsafe-code, null-bitmap,
+  chunking, release-callback, and packaging review;
+- a milestone can succeed with no new native kernel when no candidate passes admission.
+
+**Rejected alternatives:** migrating the largest-looking Python loops before optimizing their
+algorithms would measure an avoidably weak baseline; dropping `abi3` would trade user portability
+for an internal optimization; borrowing mutable Python buffers while detached would weaken memory
+safety; native RNG would change established streams or method identities; public compact carriers
+would combine performance work with an unrelated compatibility migration.
+
+**Validation:** a versioned migration benchmark records effective shape, all timed repetitions,
+process RSS, copy and workspace bytes, thread configuration, output checksum, exact commit, and
+admission outcome. Shipped paths need Rust unit/property tests, Python binding tests, differential
+and adversarial fixtures, same-wheel Python 3.11–3.14 proof, target-wheel smoke, reproduced nightly
+and release-preflight evidence, and no unexplained legacy regression above 15%.
+
+**Revisit when:** a separately benchmarked proposal establishes coordinated native parallelism,
+safe Arrow ownership, a new versioned random stream, or a public carrier/canonicalization migration.
+Each requires its own compatibility and release design rather than an exception to this decision.
 
 ## Recording future decisions
 

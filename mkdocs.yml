@@ -26,6 +26,8 @@ nav:
       - Repository layout: development/repository-layout.md
       - Python API design: development/python-api.md
       - Native Rust core: development/native-core.md
+      - Rust migration register: development/rust-migration-candidates.md
+      - Rust migration decisions: development/rust-migration-decisions.md
       - Data boundary: development/data-boundary.md
       - Testing strategy: development/testing.md
       - Continuous integration: development/continuous-integration.md

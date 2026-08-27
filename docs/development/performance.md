@@ -7,6 +7,8 @@ v0.10-v0.12 factor-diagnostic, event-window, projection, and adapter paths. The
 measurements establish reproducible baselines; no hardware-independent latency promise is claimed.
 
 Performance is a product requirement, but only measured workloads justify optimization decisions.
+The [Rust migration candidate register](rust-migration-candidates.md) maps current observation-scale
+Python work to native, Polars-first, contract-blocked, and keep-Python dispositions.
 
 ## Non-negotiable rules
 
@@ -184,6 +186,28 @@ benchmark run because comparing timings for different evidence would be meaningl
 
 Report warm and cold behavior separately when caches or dynamic loading matter.
 
+### Native-migration evidence sidecar
+
+The public benchmark-v6 dataclasses and JSON remain unchanged. Admission experiments write a
+separate private artifact with schema `lacuna.native-migration-benchmark`, version `1`. It records
+effective case dimensions rather than presenting every workload as the top-level panel row count.
+Each measured backend includes all raw timings, median absolute deviation, baseline and incremental
+process RSS, Python-traced peak memory, input/output copy bytes, workspace and legacy-projection
+bytes, checksum/tolerance results, and configured/observed Polars, BLAS, and native thread counts.
+
+Admission runs create inputs before timing, isolate each case in a child process, execute two
+warm-ups and seven alternating reference/candidate measurements, and retain a separate instrumented
+phase-attribution run. The fixed environment uses one BLAS thread, two Polars threads, and one
+native thread. Normal admission uses the first representative tier whose optimized-reference median
+is at least 50 ms; medium evidence is reproduced in nightly CI and the release preflight. Large
+evidence is required only for asymptotic or bounded-memory claims.
+
+A native path is admitted only after exact structural and method-tolerance equivalence and at least
+one transfer-inclusive result: 1.5 times throughput, 30% lower incremental RSS with no more than
+10% latency regression, or bounded completion where the reference exceeds the same declared memory
+budget. The [decision ledger](rust-migration-decisions.md) links every result to an exact commit and
+run. Rejected experiments leave no unused production kernel.
+
 ## Regression policy
 
 For every pull request and main push, the baseline and candidate small tiers run in the same Ubuntu
@@ -197,6 +221,11 @@ changes require investigation and explanation but are not reduced to a noisy cro
 threshold.
 
 An accepted regression may be appropriate for correctness, stronger validation, or clearer semantics, but it is documented rather than hidden.
+
+For v0.14, native admission additionally requires the result to reproduce in both scheduled CI and
+the exact-source non-publishing release preflight. Import latency above 115% of the v0.13 same-runner
+baseline or a core wheel more than 20% larger solely because of an unadmitted boundary experiment
+blocks that experiment from shipping.
 
 ## Memory architecture
 

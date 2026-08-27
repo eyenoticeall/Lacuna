@@ -2,6 +2,10 @@
 
 Rust is a performance implementation detail behind Lacuna's Python semantics. It owns measured quant-specific kernels, deterministic parallel work, allocation-sensitive loops, and language-independent correctness primitives.
 
+The [Rust migration candidate register](rust-migration-candidates.md) records the audited Python
+hotspots, explicit non-candidates, prerequisites, and evidence gates. A register entry is not
+approval to implement a kernel.
+
 ## Workspace responsibilities
 
 ### `lacuna-core`
@@ -80,7 +84,10 @@ The extension declares its GIL requirements accurately for supported free-thread
 
 ## Parallelism
 
-Rayon is the default native parallelism candidate when benchmarks justify it. Parallel dimensions can include dates, resamples, parameter combinations, folds, regimes, universes, and horizons.
+Rayon is a later native parallelism candidate when benchmarks justify it. v0.14 native kernels are
+single-threaded and record `native_threads=1`; this avoids claiming a coordinated budget before
+Polars, BLAS, and native execution can share one. Parallel dimensions may later include dates,
+resamples, parameter combinations, folds, regimes, universes, and horizons.
 
 Rules:
 
@@ -138,4 +145,13 @@ The Python reference remains available in tests even if production dispatch norm
 
 maturin builds the mixed project from `rust/lacuna-python/Cargo.toml` and places the extension at `lacuna._native`. Keep Python and Cargo versions aligned for releases.
 
-An ABI-stable wheel is a later evaluated decision. Do not enable `abi3` until required Python and Arrow integration paths are proven compatible.
+Lacuna already publishes `cp311-abi3` wheels through PyO3's `abi3-py311` feature. Stable ABI support
+is therefore a current packaging contract. Any typed-buffer dependency or future Arrow capsule
+boundary must prove that the same built wheel imports and passes native parity tests on Python
+3.11–3.14 before it can replace the released boundary. If that proof fails, retain the current
+owned-sequence path; do not silently drop `abi3` or narrow the supported Python range.
+
+For v0.14, normalized NumPy-compatible arrays may be copied into Rust-owned buffers before the
+interpreter lock is released. This is an explicit bulk-copy safety boundary, not a zero-copy claim.
+Arrow C Data/C Stream borrowing remains separate later work because buffer lifetime, release
+callbacks, null bitmaps, chunking, and unsafe-pointer validation require their own review.
