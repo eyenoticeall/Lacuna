@@ -31,14 +31,20 @@ def main() -> int:
     parser.add_argument("baseline", type=Path)
     parser.add_argument("candidate", type=Path)
     parser.add_argument("--maximum-regression", type=float, default=0.15)
+    parser.add_argument("--minimum-absolute-regression", type=float, default=0.001)
     arguments = parser.parse_args()
     if not 0.0 <= arguments.maximum_regression < 1.0:
         parser.error("--maximum-regression must be in [0, 1)")
+    if (
+        not math.isfinite(arguments.minimum_absolute_regression)
+        or arguments.minimum_absolute_regression < 0.0
+    ):
+        parser.error("--minimum-absolute-regression must be finite and non-negative")
 
     baseline = _cases(arguments.baseline)
     candidate = _cases(arguments.candidate)
     failures: list[str] = []
-    rows: list[tuple[str, float, float, float]] = []
+    rows: list[tuple[str, float, float, float, float]] = []
     for name, reference in sorted(baseline.items()):
         if name not in candidate:
             failures.append(f"candidate is missing legacy benchmark {name}")
@@ -59,17 +65,29 @@ def main() -> int:
         if not math.isfinite(baseline_value) or baseline_value <= 0.0:
             failures.append(f"{name}: baseline median must be finite and positive")
             continue
+        if not math.isfinite(candidate_value) or candidate_value <= 0.0:
+            failures.append(f"{name}: candidate median must be finite and positive")
+            continue
+        absolute_regression = candidate_value - baseline_value
         regression = candidate_value / baseline_value - 1.0
-        rows.append((name, baseline_value, candidate_value, regression))
-        if regression > arguments.maximum_regression:
+        rows.append((name, baseline_value, candidate_value, absolute_regression, regression))
+        if (
+            regression > arguments.maximum_regression
+            and absolute_regression > arguments.minimum_absolute_regression
+        ):
             failures.append(
                 f"{name}: median regressed {regression:.1%}, above "
-                f"{arguments.maximum_regression:.1%}"
+                f"{arguments.maximum_regression:.1%}, and added "
+                f"{absolute_regression:.6g}s, above the "
+                f"{arguments.minimum_absolute_regression:.6g}s noise floor"
             )
 
-    print("case\tbaseline_s\tcandidate_s\tdelta")
-    for name, baseline_value, candidate_value, regression in rows:
-        print(f"{name}\t{baseline_value:.6g}\t{candidate_value:.6g}\t{regression:+.1%}")
+    print("case\tbaseline_s\tcandidate_s\tabsolute_delta_s\trelative_delta")
+    for name, baseline_value, candidate_value, absolute_regression, regression in rows:
+        print(
+            f"{name}\t{baseline_value:.6g}\t{candidate_value:.6g}\t"
+            f"{absolute_regression:+.6g}\t{regression:+.1%}"
+        )
     if failures:
         print("benchmark comparison failed:")
         for failure in failures:

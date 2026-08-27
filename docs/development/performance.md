@@ -221,7 +221,10 @@ run. Rejected experiments leave no unused production kernel.
 For every pull request and main push, the baseline and candidate small tiers run in the same Ubuntu
 24.04 job with fixed Polars and BLAS thread budgets. All legacy cases must remain present and retain
 their correctness checksum. An unexplained candidate median above 115% of its same-runner baseline
-blocks packaging. New cases are measured immediately but become regression-protected legacy cases
+blocks packaging when the absolute increase also exceeds the committed 1 ms timing-noise floor.
+Sub-millisecond changes remain visible in the artifact but are not treated as release evidence from
+a three-repetition single-call measurement; a repeatedly material micro-operation must first gain a
+batched benchmark. New cases are measured immediately but become regression-protected legacy cases
 after they exist in the comparison revision.
 
 Historical artifacts and measurements from different hosted runners remain descriptive. Peak-memory

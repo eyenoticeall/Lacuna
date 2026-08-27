@@ -57,6 +57,40 @@ def test_benchmark_comparison_blocks_slow_or_semantically_changed_cases(tmp_path
     assert "correctness checksum changed" in result.stdout
 
 
+def test_benchmark_comparison_ignores_submillisecond_relative_noise(tmp_path: Path) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    _write(baseline, median=0.0002)
+    _write(candidate, median=0.0004)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), str(baseline), str(candidate)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0
+    assert "+100.0%" in result.stdout
+
+
+def test_benchmark_comparison_blocks_material_relative_and_absolute_regression(
+    tmp_path: Path,
+) -> None:
+    baseline = tmp_path / "baseline.json"
+    candidate = tmp_path / "candidate.json"
+    _write(baseline, median=0.01)
+    _write(candidate, median=0.012)
+
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), str(baseline), str(candidate)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "above the 0.001s noise floor" in result.stdout
+
+
 def test_package_metric_comparison_records_wheel_and_import_evidence(tmp_path: Path) -> None:
     baseline = tmp_path / "baseline.whl"
     candidate = tmp_path / "candidate.whl"
