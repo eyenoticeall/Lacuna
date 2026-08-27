@@ -7,7 +7,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from enum import StrEnum
-from itertools import pairwise
 from typing import Literal, TypeAlias, cast
 
 import numpy as np
@@ -1268,41 +1267,89 @@ def universe_drift(
         )
 
     group_columns = [universe] if universe is not None else []
-    partitions = (
-        frame.partition_by(group_columns, as_dict=True, maintain_order=True)
-        if group_columns
-        else {(): frame}
-    )
-    transitions: list[dict[str, object]] = []
-    for group_key, group in partitions.items():
-        snapshots = group.sort(snapshot_time).partition_by(
-            snapshot_time, as_dict=True, maintain_order=True
+    if universe is None:
+        membership = frame.select(snapshot_time, instrument).with_columns(
+            pl.lit(0, dtype=pl.UInt32).alias("_group_order")
         )
-        ordered = list(snapshots.items())
-        for (previous_key, previous), (current_key, current) in pairwise(ordered):
-            previous_members = set(previous.get_column(instrument).to_list())
-            current_members = set(current.get_column(instrument).to_list())
-            union = previous_members | current_members
-            retained = previous_members & current_members
-            previous_value = previous_key[0] if isinstance(previous_key, tuple) else previous_key
-            current_value = current_key[0] if isinstance(current_key, tuple) else current_key
-            record: dict[str, object] = {
-                "previous_time": previous_value,
-                "current_time": current_value,
-                "previous_size": len(previous_members),
-                "current_size": len(current_members),
-                "additions": len(current_members - previous_members),
-                "removals": len(previous_members - current_members),
-                "retained": len(retained),
-                "retention": len(retained) / len(previous_members),
-                "jaccard": len(retained) / len(union),
-                "drift": 1.0 - (len(retained) / len(union)),
-            }
-            if universe is not None:
-                record[universe] = group_key[0] if isinstance(group_key, tuple) else group_key
-            transitions.append(record)
-    transition_frame = pl.DataFrame(transitions) if transitions else pl.DataFrame()
-    drift_values = transition_frame.get_column("drift").to_list() if transitions else []
+    else:
+        group_order = (
+            frame.select(universe).unique(maintain_order=True).with_row_index("_group_order")
+        )
+        membership = frame.select(universe, snapshot_time, instrument).join(
+            group_order,
+            on=universe,
+            how="left",
+            maintain_order="left",
+        )
+    identity_columns = ["_group_order", *group_columns]
+    ordered_membership = membership.sort([*identity_columns, snapshot_time, instrument])
+    snapshot_sizes = (
+        ordered_membership.group_by([*identity_columns, snapshot_time], maintain_order=True)
+        .agg(pl.len().cast(pl.Int64).alias("current_size"))
+        .with_columns(
+            pl.col(snapshot_time).shift(1).over(identity_columns).alias("previous_time"),
+            pl.col("current_size").shift(1).over(identity_columns).alias("previous_size"),
+        )
+        .filter(pl.col("previous_time").is_not_null())
+        .rename({snapshot_time: "current_time"})
+    )
+    current_membership = ordered_membership.rename({snapshot_time: "current_time"}).join(
+        snapshot_sizes.select(*identity_columns, "previous_time", "current_time"),
+        on=[*identity_columns, "current_time"],
+        how="inner",
+        maintain_order="left",
+    )
+    previous_membership = ordered_membership.select(
+        *identity_columns,
+        pl.col(snapshot_time).alias("previous_time"),
+        instrument,
+    )
+    retained = (
+        current_membership.join(
+            previous_membership,
+            on=[*identity_columns, "previous_time", instrument],
+            how="inner",
+            maintain_order="left",
+        )
+        .group_by([*identity_columns, "current_time"], maintain_order=True)
+        .agg(pl.len().cast(pl.Int64).alias("retained"))
+    )
+    transition_frame = (
+        snapshot_sizes.join(
+            retained,
+            on=[*identity_columns, "current_time"],
+            how="left",
+            maintain_order="left",
+        )
+        .with_columns(pl.col("retained").fill_null(0))
+        .with_columns(
+            (pl.col("current_size") - pl.col("retained")).alias("additions"),
+            (pl.col("previous_size") - pl.col("retained")).alias("removals"),
+            (pl.col("previous_size") + pl.col("current_size") - pl.col("retained")).alias(
+                "_union_size"
+            ),
+        )
+        .with_columns(
+            (pl.col("retained") / pl.col("previous_size")).alias("retention"),
+            (pl.col("retained") / pl.col("_union_size")).alias("jaccard"),
+        )
+        .with_columns((1.0 - pl.col("jaccard")).alias("drift"))
+        .select(
+            "previous_time",
+            "current_time",
+            "previous_size",
+            "current_size",
+            "additions",
+            "removals",
+            "retained",
+            "retention",
+            "jaccard",
+            "drift",
+            *group_columns,
+        )
+    )
+    transition_count = transition_frame.height
+    drift_values = transition_frame.get_column("drift").to_list() if transition_count else []
     high_drift = sum(float(value) >= warning_threshold for value in drift_values)
     findings: list[Finding] = []
     if high_drift:
@@ -1374,12 +1421,12 @@ def universe_drift(
                 "warning_threshold": warning_threshold,
                 "frame": diagnostics.to_parameters(),
             },
-            input_fingerprint=fingerprint(_portable_records(frame), namespace="universe-drift"),
+            input_fingerprint=fingerprint(frame, namespace="universe-drift"),
         ),
         metrics={
             "rows": frame.height,
             "snapshots": unique_snapshots,
-            "transitions": len(transitions),
+            "transitions": transition_count,
             "mean_drift": float(np.mean(drift_values)) if drift_values else 0.0,
             "maximum_drift": max(drift_values, default=0.0),
             "high_drift_transitions": high_drift,
@@ -1387,7 +1434,7 @@ def universe_drift(
         },
         findings=tuple(findings),
         tables={
-            "transitions": _portable_records(transition_frame) if transitions else (),
+            "transitions": _portable_records(transition_frame) if transition_count else (),
         },
     )
 

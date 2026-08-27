@@ -17,6 +17,7 @@ from lacuna.bias import (
     validate_dataset,
 )
 from lacuna.exceptions import DataContractError, MethodContractError
+from lacuna.experiment import fingerprint
 
 
 def test_asof_join_selects_latest_admissible_record_and_preserves_left_order() -> None:
@@ -473,6 +474,80 @@ def test_universe_drift_rejects_duplicate_snapshot_membership() -> None:
     )
     with pytest.raises(DataContractError, match="duplicate membership"):
         universe_drift(frame)
+
+
+def test_universe_drift_self_join_matches_literal_multi_universe_sets() -> None:
+    frame = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "universe": ["u2", "u2", "u1", "u2", "u1"],
+                    "snapshot_time": [2, 1, 3, 3, 1],
+                    "instrument": ["C", "A", "Y", "E", "X"],
+                }
+            ),
+            pl.DataFrame(
+                {
+                    "universe": ["u2", "u2", "u2", "u1"],
+                    "snapshot_time": [2, 1, 3, 3],
+                    "instrument": ["D", "B", "C", "X"],
+                }
+            ),
+        ],
+        rechunk=False,
+    )
+    result = universe_drift(
+        frame,
+        universe="universe",
+        source_status=SurvivorshipStatus.CONFIRMED_SAFE,
+        warning_threshold=0.5,
+    )
+
+    assert result.table("transitions") == [
+        {
+            "previous_time": 1,
+            "current_time": 2,
+            "previous_size": 2,
+            "current_size": 2,
+            "additions": 2,
+            "removals": 2,
+            "retained": 0,
+            "retention": 0.0,
+            "jaccard": 0.0,
+            "drift": 1.0,
+            "universe": "u2",
+        },
+        {
+            "previous_time": 2,
+            "current_time": 3,
+            "previous_size": 2,
+            "current_size": 2,
+            "additions": 1,
+            "removals": 1,
+            "retained": 1,
+            "retention": 0.5,
+            "jaccard": 1 / 3,
+            "drift": 1.0 - 1 / 3,
+            "universe": "u2",
+        },
+        {
+            "previous_time": 1,
+            "current_time": 3,
+            "previous_size": 1,
+            "current_size": 2,
+            "additions": 1,
+            "removals": 0,
+            "retained": 1,
+            "retention": 1.0,
+            "jaccard": 0.5,
+            "drift": 0.5,
+            "universe": "u1",
+        },
+    ]
+    assert result.metadata.input_fingerprint == fingerprint(
+        frame.to_dicts(),
+        namespace="universe-drift",
+    )
 
 
 def test_validate_dataset_reports_structural_and_temporal_defects() -> None:
