@@ -24,6 +24,7 @@ from lacuna._frames import (
     validate_label_intervals,
     validate_panel_schema,
 )
+from lacuna._native_arrays import readonly_float64, readonly_int64
 from lacuna._portfolio import PortfolioProjectionResult, portfolio_projection
 from lacuna._signal_transform import (
     BucketSpec,
@@ -354,16 +355,26 @@ def _native_grouped_rank_ic(panel: pl.DataFrame, group_keys: Sequence[str]) -> p
     keys = ["_single_group"] if not group_keys else list(group_keys)
     ordered = working.sort(keys)
     groups = ordered.group_by(keys, maintain_order=True).len(name="n_observations")
-    counts = groups.get_column("n_observations").to_list()
-    offsets = [0]
-    for count in counts:
-        offsets.append(offsets[-1] + int(count))
-    correlations = _native.grouped_rank_ic(
-        ordered.get_column("signal").to_list(),
-        ordered.get_column("forward_return").to_list(),
-        offsets,
+    counts: npt.NDArray[np.int64] = (
+        groups.get_column("n_observations").to_numpy().astype(np.int64, copy=False)
     )
-    result = groups.with_columns(pl.Series("ic", correlations, dtype=pl.Float64))
+    offsets: npt.NDArray[np.int64] = np.empty(counts.size + 1, dtype=np.int64)
+    offsets[0] = 0
+    np.cumsum(counts, dtype=np.int64, out=offsets[1:])
+    signal = readonly_float64(ordered.get_column("signal"), name="signal").values
+    labels = readonly_float64(ordered.get_column("forward_return"), name="labels").values
+    native_offsets = readonly_int64(offsets, name="offsets").values
+    correlations, validity = _native.grouped_rank_ic(
+        signal,
+        labels,
+        native_offsets,
+    )
+    if not np.isin(validity, (0, 1)).all():
+        raise RuntimeError("native grouped rank IC returned an invalid validity code")
+    ic_values = pl.Series("ic", correlations, dtype=pl.Float64)
+    if not validity.all():
+        ic_values = ic_values.set(pl.Series(validity == 0), None)
+    result = groups.with_columns(ic_values)
     return result.drop("_single_group") if not group_keys else result
 
 

@@ -22,6 +22,9 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   runner, raw timing/RSS evidence, mechanical materiality and admission evaluator, clean-source
   enforcement, artifact validation, and deterministic correctness checks without changing the
   public benchmark-v6 API.
+- Replace private per-element PyO3 conversions with checked, bulk NumPy carriers for grouped IC,
+  bootstrap means, and interval purging; snapshot inputs before releasing the interpreter lock,
+  return dense arrays plus byte validity/status codes, and preserve every public result contract.
 
 ## [0.13.0] - 2026-08-27
 

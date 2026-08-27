@@ -84,14 +84,13 @@ require(
     "installed-wheel diagnostics omitted a release check",
 )
 
-rank_ic = _native.grouped_rank_ic(
-    [1.0, 2.0, 3.0, 1.0, 2.0],
-    [0.0, -0.0, 1.0, 0.0, -0.0],
-    [0, 3, 5],
+rank_ic, rank_ic_validity = _native.grouped_rank_ic(
+    np.asarray([1.0, 2.0, 3.0, 1.0, 2.0], dtype=np.float64),
+    np.asarray([0.0, -0.0, 1.0, 0.0, -0.0], dtype=np.float64),
+    np.asarray([0, 3, 5], dtype=np.int64),
 )
-require(rank_ic[0] is not None, "native rank IC unexpectedly undefined")
 require(math.isclose(rank_ic[0], math.sqrt(3.0) / 2.0, abs_tol=1e-14), "native rank IC failed")
-require(rank_ic[1] is None, "signed-zero constant group must be undefined")
+require(rank_ic_validity.tolist() == [1, 0], "signed-zero constant group must be undefined")
 
 signal_result = lacuna.signal.ic(
     np.array([1.0, 2.0, 3.0]),

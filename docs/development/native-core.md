@@ -155,3 +155,17 @@ For v0.14, normalized NumPy-compatible arrays may be copied into Rust-owned buff
 interpreter lock is released. This is an explicit bulk-copy safety boundary, not a zero-copy claim.
 Arrow C Data/C Stream borrowing remains separate later work because buffer lifetime, release
 callbacks, null bitmaps, chunking, and unsafe-pointer validation require their own review.
+
+### v0.14 typed-boundary dependency review
+
+The binding uses `numpy` crate 0.29.0 with PyO3 0.29.2. The crate is BSD-2-Clause licensed, has an
+MSRV of Rust 1.83 (within Lacuna's Rust 1.85 contract), and shares Lacuna's existing PyO3 minor.
+NumPy is already a mandatory Python dependency, so this adds no Python runtime extra. The boundary
+accepts only aligned, C-contiguous, native-endian one-dimensional `float64` and `int64` arrays and
+returns `float64` values with `uint8` validity/status arrays. It does not use Python object arrays.
+
+The Python caller first attempts Polars' no-copy, non-writable NumPy conversion. Dtype, chunking,
+null representation, alignment, or layout mismatches trigger a deliberate normalized copy whose
+bytes are available to the private measurement layer. The binding then takes one Rust-owned
+snapshot while holding the interpreter lock and detaches only after that copy. Local same-wheel
+smoke covers Python 3.11–3.14; the release matrix remains the authority for every target platform.

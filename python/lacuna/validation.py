@@ -38,6 +38,7 @@ from lacuna._frames import (
     require_numeric,
     require_unique,
 )
+from lacuna._native_arrays import readonly_float64, readonly_int64
 from lacuna.config import get_config
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.experiment import (
@@ -182,16 +183,19 @@ def _bootstrap_indices(
 def _native_mean_batch(
     values: FloatArray,
     indices: Sequence[npt.NDArray[np.intp]],
-) -> list[float] | None:
+) -> FloatArray | None:
     try:
         from lacuna import _native
     except ImportError:
         return None
     if not hasattr(_native, "bootstrap_means"):
         return None
-    flattened = np.concatenate(indices).astype(np.uintp, copy=False)
-    offsets = np.arange(0, flattened.size + 1, values.size, dtype=np.uintp)
-    return _native.bootstrap_means(values.tolist(), flattened.tolist(), offsets.tolist())
+    flattened = np.concatenate(indices).astype(np.int64, copy=False)
+    offsets = np.arange(0, flattened.size + 1, values.size, dtype=np.int64)
+    native_values = readonly_float64(values, name="values").values
+    native_indices = readonly_int64(flattened, name="indices").values
+    native_offsets = readonly_int64(offsets, name="offsets").values
+    return _native.bootstrap_means(native_values, native_indices, native_offsets)
 
 
 def _distribution_summary(distribution: FloatArray) -> pl.DataFrame:

@@ -16,6 +16,7 @@ import numpy as np
 import polars as pl
 
 from lacuna._frames import eager_frame, series_time_i64
+from lacuna._native_arrays import readonly_int64
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
 
@@ -392,13 +393,19 @@ def _purge_mask(
         try:
             from lacuna import _native
 
+            starts = readonly_int64(train_starts, name="train_starts").values
+            ends = readonly_int64(train_ends, name="train_ends").values
+            held_starts = readonly_int64(test_starts, name="test_starts").values
+            held_ends = readonly_int64(test_ends, name="test_ends").values
             return (
                 _native.interval_purge(
-                    train_starts,
-                    train_ends,
-                    test_starts,
-                    test_ends,
-                ),
+                    starts,
+                    ends,
+                    held_starts,
+                    held_ends,
+                )
+                .astype(np.bool_, copy=False)
+                .tolist(),
                 "rust_native",
             )
         except (ImportError, AttributeError):

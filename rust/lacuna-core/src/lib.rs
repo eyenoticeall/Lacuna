@@ -50,6 +50,15 @@ impl Display for NumericError {
 
 impl Error for NumericError {}
 
+/// Dense values and byte validity for nullable floating-point kernel output.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NullableF64Buffer {
+    /// Floating-point values; invalid positions contain a deterministic zero placeholder.
+    pub values: Vec<f64>,
+    /// One marks a defined value and zero marks an undefined value.
+    pub validity: Vec<u8>,
+}
+
 /// Compute a checked arithmetic mean using Neumaier compensated summation.
 ///
 /// This small kernel is the initial cross-language smoke test. It establishes
@@ -183,6 +192,34 @@ pub fn grouped_rank_ic(
         .collect())
 }
 
+/// Compute grouped rank IC into contiguous values and byte validity buffers.
+///
+/// This compact carrier avoids constructing nullable Python objects at the
+/// language boundary while retaining [`grouped_rank_ic`] as the legible oracle.
+///
+/// # Errors
+///
+/// Returns the same checked input errors as [`grouped_rank_ic`].
+pub fn grouped_rank_ic_buffer(
+    signal: &[f64],
+    labels: &[f64],
+    offsets: &[usize],
+) -> Result<NullableF64Buffer, NumericError> {
+    let correlations = grouped_rank_ic(signal, labels, offsets)?;
+    let mut values = Vec::with_capacity(correlations.len());
+    let mut validity = Vec::with_capacity(correlations.len());
+    for correlation in correlations {
+        if let Some(value) = correlation {
+            values.push(value);
+            validity.push(1);
+        } else {
+            values.push(0.0);
+            validity.push(0);
+        }
+    }
+    Ok(NullableF64Buffer { values, validity })
+}
+
 /// Reduce pre-generated bootstrap index batches to arithmetic means.
 ///
 /// Random-index generation remains outside this kernel so callers can derive
@@ -291,7 +328,10 @@ pub fn interval_purge(
 
 #[cfg(test)]
 mod tests {
-    use super::{NumericError, bootstrap_means, checked_mean, grouped_rank_ic, interval_purge};
+    use super::{
+        NumericError, bootstrap_means, checked_mean, grouped_rank_ic, grouped_rank_ic_buffer,
+        interval_purge,
+    };
 
     #[test]
     fn computes_the_mean() {
@@ -353,6 +393,18 @@ mod tests {
             grouped_rank_ic(&[1.0], &[2.0], &[1, 1]),
             Err(NumericError::InvalidOffsets)
         );
+    }
+
+    #[test]
+    fn grouped_rank_ic_buffer_uses_dense_values_and_byte_validity() {
+        let result = grouped_rank_ic_buffer(
+            &[1.0, 2.0, 3.0, 1.0, 1.0],
+            &[1.0, 2.0, 3.0, 1.0, 2.0],
+            &[0, 3, 5],
+        )
+        .expect("valid grouped data");
+        assert_eq!(result.values, vec![1.0, 0.0]);
+        assert_eq!(result.validity, vec![1, 0]);
     }
 
     #[test]

@@ -16,6 +16,7 @@ test = false
 
 [dependencies]
 lacuna-core = { path = "../lacuna-core" }
+numpy = "0.29.0"
 pyo3 = { version = "0.29.2", features = ["abi3-py311"] }
 
 [lints]
