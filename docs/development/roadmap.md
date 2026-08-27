@@ -24,6 +24,7 @@ such as `0.2.0rc1`.
 | `0.11.x` | Validated decay inference, diagnostic portfolio projection, robust event studies | Released |
 | `0.12.x` | Generic factor-panel interoperability and migration guidance | Released |
 | `0.13.x` | PyPI-safe distribution identity, Trusted Publishing, and registry-install verification | Released |
+| `0.14.x` | Admission-gated Rust migration and performance/memory hardening | Release-gated |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -252,6 +253,24 @@ fixtures pinned to a reviewed upstream commit without a runtime Alphalens depend
 
 Excluded throughout: lookahead z-score filtering, implicit calendars or timing, mandatory pandas
 or plotting, cumulative backtesting, order/fill simulation, and plotting side effects.
+
+## Admission-gated performance (`0.14`)
+
+`0.14` preserves the complete `0.13` public API, schema-v1 result envelope, analytical method
+versions, c14n-v1 identities, and deterministic RNG streams. It profiles every registered
+migration candidate against an already optimized NumPy or Polars reference and ships native code
+only after correctness plus an end-to-end throughput, memory, or bounded-completion gate.
+
+The implementation phase is complete. Most candidates finish as `OPTIMIZED_NON_NATIVE`; shared
+resampling is `NOT_MIGRATING`, and deferred identity/public-carrier work is `BLOCKED`. Grouped-rank
+IC and PBO/CSCV remain release-gated until pinned Linux evidence, the same `cp311-abi3` wheel on
+Python 3.11–3.14, every target wheel, and the exact-SHA non-publishing preflight reproduce their
+admission. The tag workflow refuses any non-terminal decision.
+
+Native work stays single-threaded. Python retains timing semantics, methodology, validation,
+findings, provenance, RNG, and public result construction. Arrow C Data, native RNG/scheduling,
+Rayon, public compact carriers, c14n-v2, approximate quantiles, and semantic method changes remain
+outside this milestone.
 
 ## Historical v0.1 boundary
 

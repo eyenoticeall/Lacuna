@@ -1,0 +1,22 @@
+{
+  "callables": [],
+  "contract": "lacuna-public-api-v0.14",
+  "inherited_contracts": [
+    "lacuna-public-api-v0.1",
+    "lacuna-public-api-v0.2",
+    "lacuna-public-api-v0.3",
+    "lacuna-public-api-v0.4",
+    "lacuna-public-api-v0.5",
+    "lacuna-public-api-v0.6",
+    "lacuna-public-api-v0.7",
+    "lacuna-public-api-v0.8",
+    "lacuna-public-api-v0.9",
+    "lacuna-public-api-v0.10",
+    "lacuna-public-api-v0.11",
+    "lacuna-public-api-v0.12",
+    "lacuna-public-api-v0.13"
+  ],
+  "module_exports": {},
+  "package_series": "0.14",
+  "root_exports": []
+}

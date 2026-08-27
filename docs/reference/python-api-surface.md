@@ -1,6 +1,6 @@
 # Python API surface
 
-This is the complete import inventory for Lacuna core `0.13.x`. It answers where a supported name
+This is the complete import inventory for Lacuna core `0.14.x`. It answers where a supported name
 lives and routes each module to the document that defines its semantics. Callable signatures are
 frozen by the cumulative `tests/fixtures/public-api-v0.*.json` contracts; formulas, temporal rules,
 failure modes, and result interpretation live in the linked design and methodology pages.

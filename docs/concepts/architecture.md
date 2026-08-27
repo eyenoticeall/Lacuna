@@ -144,8 +144,8 @@ The repository currently implements the v0.1 signal-validation path, v0.2 robust
 v0.3 trading-realism milestone, v0.4 data-correctness milestone, v0.5 advanced-inference
 milestone, the v0.6 optional-integration milestone, the v0.7 portable-evidence milestone, and the
 v0.8 standardized-audit, v0.9 operational-hardening, v0.10 factor-diagnostic, v0.11
-decay/projection/event, v0.12 factor-panel interoperability, and v0.13 PyPI-distribution
-milestones:
+decay/projection/event, v0.12 factor-panel interoperability, v0.13 PyPI-distribution, and v0.14
+admission-gated performance-hardening milestones:
 
 - mixed Python/Rust packaging through maturin and PyO3;
 - explicit runtime configuration;
@@ -157,7 +157,8 @@ milestones:
 - validated positive exponential decay inference, explicit non-compounding portfolio projection,
   and availability-anchored event paths with clustered complete-path response bands;
 - walk-forward folds, half-open interval purging, observation embargo, and four bootstrap schemes;
-- native grouped-rank IC, bootstrap-mean, and interval-purge kernels with reference paths;
+- native grouped-rank IC, bootstrap-mean, interval-purge, and PBO partition kernels with callable
+  reference paths and checked bulk-array boundaries;
 - deterministic audit rules, evidence scoring, JSON/Markdown/basic HTML, and `SignalStudy`;
 - `doctor`, `signal`, and developer `bench` CLI workflows;
 - published result schema, golden fixtures, layered tests, and reproducible benchmark suites;
@@ -182,6 +183,8 @@ milestones:
   chains, carry forwards, log-forward moneyness, delta buckets, and empirical surface residuals.
 - a PyPI-safe `lacuna-quant` distribution that preserves `import lacuna`, plus OIDC-only Trusted
   Publishing and clean post-registry core/extension installation smoke;
+- admission-gated exact NumPy/Polars performance improvements, single-threaded native dispatch,
+  same-wheel stable-ABI verification, and exact-SHA non-publishing release rehearsals;
 - deterministic `.lacuna` evidence archives with a published manifest schema, bounded non-executing
   verification, privacy redaction, and SHA-256 member/artifact-set integrity.
 - versioned signal/strategy/options audit profiles that recognize every released method family,
@@ -193,7 +196,7 @@ milestones:
 DataFusion, framework-specific adapters, automatic execution
 planning, model-based option pricing/
 calibration, and a plugin marketplace remain later contracts. Pre-1.0 minor versions can change
-through documented migrations; the published `0.1.x` through `0.13.x` contracts govern their
+through documented migrations; the published `0.1.x` through `0.14.x` contracts govern their
 respective release lines.
 
 ## Detailed guides

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## [0.2.1] - 2026-08-28
+
+### Changed
+
+- Widen the core dependency to `lacuna-quant>=0.13,<0.15` after the v0.14 compatibility, clean
+  wheel, and unchanged public-API gates passed. No options API or analytical behavior changes.
+
 ## [0.2.0] - 2026-08-27
 
 ### Changed

@@ -1,8 +1,8 @@
 # Options-research extension
 
 **Status:** implemented as the separately versioned `lacuna-options` package for the Lacuna 0.6
-milestone. Version `0.2.0` migrates dependency identity to the PyPI core distribution
-`lacuna-quant`; it remains optional and is not a core dependency.
+milestone. The `0.2.1` release target supports the PyPI core distribution through Lacuna 0.14; it
+remains optional and is not a core dependency.
 
 The extension provides empirical option-chain normalization and transparent derived coordinates.
 It deliberately begins below the level of a pricing library: callers provide market/model fields,
@@ -17,7 +17,7 @@ core distribution:      lacuna-quant
 core import:            lacuna
 extension distribution: lacuna-options
 extension import:       lacuna_options
-extension version:      0.2.x (independent of Lacuna core 0.13.x)
+extension version:      0.2.x (independent of Lacuna core 0.13.x and 0.14.x)
 ```
 
 Install from PyPI:
@@ -26,17 +26,17 @@ Install from PyPI:
 python -m pip install lacuna-options
 ```
 
-The extension supports `lacuna-quant>=0.13,<0.14`. Its exact original exports and signatures are
+The extension supports `lacuna-quant>=0.13,<0.15`. Its exact original exports and signatures are
 frozen in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; the `v0.2` fixture
 inherits that complete contract and records the distribution migration. Core and extension
 versions do not advance in lockstep: a later extension patch can improve its own compatible
 contract without a core release, while a future core incompatibility must update the dependency
 range and migration notes.
 
-`0.2.0` changes distribution dependency metadata and integration evidence, not analytical
-semantics. The minor increment makes the incompatible package-resolution boundary visible: older
-`0.1.x` releases depend on the historical distribution named `lacuna`, while `0.2.x` safely depends
-on `lacuna-quant`.
+`0.2.0` changed distribution identity; `0.2.1` only widens the compatible core range after joint
+installation against both supported core minors. Neither release changes analytical semantics.
+Older `0.1.x` releases depend on the historical distribution named `lacuna`, while `0.2.x` safely
+depends on `lacuna-quant`.
 
 Core remains importable without this package. Conversely, `lacuna_options` depends on the core data
 boundary, exceptions, and evidence types instead of duplicating them.

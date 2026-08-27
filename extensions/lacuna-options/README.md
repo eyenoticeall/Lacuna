@@ -31,7 +31,8 @@ The package does not claim a universal implied-volatility solver, Greeks model, 
 arbitrage-free calibration. Those depend on explicit model, day-count, exercise, settlement,
 dividend, and numerical policies and belong in later separately versioned capabilities.
 
-Version `0.2.0` preserves the exact `0.1.x` Python surface while moving dependency metadata to
-`lacuna-quant>=0.13,<0.14`. The `0.2` fixture explicitly inherits the complete `0.1` contract.
-Validated chain evidence is recognized by the required `options_evidence` capability in Lacuna's
-standardized options audit profile.
+Version `0.2.1` preserves the exact `0.1.x` Python surface and supports
+`lacuna-quant>=0.13,<0.15`. The `0.2` fixture explicitly inherits the complete `0.1` contract.
+Release CI installs the same extension wheel with both supported core minor lines. Validated chain
+evidence is recognized by the required `options_evidence` capability in Lacuna's standardized
+options audit profile.

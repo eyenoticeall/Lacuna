@@ -323,11 +323,12 @@ name would misdirect users and extension dependency resolution, while renaming t
 Python package would create broad migration cost without improving analytical clarity.
 
 **Decision:** publish core as the distribution `lacuna-quant` while preserving the Python import
-package and CLI as `lacuna`. Publish the optional extension as `lacuna-options`; from extension
-`0.2.0`, its dependency is `lacuna-quant>=0.13,<0.14`. Registry publication uses PyPI Trusted
-Publishing from the tag-only `release.yml` workflow and protected GitHub environments. Core uses
-`pypi`; the extension uses `pypi-options` because PyPI requires distinct pending-publisher identity
-tuples for separate project names.
+package and CLI as `lacuna`. Publish the optional extension as `lacuna-options`; extension `0.2.0`
+uses `lacuna-quant>=0.13,<0.14`, and `0.2.1` widens that to `>=0.13,<0.15` after compatibility
+verification. Registry publication uses PyPI Trusted Publishing from tag events in `release.yml`;
+the same workflow's manual preflight path has no identity-token permission. Core uses the protected
+`pypi` environment; the extension uses `pypi-options` because PyPI requires distinct
+pending-publisher identity tuples for separate project names.
 
 **Consequences:**
 

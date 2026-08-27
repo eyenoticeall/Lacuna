@@ -11,8 +11,10 @@ Lacuna is an open-source quantitative research validation library for discoverin
     advanced-inference milestone, the v0.6 optional-adapter/plugin milestone with the separately
     versioned options package, v0.7 portable evidence, v0.8 standardized audit, v0.9 operational
     hardening, v0.10 factor diagnostics, v0.11 decay/projection/events, v0.12 factor-panel
-    interoperability, and the v0.13 PyPI distribution migration. It remains pre-1.0: later minor
-    APIs may change through documented migrations.
+    interoperability, and the v0.13 PyPI distribution migration. The v0.14 performance-hardening
+    implementation on main remains release-gated by native, ABI, target-wheel, and exact-SHA
+    preflight evidence. Lacuna remains pre-1.0: later minor APIs may change through documented
+    migrations.
 
 ## Install Lacuna
 

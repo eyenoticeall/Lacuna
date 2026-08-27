@@ -1,9 +1,9 @@
 # Public API compatibility
 
-Lacuna `0.13` preserves the complete `0.12` Python API while changing only distribution and release
-identity. Users install `lacuna-quant`, then continue to use `import lacuna` and the `lacuna`
-command. The `0.13` fixture declares no new imports and inherits every `0.1` through `0.12`
-contract, so CI detects accidental removal, export, or signature drift during the migration.
+Lacuna `0.14` preserves the complete `0.13` Python API while changing only private implementation,
+performance, and release evidence. Users install `lacuna-quant`, then continue to use
+`import lacuna` and the `lacuna` command. The `0.14` fixture declares no new imports and inherits
+every `0.1` through `0.13` contract, so CI detects accidental removal, export, or signature drift.
 
 ## Supported surface
 
@@ -16,7 +16,7 @@ study = lc.SignalStudy(...)
 report = study.audit()
 ```
 
-The following modules are part of the supported core contract through `0.13`:
+The following modules are part of the supported core contract through `0.14`:
 
 | Module | Supported purpose |
 | --- | --- |
@@ -42,7 +42,7 @@ The following modules are part of the supported core contract through `0.13`:
 
 Names declared by each module's `__all__`, the package-root exports, and the primary callable
 signatures are captured in the versioned files under `tests/fixtures/public-api-v*.json`. Contract
-tests verify that `0.13` adds no import surface. Separate tests require every `v0.1` through `v0.12`
+tests verify that `0.14` adds no import surface. Separate tests require every `v0.1` through `v0.13`
 root/module export and compatible primary signature to remain available.
 
 The [complete Python API surface](python-api-surface.md) lists every root and supported-module
@@ -53,11 +53,11 @@ the cumulative fixtures, so compatibility coverage and reference coverage cannot
 `lacuna-options` is a separate distribution and import package. Its initial exact exports and
 signatures live in `extensions/lacuna-options/tests/fixtures/public-api-v0.1.json`; the `v0.2`
 fixture inherits them unchanged while recording the new `lacuna-quant` dependency line. Extension
-versions remain independent of core `0.13.x` versions.
+versions remain independent of core `0.13.x` and `0.14.x` versions.
 
 ## Compatibility promise
 
-Within the respective core `0.13.x` and extension `0.2.x` release lines:
+Within the respective core `0.14.x` and extension `0.2.x` release lines:
 
 - exported names are not removed or renamed without a deprecation path;
 - required parameters are not added to an existing call;

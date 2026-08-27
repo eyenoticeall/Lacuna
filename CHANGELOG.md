@@ -11,6 +11,11 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   pages with the published `lacuna-quant` 0.13.0 and `lacuna-options` 0.2.0 releases.
 - Use repository-absolute README assets and handbook links so future PyPI descriptions retain
   working brand imagery and navigation.
+
+## [0.14.0] - 2026-08-28
+
+### Documentation and foundations
+
 - Add an evidence-gated Rust migration candidate register covering native-boundary prerequisites,
   prioritized analytical kernels, explicit non-candidates, benchmark shapes, compatibility rules,
   and phased implementation order.
@@ -33,6 +38,33 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Stream c14n-v1 NumPy and Polars fingerprint inputs in bounded batches, preserving exact prefixes,
   digests, scalar normalization, sensitive-key rejection, row order, and chunk-layout invariance
   while removing whole-input `.tolist()` intermediates from inference fingerprints.
+
+### Performance
+
+- Add the admission-gated typed NumPy/PyO3 boundary and retain single-threaded native grouped-rank
+  IC and PBO/CSCV dispatch only where full-call evidence clears the native gate.
+- Replace repeated Python work in costs, capacity, break-even analysis, permutation testing, CPCV,
+  bucketization, turnover, regime thresholds, event windows and response, diagnostic projection,
+  universe transitions, and c14n-v1 fingerprints with exact NumPy or Polars references when Rust
+  did not provide a justified end-to-end advantage.
+- Add bounded execution-budget resolution, exact streaming c14n-v1 encoding, compact internal
+  carriers, copy/workspace accounting, and deterministic backend-equivalence evidence without
+  changing semantic fingerprints or randomized streams.
+
+### Compatibility and release QA
+
+- Preserve every v0.13 public signature, result table, method version, schema-v1 envelope,
+  c14n-v1 digest, and public benchmark-v6 contract; add the cumulative v0.14 API fixture.
+- Add authoritative isolated native-migration benchmarks, package/import regression gates,
+  same-wheel `cp311-abi3` smoke on Python 3.11–3.14, target-wheel parity, nightly native property
+  QA, and exact-source decision-ledger enforcement.
+- Replace the yanked Polars 1.44.0 lock with 1.44.1 before regenerating authoritative evidence for
+  the expression-heavy optimized paths.
+- Add a non-publishing exact-SHA release rehearsal with checksummed preflight evidence. A tag must
+  find that manifest, repeat all source, statistical, native, ABI, target-wheel, options, archive,
+  and registry checks, then publish core before the independently versioned extension.
+- Publish `lacuna-options` 0.2.1 with the unchanged API and a widened
+  `lacuna-quant>=0.13,<0.15` dependency, verified against both supported core minor lines.
 
 ## [0.13.0] - 2026-08-27
 

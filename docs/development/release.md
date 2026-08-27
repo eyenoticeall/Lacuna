@@ -33,9 +33,10 @@ Normal users should not need a Rust toolchain.
 The current native surface is compatible with PyO3's `abi3-py311` mode: it exchanges owned Python
 sequences and scalar results rather than borrowing Arrow buffers through version-specific CPython
 APIs. The release therefore builds one CPython 3.11 stable-ABI wheel per platform and smoke-tests it
-under Python 3.13 on the target architecture. The ordinary CI matrix separately verifies the full
-Python 3.11–3.14 range. Revisit `abi3` before introducing native Arrow capsules, buffer borrowing, or
-another CPython API that the stable ABI cannot represent safely.
+under Python 3.13 on the target architecture. The exact Linux wheel is additionally installed,
+without rebuilding, under Python 3.11–3.14 in pull-request CI and the release rehearsal. Revisit
+`abi3` before introducing native Arrow capsules, buffer borrowing, or another CPython API that the
+stable ABI cannot represent safely.
 
 ## Release gate
 
@@ -101,7 +102,9 @@ wheel matrix build and smoke install
     ↓
 merge to main
     ↓
-version/tag from the exact tested commit
+non-publishing exact-SHA preflight
+    ↓
+version/tag from the exact preflight commit
     ↓
 signed/attested artifacts
     ↓
@@ -110,16 +113,32 @@ GitHub Release
 PyPI Trusted Publishing and registry-install smoke
 ```
 
-Do not rebuild release artifacts from a different source state after approval.
+The preflight's binaries are evidence, not publication inputs. The tag workflow validates the
+preflight manifest and deliberately rebuilds every immutable registry artifact from the same
+source SHA. Never reuse evidence from a different commit or overwrite a published artifact.
+
+## Non-publishing release preflight
+
+Manual dispatch of `.github/workflows/release.yml` requires the complete commit SHA, expected core
+version, and expected options version. That path has read-only repository/action permissions and no
+PyPI identity-token permission. It requires the exact commit on main and a successful `CI gate`,
+then repeats the Python, extension, Rust, documentation, statistical-calibration, native-admission,
+source/wheel, ABI, options-compatibility, and archive-inspection gates.
+
+The final job writes `release-preflight.json` with the source SHA, both versions, gate outcomes,
+candidate decision manifest, native benchmark hashes, and distribution hashes. It refuses any
+`PROPOSED`, `MEASURED`, or `ADMITTED` migration decision. The artifact is retained for the tag
+workflow; no registry or GitHub Release is modified.
 
 ## Tagged release workflow
 
-`.github/workflows/release.yml` runs only for a pushed `v*` tag and rejects the event unless:
+For a pushed `v*` tag, `.github/workflows/release.yml` rejects the event unless:
 
 - Python, Rust, source-code, changelog, and tag versions agree;
 - the annotated tag resolves to the checked-out commit;
 - that commit is an ancestor of `main`;
 - the commit's stable `CI gate` check concluded successfully;
+- an exact-SHA successful non-publishing preflight has a valid terminal decision manifest;
 - the public API fixture belongs to the same package series.
 
 The release builds a core source distribution plus Linux x86_64, Linux aarch64, macOS arm64, and
@@ -129,8 +148,8 @@ universal `lacuna-options` wheel and source distribution, installs that wheel wi
 target-smoke-tested Linux core wheel, and runs the extension smoke contract.
 
 A separate job downloads the complete matrix, rejects missing or unexpected filenames/tags/names/
-versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.13.0`
-tag with extension `0.2.0`, the release set is exactly four `lacuna-quant` wheels, one
+versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.14.0`
+tag with extension `0.2.1`, the release set is exactly four `lacuna-quant` wheels, one
 `lacuna-options` wheel, two source distributions, and the checksum manifest.
 
 Only the GitHub publication job has `contents: write` and GitHub attestation permissions. The two
@@ -143,7 +162,8 @@ distributions.
 Core publishes to PyPI as `lacuna-quant`; the Python import package and CLI remain `lacuna`. The
 PyPI name `lacuna` belongs to an unrelated project and is a prohibited release target. The optional
 extension publishes independently as `lacuna-options` and depends on
-`lacuna-quant>=0.13,<0.14` from its `0.2.0` release onward.
+`lacuna-quant>=0.13,<0.15` from its `0.2.1` release onward. Release QA installs that exact extension
+wheel beside both core 0.13.0 and the candidate 0.14.0 wheel.
 
 Registry publication uses PyPI Trusted Publishing only—no long-lived API token is stored. Both
 PyPI projects authorize repository `eyenoticeall/Lacuna` and workflow `release.yml`. The core
