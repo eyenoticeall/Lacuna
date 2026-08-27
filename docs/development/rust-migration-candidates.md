@@ -263,7 +263,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-11 | Prior-only expanding/rolling regime quantiles | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | exact Polars order statistics |
 | R-12 | Event-window alignment/path extraction | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars range/as-of plan |
 | R-13 | Event-response cluster resampling | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | cluster sufficient statistics |
-| R-14 | Diagnostic portfolio allocation core | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | columnar allocator reference |
+| R-14 | Diagnostic portfolio allocation core | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars window allocator |
 | R-15 | Universe membership transitions | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | encoded-ID self-join reference |
 | R-16 | c14n-v1 semantic frame fingerprint | MIGRATE_AFTER_PROFILE | P0 | High | High | Low | PROPOSED | F-02a exact Python streaming |
 
@@ -537,12 +537,25 @@ construction, findings, and attrition. Tests compare against literal complete-pa
 preserve cluster rather than event-row sampling, jointly resample every offset, exercise unequal
 cluster sizes, verify batch-size invariance, and reject an explicit memory limit before allocation.
 
-### R-14 and R-15: conditional columnar candidates
+### R-14: diagnostic portfolio allocation
 
-`signal.portfolio_projection` should first replace Python cohort/group/leg iteration and
-dictionary bookkeeping with Polars grouping, joins, and window expressions. Only a residual
-quant-specific constrained allocator is a Rust candidate; BLAS-like or generic dataframe work is
-not.
+`signal.portfolio_projection` now determines two-sided group eligibility, explicit exclusions,
+per-cohort neutral group counts, equal/rank/absolute-signal scores, zero-signal fallbacks, and
+gross/net-normalized weights through Polars grouping, joins, ranks, and window expressions. Python
+still validates methodology and constructs reconciliation, attrition, findings, and results.
+
+At 100,000 rows, 200 cohorts, ten neutral groups, and rank-weighted long/short legs, the exact
+public checksum was preserved while median latency fell from 880.93 ms to 37.64 ms (23.4 times
+faster). Incremental RSS fell by 91.5% and traced Python peak memory fell by 69.3%. The optimized
+call is below 50 ms and no residual constrained allocator remains. R-14 is
+`OPTIMIZED_NON_NATIVE`; reopen only if a materially different weighting contract requires a
+measured bespoke solver.
+
+Literal score fixtures cover equal, rank, and absolute-signal weighting across neutral groups;
+existing reconciliation, nonzero-net, zero-dispersion, one-sided-group, temporal alignment, and
+permutation tests remain authoritative.
+
+### R-15: universe transitions
 
 Universe drift and membership checks should first use encoded IDs plus Polars self-joins and grouped
 set/count expressions. A native sorted-membership transition scan is reasonable only if snapshot
