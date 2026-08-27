@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import bisect
 import math
 import secrets
 from dataclasses import dataclass
@@ -56,13 +55,6 @@ class EventWindowResult:
         """Serialize compact evidence without embedding every event path row."""
 
         return self.evidence.to_json(indent=indent)
-
-
-def _finite_price(value: object) -> float | None:
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        return None
-    parsed = float(value)
-    return parsed if math.isfinite(parsed) and parsed > 0.0 else None
 
 
 def _delay(later: object, earlier: object) -> float | None:
@@ -212,32 +204,156 @@ def event_windows(
         raise DataContractError(
             f"prices contain {invalid_price} non-positive or non-finite observed values"
         )
-    prices_by_instrument = {
-        group.get_column(instrument)[0]: group.sort(price_time)
-        for group in price_frame.partition_by(instrument, maintain_order=True)
-    }
+    indexed_prices = (
+        price_frame.select(
+            pl.col(instrument).alias("_instrument"),
+            pl.col(price_time).alias("_price_time"),
+            pl.col(price).cast(pl.Float64).alias("_price"),
+        )
+        .sort(["_instrument", "_price_time"])
+        .with_columns(
+            pl.int_range(pl.len()).over("_instrument").cast(pl.Int64).alias("_price_index"),
+            pl.len().over("_instrument").cast(pl.Int64).alias("_price_count"),
+        )
+    )
+    price_counts = indexed_prices.group_by("_instrument", maintain_order=True).agg(
+        pl.col("_price_count").first()
+    )
+    ordered_events = (
+        event_frame.select(
+            pl.col(event_id).alias("_event_id"),
+            pl.col(instrument).alias("_instrument"),
+            pl.col(event_time).alias("_event_time"),
+            pl.col(available_time).alias("_available_time"),
+        )
+        .sort(["_event_time", "_event_id"])
+        .with_row_index("_event_order")
+        .with_columns(
+            pl.col("_available_time" if anchor == "available_time" else "_event_time").alias(
+                "_anchor_time"
+            )
+        )
+        .join(price_counts, on="_instrument", how="left", maintain_order="left")
+    )
+    first_observations = indexed_prices.select(
+        "_instrument",
+        pl.col("_price_time").alias("_first_observation_time"),
+        pl.col("_price_index").alias("_first_observation_index"),
+    ).sort("_first_observation_time")
+    eligible_anchors = (
+        indexed_prices.filter(pl.col("_price").is_not_null())
+        .select(
+            "_instrument",
+            pl.col("_price_time").alias("_aligned_anchor_time"),
+            pl.col("_price_index").alias("_anchor_index"),
+            pl.col("_price").alias("_anchor_price"),
+        )
+        .sort("_aligned_anchor_time")
+    )
+    aligned = (
+        ordered_events.sort("_anchor_time")
+        .join_asof(
+            first_observations,
+            left_on="_anchor_time",
+            right_on="_first_observation_time",
+            by="_instrument",
+            strategy="forward",
+            check_sortedness=False,
+        )
+        .join_asof(
+            eligible_anchors,
+            left_on="_anchor_time",
+            right_on="_aligned_anchor_time",
+            by="_instrument",
+            strategy="forward",
+            check_sortedness=False,
+        )
+        .with_columns(
+            pl.when(pl.col("_first_observation_index").is_null())
+            .then(0)
+            .otherwise(
+                pl.coalesce("_anchor_index", "_price_count") - pl.col("_first_observation_index")
+            )
+            .cast(pl.Int64)
+            .alias("_skipped_anchor_prices")
+        )
+        .sort("_event_order")
+    )
+    aligned_only = aligned.filter(pl.col("_anchor_index").is_not_null())
+    offset_frame = pl.DataFrame({"offset": range(-before, after + 1)})
+    expanded_paths = (
+        aligned_only.join(offset_frame, how="cross")
+        .with_columns((pl.col("_anchor_index") + pl.col("offset")).alias("_path_index"))
+        .join(
+            indexed_prices.select(
+                "_instrument",
+                "_price_index",
+                "_price_time",
+                "_price",
+            ),
+            left_on=("_instrument", "_path_index"),
+            right_on=("_instrument", "_price_index"),
+            how="left",
+            maintain_order="left",
+        )
+        .with_columns(
+            ((pl.col("_path_index") >= 0) & (pl.col("_path_index") < pl.col("_price_count"))).alias(
+                "_in_bounds"
+            )
+        )
+    )
+    path_coverage = (
+        expanded_paths.filter(pl.col("_in_bounds"))
+        .group_by("_event_id", maintain_order=True)
+        .agg(
+            pl.col("_price").is_not_null().sum().cast(pl.Int64).alias("_observed_rows"),
+            pl.col("_price").is_null().sum().cast(pl.Int64).alias("_missing_price_rows"),
+        )
+    )
+    aligned = aligned.join(path_coverage, on="_event_id", how="left", maintain_order="left")
+    output = (
+        expanded_paths.filter(pl.col("_in_bounds") & pl.col("_price").is_not_null())
+        .select(
+            pl.col("_event_id").alias("event_id"),
+            pl.col("_instrument").alias("instrument"),
+            pl.col("_event_time").alias("event_time"),
+            pl.col("_available_time").alias("available_time"),
+            pl.col("_anchor_time").alias("anchor_time"),
+            pl.col("_aligned_anchor_time").alias("aligned_anchor_time"),
+            "offset",
+            pl.col("_price_time").alias("price_time"),
+            pl.col("_price").alias("price"),
+            pl.col("_anchor_price").alias("anchor_price"),
+            (pl.col("_price") / pl.col("_anchor_price") - 1.0).alias("response"),
+        )
+        .sort(["aligned_anchor_time", "event_id", "offset"])
+    )
+    if output.is_empty():
+        raise DataContractError("no event window observations remain after anchor alignment")
 
-    path_rows: list[dict[str, object]] = []
     coverage_rows: list[dict[str, object]] = []
     window_descriptors: list[dict[str, object]] = []
-    aligned_events = 0
-    retrospective_lookahead = 0
-    skipped_anchor_prices = 0
-    for event in event_frame.sort([event_time, event_id]).to_dicts():
-        event_identity = event[event_id]
-        instrument_identity = event[instrument]
-        event_anchor = event[available_time] if anchor == "available_time" else event[event_time]
-        if anchor == "event_time" and event[available_time] > event[event_time]:
-            retrospective_lookahead += 1
-        instrument_prices = prices_by_instrument.get(instrument_identity)
-        if instrument_prices is None:
+    aligned_events = aligned_only.height
+    retrospective_lookahead = (
+        int(event_frame.select((pl.col(available_time) > pl.col(event_time)).sum()).item())
+        if anchor == "event_time"
+        else 0
+    )
+    skipped_anchor_prices = int(aligned.get_column("_skipped_anchor_prices").sum() or 0)
+    expected_rows = before + after + 1
+    for event in aligned.to_dicts():
+        event_identity = event["_event_id"]
+        instrument_identity = event["_instrument"]
+        price_count = event["_price_count"]
+        anchor_index = event["_anchor_index"]
+        if price_count is None:
             coverage_rows.append(
                 {
                     "event_id": event_identity,
                     "instrument": instrument_identity,
-                    "expected_rows": before + after + 1,
+                    "expected_rows": expected_rows,
                     "observed_rows": 0,
-                    "censored_rows": before + after + 1,
+                    "censored_rows": expected_rows,
                     "left_censored_rows": before,
                     "right_censored_rows": after + 1,
                     "missing_price_rows": 0,
@@ -246,22 +362,14 @@ def event_windows(
                 }
             )
             continue
-        times = instrument_prices.get_column(price_time).to_list()
-        anchor_index = bisect.bisect_left(times, event_anchor)
-        while (
-            anchor_index < instrument_prices.height
-            and _finite_price(instrument_prices.get_column(price)[anchor_index]) is None
-        ):
-            skipped_anchor_prices += 1
-            anchor_index += 1
-        if anchor_index >= instrument_prices.height:
+        if anchor_index is None:
             coverage_rows.append(
                 {
                     "event_id": event_identity,
                     "instrument": instrument_identity,
-                    "expected_rows": before + after + 1,
+                    "expected_rows": expected_rows,
                     "observed_rows": 0,
-                    "censored_rows": before + after + 1,
+                    "censored_rows": expected_rows,
                     "left_censored_rows": before,
                     "right_censored_rows": after + 1,
                     "missing_price_rows": 0,
@@ -270,39 +378,15 @@ def event_windows(
                 }
             )
             continue
-        aligned_events += 1
-        aligned_time = times[anchor_index]
-        anchor_price = _finite_price(instrument_prices.get_column(price)[anchor_index])
-        assert anchor_price is not None
-        left_censored = max(0, before - anchor_index)
-        right_censored = max(0, anchor_index + after - (instrument_prices.height - 1))
-        missing_prices = 0
-        observed_rows = 0
-        for offset in range(-before, after + 1):
-            price_index = anchor_index + offset
-            if price_index < 0 or price_index >= instrument_prices.height:
-                continue
-            observed_price = _finite_price(instrument_prices.get_column(price)[price_index])
-            if observed_price is None:
-                missing_prices += 1
-                continue
-            observed_rows += 1
-            path_rows.append(
-                {
-                    "event_id": event_identity,
-                    "instrument": instrument_identity,
-                    "event_time": event[event_time],
-                    "available_time": event[available_time],
-                    "anchor_time": event_anchor,
-                    "aligned_anchor_time": aligned_time,
-                    "offset": offset,
-                    "price_time": times[price_index],
-                    "price": observed_price,
-                    "anchor_price": anchor_price,
-                    "response": observed_price / anchor_price - 1.0,
-                }
-            )
-        expected_rows = before + after + 1
+        resolved_anchor_index = _integer(anchor_index, name="anchor_index")
+        resolved_price_count = _integer(price_count, name="price_count")
+        left_censored = max(0, before - resolved_anchor_index)
+        right_censored = max(
+            0,
+            resolved_anchor_index + after - (resolved_price_count - 1),
+        )
+        observed_rows = _integer(event["_observed_rows"], name="observed_rows")
+        missing_prices = _integer(event["_missing_price_rows"], name="missing_price_rows")
         coverage_rows.append(
             {
                 "event_id": event_identity,
@@ -313,7 +397,7 @@ def event_windows(
                 "left_censored_rows": left_censored,
                 "right_censored_rows": right_censored,
                 "missing_price_rows": missing_prices,
-                "anchor_delay": _delay(aligned_time, event_anchor),
+                "anchor_delay": _delay(event["_aligned_anchor_time"], event["_anchor_time"]),
                 "status": "aligned",
             }
         )
@@ -321,20 +405,22 @@ def event_windows(
             {
                 "event_id": event_identity,
                 "instrument": instrument_identity,
-                "window_start_index": anchor_index - before,
-                "window_end_index": anchor_index + after,
+                "window_start_index": resolved_anchor_index - before,
+                "window_end_index": resolved_anchor_index + after,
             }
         )
-    if not path_rows:
-        raise DataContractError("no event window observations remain after anchor alignment")
     clusters, overlapping_events = _window_clusters(window_descriptors)
     if overlapping_events and overlap_policy == "raise":
         raise DataContractError(
             f"{overlapping_events} events have overlapping same-instrument windows"
         )
-    for row in path_rows:
-        row["overlap_cluster"] = clusters[row["event_id"]]
-    output = pl.DataFrame(path_rows).sort(["aligned_anchor_time", "event_id", "offset"])
+    cluster_frame = pl.DataFrame(
+        {
+            "event_id": list(clusters),
+            "overlap_cluster": list(clusters.values()),
+        }
+    )
+    output = output.join(cluster_frame, on="event_id", how="left", maintain_order="left")
     coverage = pl.DataFrame(coverage_rows).sort("event_id")
     findings: list[Finding] = []
     if retrospective_lookahead:

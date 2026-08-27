@@ -93,6 +93,163 @@ def test_event_windows_make_censoring_and_missing_prices_visible() -> None:
     assert result.evidence.metrics["censored_events"] == 1
 
 
+def test_event_windows_polars_plan_matches_irregular_literal_paths() -> None:
+    prices = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "time": [13, 3, 1],
+                    "instrument": ["A", "A", "A"],
+                    "close": [113.0, None, 100.0],
+                }
+            ),
+            pl.DataFrame(
+                {
+                    "time": [15, 8, 5, 9, 2, 4],
+                    "instrument": ["A", "A", "A", "B", "B", "B"],
+                    "close": [None, 108.0, 105.0, 209.0, 200.0, 204.0],
+                }
+            ),
+        ],
+        rechunk=False,
+    )
+    events = pl.DataFrame(
+        {
+            "event_id": ["missing", "a", "trailing", "b"],
+            "instrument": ["C", "A", "A", "B"],
+            "event_time": [2, 2, 14, 2],
+            "available_time": [3, 3, 14, 3],
+        }
+    )
+
+    result = event_windows(
+        events,
+        prices,
+        before=2,
+        after=2,
+        price_adjustment="split_adjusted",
+    )
+
+    assert result.frame.to_dicts() == [
+        {
+            "event_id": "b",
+            "instrument": "B",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 4,
+            "offset": -1,
+            "price_time": 2,
+            "price": 200.0,
+            "anchor_price": 204.0,
+            "response": 200.0 / 204.0 - 1.0,
+            "overlap_cluster": "overlap-0002",
+        },
+        {
+            "event_id": "b",
+            "instrument": "B",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 4,
+            "offset": 0,
+            "price_time": 4,
+            "price": 204.0,
+            "anchor_price": 204.0,
+            "response": 0.0,
+            "overlap_cluster": "overlap-0002",
+        },
+        {
+            "event_id": "b",
+            "instrument": "B",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 4,
+            "offset": 1,
+            "price_time": 9,
+            "price": 209.0,
+            "anchor_price": 204.0,
+            "response": 209.0 / 204.0 - 1.0,
+            "overlap_cluster": "overlap-0002",
+        },
+        {
+            "event_id": "a",
+            "instrument": "A",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 5,
+            "offset": -2,
+            "price_time": 1,
+            "price": 100.0,
+            "anchor_price": 105.0,
+            "response": 100.0 / 105.0 - 1.0,
+            "overlap_cluster": "overlap-0001",
+        },
+        {
+            "event_id": "a",
+            "instrument": "A",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 5,
+            "offset": 0,
+            "price_time": 5,
+            "price": 105.0,
+            "anchor_price": 105.0,
+            "response": 0.0,
+            "overlap_cluster": "overlap-0001",
+        },
+        {
+            "event_id": "a",
+            "instrument": "A",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 5,
+            "offset": 1,
+            "price_time": 8,
+            "price": 108.0,
+            "anchor_price": 105.0,
+            "response": 108.0 / 105.0 - 1.0,
+            "overlap_cluster": "overlap-0001",
+        },
+        {
+            "event_id": "a",
+            "instrument": "A",
+            "event_time": 2,
+            "available_time": 3,
+            "anchor_time": 3,
+            "aligned_anchor_time": 5,
+            "offset": 2,
+            "price_time": 13,
+            "price": 113.0,
+            "anchor_price": 105.0,
+            "response": 113.0 / 105.0 - 1.0,
+            "overlap_cluster": "overlap-0001",
+        },
+    ]
+    coverage = {row["event_id"]: row for row in result.evidence.table("event_coverage")}
+    assert coverage["a"] == {
+        "event_id": "a",
+        "instrument": "A",
+        "expected_rows": 5,
+        "observed_rows": 4,
+        "censored_rows": 1,
+        "left_censored_rows": 0,
+        "right_censored_rows": 0,
+        "missing_price_rows": 1,
+        "anchor_delay": 2.0,
+        "status": "aligned",
+    }
+    assert coverage["b"]["left_censored_rows"] == 1
+    assert coverage["b"]["right_censored_rows"] == 1
+    assert coverage["missing"]["status"] == "no_instrument_prices"
+    assert coverage["trailing"]["status"] == "no_eligible_anchor"
+    assert result.evidence.metrics["skipped_null_anchor_prices"] == 2
+
+
 def test_duplicate_and_overlapping_events_raise_unless_retained() -> None:
     duplicate = pl.DataFrame(
         {
