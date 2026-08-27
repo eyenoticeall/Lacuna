@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import secrets
+import time
 from collections.abc import Callable, Sequence
 from itertools import combinations
 from statistics import NormalDist
@@ -879,6 +880,7 @@ def _native_pbo_for_partitions(
     statistic: PBOStatistic,
     tie_break: PBOTieBreak,
     max_combinations: int,
+    telemetry: dict[str, int | float | None] | None = None,
 ) -> tuple[float, list[dict[str, JsonValue]], int] | None:
     """Return compact native PBO output, or ``None`` when the symbol is unavailable."""
 
@@ -906,11 +908,14 @@ def _native_pbo_for_partitions(
     if not hasattr(_native, "pbo_partition_splits"):
         return None
 
-    native_matrix = readonly_float64_matrix(matrix, name="matrix").values
-    native_groups = readonly_int64_matrix(
+    normalized_matrix = readonly_float64_matrix(matrix, name="matrix")
+    normalized_groups = readonly_int64_matrix(
         combination_groups,
         name="combination_groups",
-    ).values
+    )
+    native_matrix = normalized_matrix.values
+    native_groups = normalized_groups.values
+    kernel_started = time.perf_counter()
     try:
         raw = _native.pbo_partition_splits(
             native_matrix,
@@ -920,6 +925,7 @@ def _native_pbo_for_partitions(
         )
     except ValueError as error:
         raise DataContractError(str(error)) from error
+    kernel_seconds = time.perf_counter() - kernel_started
     if len(raw) != 7:
         raise RuntimeError("native PBO reducer returned an invalid carrier")
     selected, in_performance, out_performance, ranks, logits, ties, underperformed = raw
@@ -941,6 +947,7 @@ def _native_pbo_for_partitions(
             "declared strategy order is a defensible deterministic rule"
         )
 
+    projection_started = time.perf_counter()
     all_groups = set(range(partitions))
     rows: list[dict[str, JsonValue]] = []
     for combination_index, in_sample_groups in enumerate(combination_tuples):
@@ -968,6 +975,32 @@ def _native_pbo_for_partitions(
             }
         )
     pbo = float(np.mean(underperformed, dtype=np.float64))
+    if telemetry is not None:
+        input_bytes = int(native_matrix.nbytes + native_groups.nbytes)
+        normalization_copy_bytes = normalized_matrix.copied_bytes + normalized_groups.copied_bytes
+        moment_bytes = (
+            partitions
+            * matrix.shape[1]
+            * (np.dtype(np.uintp).itemsize + 2 * np.dtype(np.float64).itemsize)
+        )
+        scratch_bytes = partitions * np.dtype(np.uint8).itemsize + (
+            2 * matrix.shape[1] * np.dtype(np.float64).itemsize
+        )
+        telemetry["input_copy_bytes"] = int(telemetry.get("input_copy_bytes") or 0) + (
+            normalization_copy_bytes + input_bytes
+        )
+        telemetry["output_copy_bytes"] = 0
+        telemetry["temporary_workspace_bytes"] = max(
+            int(telemetry.get("temporary_workspace_bytes") or 0),
+            moment_bytes + scratch_bytes,
+        )
+        telemetry["result_projection_bytes"] = int(
+            telemetry.get("result_projection_bytes") or 0
+        ) + sum(int(value.nbytes) for value in arrays)
+        telemetry["kernel"] = float(telemetry.get("kernel") or 0.0) + kernel_seconds
+        telemetry["result_projection"] = float(telemetry.get("result_projection") or 0.0) + (
+            time.perf_counter() - projection_started
+        )
     return pbo, rows, tie_count
 
 
@@ -980,6 +1013,7 @@ def _pbo_for_partitions(
     tie_break: PBOTieBreak,
     max_combinations: int,
     backend: _PBOBackend,
+    telemetry: dict[str, int | float | None] | None = None,
 ) -> tuple[float, list[dict[str, JsonValue]], int, str]:
     combination_count = (
         math.comb(partitions, partitions // 2)
@@ -997,6 +1031,7 @@ def _pbo_for_partitions(
             statistic=statistic,
             tie_break=tie_break,
             max_combinations=max_combinations,
+            telemetry=telemetry,
         )
         if native is not None:
             return (*native, "rust_native")
@@ -1023,6 +1058,7 @@ def _probability_of_backtest_overfitting(
     tie_break: PBOTieBreak = "raise",
     max_combinations: int = 20_000,
     backend: _PBOBackend,
+    telemetry: dict[str, int | float | None] | None = None,
 ) -> AnalysisResult:
     if statistic not in {"mean", "sharpe"}:
         raise MethodContractError("statistic must be 'mean' or 'sharpe'")
@@ -1032,11 +1068,16 @@ def _probability_of_backtest_overfitting(
         raise MethodContractError("max_combinations must be an integer")
     if max_combinations < 1:
         raise MethodContractError("max_combinations must be positive")
+    if backend not in {"auto", "reference", "native"}:
+        raise MethodContractError("private PBO backend must be auto, reference, or native")
+    normalization_started = time.perf_counter()
     matrix, names, source = _strategy_matrix(
         data,
         strategy_columns=strategy_columns,
         name="PBO",
     )
+    if telemetry is not None:
+        telemetry["normalization"] = time.perf_counter() - normalization_started
     counts = tuple(dict.fromkeys((partitions, *(partition_sensitivity or ()))))
     sensitivity_rows: list[dict[str, JsonValue]] = []
     main_rows: list[dict[str, JsonValue]] = []
@@ -1052,6 +1093,7 @@ def _probability_of_backtest_overfitting(
             tie_break=tie_break,
             max_combinations=max_combinations,
             backend=backend,
+            telemetry=telemetry,
         )
         selected_backends.add(selected_backend)
         sensitivity_rows.append(
@@ -1095,7 +1137,8 @@ def _probability_of_backtest_overfitting(
         warnings.append(
             "In-sample ties were resolved by declared strategy order because tie_break='first'."
         )
-    return AnalysisResult(
+    result_started = time.perf_counter()
+    result = AnalysisResult(
         metadata=ResultMetadata(
             method="validation.probability_of_backtest_overfitting",
             method_version=1,
@@ -1131,6 +1174,9 @@ def _probability_of_backtest_overfitting(
         },
         warnings=tuple(warnings),
     )
+    if telemetry is not None:
+        telemetry["result_construction"] = time.perf_counter() - result_started
+    return result
 
 
 def probability_of_backtest_overfitting(

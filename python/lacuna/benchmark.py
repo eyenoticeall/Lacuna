@@ -359,6 +359,57 @@ def _equivalence_value(value: object) -> object:
     return value
 
 
+def _pbo_migration_fixture(
+    config: BenchmarkConfig,
+) -> tuple[npt.NDArray[np.float64], int]:
+    """Build the fixed PBO migration input outside measured regions."""
+
+    partitions = 14 if config.periods >= 200 else 6
+    periods = partitions * math.ceil(max(config.periods, partitions * 4) / partitions)
+    strategies = max(3, min(config.instruments, 12))
+    time_values: npt.NDArray[np.float64] = np.arange(periods, dtype=np.float64)[:, np.newaxis]
+    identities: npt.NDArray[np.float64] = np.arange(strategies, dtype=np.float64)[np.newaxis, :]
+    matrix: npt.NDArray[np.float64] = (
+        np.sin(time_values * 0.13 + identities * 0.29) + identities * 0.005
+    )
+    return matrix, partitions
+
+
+def _instrument_migration_case(
+    case_name: str,
+    config: BenchmarkConfig,
+) -> dict[str, object]:
+    """Run one untimed candidate-specific phase and byte-accounting pass."""
+
+    if case_name not in {
+        "migration.validation.pbo.public",
+        "migration.validation.pbo.reference",
+        "migration.validation.pbo.native",
+    }:
+        return {}
+    matrix, partitions = _pbo_migration_fixture(config)
+    backends: dict[str, _PBOBackend] = {
+        "migration.validation.pbo.public": "auto",
+        "migration.validation.pbo.reference": "reference",
+        "migration.validation.pbo.native": "native",
+    }
+    telemetry: dict[str, int | float | None] = {}
+    result = _probability_of_backtest_overfitting(
+        matrix,
+        partitions=partitions,
+        statistic="sharpe",
+        tie_break="first",
+        backend=backends[case_name],
+        telemetry=telemetry,
+    )
+    payload, backend = _output_payload(result)
+    return {
+        **telemetry,
+        "backend": backend,
+        "checksum": _checksum(payload),
+    }
+
+
 def _measure(
     name: str,
     operation: BenchmarkCallable,
@@ -978,21 +1029,7 @@ def _run_benchmarks(
         }
     )
     if requested_pbo_cases:
-        pbo_partitions = 14 if resolved.periods >= 200 else 6
-        pbo_periods = pbo_partitions * math.ceil(
-            max(resolved.periods, pbo_partitions * 4) / pbo_partitions
-        )
-        pbo_time: npt.NDArray[np.float64] = np.arange(
-            pbo_periods,
-            dtype=np.float64,
-        )[:, np.newaxis]
-        pbo_identity: npt.NDArray[np.float64] = np.arange(
-            inference_strategies,
-            dtype=np.float64,
-        )[np.newaxis, :]
-        pbo_matrix: npt.NDArray[np.float64] = (
-            np.sin(pbo_time * 0.13 + pbo_identity * 0.29) + pbo_identity * 0.005
-        )
+        pbo_matrix, pbo_partitions = _pbo_migration_fixture(resolved)
         pbo_backends: dict[str, _PBOBackend] = {
             "migration.validation.pbo.public": "auto",
             "migration.validation.pbo.reference": "reference",

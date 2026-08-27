@@ -184,6 +184,37 @@ def test_timed_fingerprint_worker_skips_python_memory_trace() -> None:
     assert measurement["python_traced_peak_bytes"] == 0
 
 
+def test_instrumented_native_pbo_reconciles_boundary_and_projection_bytes() -> None:
+    config = BenchmarkConfig(
+        periods=8,
+        instruments=5,
+        horizons=(1, 2),
+        quantiles=3,
+        bootstrap_resamples=100,
+        repetitions=1,
+        warmups=0,
+    )
+    payload = _worker_payload(
+        "migration.validation.pbo.native",
+        config,
+        use_native=True,
+        instrumented=True,
+    )
+    measurement = payload["measurement"]
+    assert isinstance(measurement, dict)
+    assert measurement["backend"] == "rust_native"
+    assert measurement["input_copy_bytes"] == 1_440
+    assert measurement["output_copy_bytes"] == 0
+    assert measurement["temporary_workspace_bytes"] == 806
+    assert measurement["result_projection_bytes"] == 840
+    phases = measurement["phase_seconds"]
+    assert isinstance(phases, dict)
+    assert all(
+        isinstance(phases[name], float) and phases[name] >= 0.0
+        for name in ("normalization", "kernel", "result_projection", "result_construction")
+    )
+
+
 @pytest.mark.parametrize(
     "case_name",
     (

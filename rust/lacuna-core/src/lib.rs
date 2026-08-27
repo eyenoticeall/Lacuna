@@ -492,21 +492,21 @@ pub fn pbo_partition_splits(
     let mut logits = Vec::with_capacity(combination_count);
     let mut selection_tie = Vec::with_capacity(combination_count);
     let mut underperformed_median = Vec::with_capacity(combination_count);
-    let mut included = vec![false; partitions];
+    let mut included = vec![0_u8; partitions];
     let mut in_sample = vec![0.0; columns];
     let mut out_of_sample = vec![0.0; columns];
 
     for groups in combination_groups.chunks_exact(groups_per_combination) {
-        included.fill(false);
+        included.fill(0);
         for group in groups {
-            included[*group] = true;
+            included[*group] = 1;
         }
         for column in 0..columns {
             let mut in_moments = Moments::empty();
             let mut out_moments = Moments::empty();
             for group in 0..partitions {
                 let moments = partition_moments[group * columns + column];
-                if included[group] {
+                if included[group] != 0 {
                     in_moments.combine(moments);
                 } else {
                     out_moments.combine(moments);

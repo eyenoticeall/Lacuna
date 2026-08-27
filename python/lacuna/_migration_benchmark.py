@@ -27,6 +27,7 @@ from lacuna._frames import frame_records
 from lacuna.benchmark import (
     BenchmarkConfig,
     _current_rss_bytes,
+    _instrument_migration_case,
     _process_peak_rss_bytes,
     _run_benchmark_case_detailed,
 )
@@ -274,6 +275,22 @@ def _measurement_from_worker(payload: Mapping[str, object]) -> MigrationMeasurem
             raise MethodContractError(f"worker {name} must be a non-negative integer or null")
         return value
 
+    phase_value = payload.get("phase_seconds")
+    if phase_value is not None and not isinstance(phase_value, dict):
+        raise MethodContractError("worker phase_seconds must be an object or null")
+    phase_payload = cast(dict[str, object], phase_value or {})
+
+    def optional_phase(name: str) -> float | None:
+        value = phase_payload.get(name)
+        if value is None:
+            return None
+        if not isinstance(value, int | float) or isinstance(value, bool):
+            raise MethodContractError(f"worker phase {name} must be numeric or null")
+        resolved = float(value)
+        if not math.isfinite(resolved) or resolved < 0.0:
+            raise MethodContractError(f"worker phase {name} must be finite and non-negative")
+        return resolved
+
     median_seconds = statistics.median(timings)
     throughput_value = payload.get("throughput")
     if not isinstance(throughput_value, int | float) or isinstance(throughput_value, bool):
@@ -302,11 +319,11 @@ def _measurement_from_worker(payload: Mapping[str, object]) -> MigrationMeasurem
         temporary_workspace_bytes=optional_integer("temporary_workspace_bytes"),
         result_projection_bytes=optional_integer("result_projection_bytes"),
         phase_seconds={
-            "normalization": None,
-            "input_copy": None,
-            "kernel": None,
-            "result_projection": None,
-            "result_construction": None,
+            "normalization": optional_phase("normalization"),
+            "input_copy": optional_phase("input_copy"),
+            "kernel": optional_phase("kernel"),
+            "result_projection": optional_phase("result_projection"),
+            "result_construction": optional_phase("result_construction"),
             "public_call_total": median_seconds,
         },
         checksum=string("checksum"),
@@ -661,7 +678,10 @@ def run_isolated_migration_benchmark(
             "polars_threads": 2,
             "native_threads": 1,
             "isolation": "one child process per measured backend",
-            "copy_measurement": "null until the selected boundary reports exact byte counters",
+            "copy_measurement": (
+                "exact logical boundary and compact-carrier bytes when candidate telemetry is "
+                "available; null for uninstrumented backends"
+            ),
         },
     )
 
@@ -866,6 +886,12 @@ def _worker_payload(
         use_native=use_native,
         measure_python_memory=instrumented,
     )
+    instrumentation = _instrument_migration_case(case_name, config) if instrumented else {}
+    if instrumentation:
+        if instrumentation.get("backend") != case.backend:
+            raise RuntimeError("migration instrumentation selected a different backend")
+        if instrumentation.get("checksum") != case.checksum:
+            raise RuntimeError("migration instrumentation produced a different result")
     return {
         "measurement": {
             "case_name": case.name,
@@ -877,10 +903,17 @@ def _worker_payload(
             "process_peak_rss_bytes": trace.process_peak_rss_bytes,
             "incremental_peak_rss_bytes": trace.incremental_peak_rss_bytes,
             "python_traced_peak_bytes": trace.python_traced_peak_bytes,
-            "input_copy_bytes": None,
-            "output_copy_bytes": None,
-            "temporary_workspace_bytes": None,
-            "result_projection_bytes": None,
+            "input_copy_bytes": instrumentation.get("input_copy_bytes"),
+            "output_copy_bytes": instrumentation.get("output_copy_bytes"),
+            "temporary_workspace_bytes": instrumentation.get("temporary_workspace_bytes"),
+            "result_projection_bytes": instrumentation.get("result_projection_bytes"),
+            "phase_seconds": {
+                "normalization": instrumentation.get("normalization"),
+                "input_copy": instrumentation.get("input_copy"),
+                "kernel": instrumentation.get("kernel"),
+                "result_projection": instrumentation.get("result_projection"),
+                "result_construction": instrumentation.get("result_construction"),
+            },
             "checksum": case.checksum,
         },
         "environment": dict(public_environment),

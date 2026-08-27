@@ -44,15 +44,6 @@ mod _native {
         Ok(values.to_vec())
     }
 
-    fn copy_i64_matrix(array: &PyReadonlyArray2<'_, i64>, name: &str) -> PyResult<Vec<i64>> {
-        let values = array.as_slice().map_err(|error| {
-            PyValueError::new_err(format!(
-                "{name} must be a two-dimensional, aligned, C-contiguous int64 array: {error}"
-            ))
-        })?;
-        Ok(values.to_vec())
-    }
-
     fn checked_usize(values: &[i64], name: &str) -> PyResult<Vec<usize>> {
         values
             .iter()
@@ -66,6 +57,24 @@ mod _native {
                 })
             })
             .collect()
+    }
+
+    fn copy_usize(array: &PyReadonlyArray1<'_, i64>, name: &str) -> PyResult<Vec<usize>> {
+        let values = array.as_slice().map_err(|error| {
+            PyValueError::new_err(format!(
+                "{name} must be a one-dimensional, aligned, C-contiguous int64 array: {error}"
+            ))
+        })?;
+        checked_usize(values, name)
+    }
+
+    fn copy_usize_matrix(array: &PyReadonlyArray2<'_, i64>, name: &str) -> PyResult<Vec<usize>> {
+        let values = array.as_slice().map_err(|error| {
+            PyValueError::new_err(format!(
+                "{name} must be a two-dimensional, aligned, C-contiguous int64 array: {error}"
+            ))
+        })?;
+        checked_usize(values, name)
     }
 
     /// Return the version of the compiled extension.
@@ -99,8 +108,7 @@ mod _native {
         // borrowed NumPy buffer can otherwise be mutated by a Python alias.
         let signal = copy_f64(&signal, "signal")?;
         let labels = copy_f64(&labels, "labels")?;
-        let raw_offsets = copy_i64(&offsets, "offsets")?;
-        let offsets = checked_usize(&raw_offsets, "offsets")?;
+        let offsets = copy_usize(&offsets, "offsets")?;
         let result = py
             .detach(move || lacuna_core::grouped_rank_ic_buffer(&signal, &labels, &offsets))
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -121,10 +129,8 @@ mod _native {
         offsets: PyReadonlyArray1<'py, i64>,
     ) -> PyResult<Bound<'py, PyArray1<f64>>> {
         let values = copy_f64(&values, "values")?;
-        let raw_indices = copy_i64(&indices, "indices")?;
-        let raw_offsets = copy_i64(&offsets, "offsets")?;
-        let indices = checked_usize(&raw_indices, "indices")?;
-        let offsets = checked_usize(&raw_offsets, "offsets")?;
+        let indices = copy_usize(&indices, "indices")?;
+        let offsets = copy_usize(&offsets, "offsets")?;
         let result = py
             .detach(move || lacuna_core::bootstrap_means(&values, &indices, &offsets))
             .map_err(|error| PyValueError::new_err(error.to_string()))?;
@@ -148,8 +154,7 @@ mod _native {
         let combination_shape = combination_groups.shape();
         let groups_per_combination = combination_shape[1];
         let values = copy_f64_matrix(&matrix, "matrix")?;
-        let raw_groups = copy_i64_matrix(&combination_groups, "combination_groups")?;
-        let groups = checked_usize(&raw_groups, "combination_groups")?;
+        let groups = copy_usize_matrix(&combination_groups, "combination_groups")?;
         let statistic = match statistic {
             "mean" => lacuna_core::PboStatistic::Mean,
             "sharpe" => lacuna_core::PboStatistic::Sharpe,
