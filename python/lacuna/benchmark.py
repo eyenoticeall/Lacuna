@@ -80,7 +80,6 @@ _PRIVATE_MIGRATION_VALIDATION_CASES = {
 }
 _PRIVATE_MIGRATION_CV_CASES = {
     "migration.cv.cpcv.reference",
-    "migration.cv.cpcv.native",
 }
 
 
@@ -1069,7 +1068,7 @@ def _run_benchmarks(
                         n_groups=6,
                         n_test_groups=2,
                         embargo=2,
-                        use_native=case_name.endswith(".native"),
+                        use_native=False,
                     ).split,
                     interval_frame,
                 ),

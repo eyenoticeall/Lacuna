@@ -254,7 +254,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-02 | Built-in cost estimates and `costs.stress`, `O(SN)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | optimized algebra, F-01/F-03a |
 | R-03 | `costs.capacity_curve`, currently up to `O(SCN)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | scaling algebra, new benchmark |
 | R-04 | `costs.break_even_cost` repeated reductions | POLARS_FIRST | P2 | Medium | Medium | Low | PROPOSED | period preaggregation |
-| R-05 | Purged/CPCV split assembly, up to `O(KN)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | F-01/F-03a |
+| R-05 | Purged/CPCV split assembly, up to `O(KN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | F-01/F-03a |
 | R-06 | Shared resampling reduction, `O(RN)`/`O(RNM)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | F-01, Python-owned RNG |
 | R-07 | Built-in permutation schemes/statistics | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
 | R-08 | PBO/CSCV combination evaluation, `O(KNM)` | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | compact output, representative `M` |
@@ -365,12 +365,12 @@ first become `O(P)`, where `P` is the number of periods.
 
 ### R-05: whole purged and combinatorial split assembly
 
-**Current path.** Rust marks interval overlap, but Python repeatedly builds test/candidate lists,
-slices start/end values, filters masks, constructs embargo sets, freezes index tuples, reconstructs
-CPCV paths, and expands evidence rows. The native overlap kernel therefore covers only a portion of
-the public call.
+**Measured outcome.** The v0.14 NumPy reference precomputes chronological group and period codes,
+uses vectorized half-open interval search, and eliminates repeated Polars filters. At 100,000 rows,
+six groups, and 15 combinations it reduced the original 420.52 ms public call to 184.60 ms while
+preserving the exact benchmark checksum.
 
-**Proposed native boundary.**
+The design spike evaluated this native boundary:
 
 - Input: source-order period codes, half-open label-start/end buffers, fold/group boundaries,
   embargo count, and enumerated test-group combinations.
@@ -380,11 +380,13 @@ the public call.
 Python retains time dtype validation, stable period encoding, split configuration, safety limits,
 method/version metadata, and result/evidence policy.
 
-This migration is blocked from delivering its full memory benefit while every `Fold` and evidence
-table eagerly expands one Python object per index/role. Resolve F-03a first or benchmark both the
-compact internal kernel and required legacy projection honestly. Differential tests must cover
-half-open touching intervals, duplicate times, unsorted source rows, embargo boundaries, all
-combination sizes, source-order restoration, and exact path incidence.
+The complete spike passed analytical, differential, adversarial, source-order, path-incidence, and
+boundary tests. After optimizing compact-carrier validation and projection, its exact-commit
+full-call median was 159.42 ms versus 184.60 ms for the optimized reference: only 1.158 times faster,
+below the 1.5 times gate. The unchanged `Fold` tuples and evidence rows dominate the common path,
+so the Rust kernel, PyO3 binding, carrier, and dispatch were removed. R-05 is
+`OPTIMIZED_NON_NATIVE` for v0.14. Reopen it only with a changed projection design or new benchmark
+evidence; a public carrier redesign remains deferred.
 
 ### R-06: shared deterministic resampling engine
 

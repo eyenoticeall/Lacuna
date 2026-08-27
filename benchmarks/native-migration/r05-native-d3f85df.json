@@ -1,0 +1,143 @@
+{
+  "admission": {
+    "correctness_match": true,
+    "latency_regression_fraction": -0.1363974185604068,
+    "material": true,
+    "reasons": [
+      "candidate did not meet throughput, memory, or bounded-completion admission"
+    ],
+    "rss_reduction_fraction": null,
+    "state": "NOT_MIGRATING",
+    "throughput_ratio": 1.1579400310881858
+  },
+  "candidate": {
+    "backend": "rust_native",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.cv.cpcv.native",
+    "checksum": "8b1ec8d6f413fcad524107cb0be0406ce55949f16b058c754dbd688be05178bc",
+    "incremental_peak_rss_bytes": 0,
+    "input_copy_bytes": null,
+    "maximum_seconds": 0.1746875000098953,
+    "median_absolute_deviation_seconds": 0.004378084006020799,
+    "median_seconds": 0.15942495901254006,
+    "minimum_seconds": 0.15429391599900555,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 0.15942495901254006,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 2745696256,
+    "python_traced_peak_bytes": 102869074,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 9408815.340401078,
+    "throughput_unit": "role_evaluations/second",
+    "timings_seconds": [
+      0.15429391599900555,
+      0.15942495901254006,
+      0.1577240000042366,
+      0.1628726250055479,
+      0.1729872500000056,
+      0.15504687500651926,
+      0.1746875000098953
+    ]
+  },
+  "config": {
+    "bootstrap_resamples": 2000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 5000,
+    "periods": 1000,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "environment": {
+    "checksum_normalization": "backend excluded; finite floats rounded to 12 significant digits",
+    "copy_measurement": "exact logical boundary and compact-carrier bytes when candidate telemetry is available; null for uninstrumented backends",
+    "isolation": "one child process per measured backend",
+    "machine": "arm64",
+    "memory_measurement": "tracemalloc peak; native allocations may not be attributed",
+    "mkl_threads": 1,
+    "native_available": true,
+    "native_threads": 1,
+    "native_version": "0.13.0",
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "polars": "1.44.0",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 2201698304,
+    "processor": "arm",
+    "python": "3.13.12",
+    "timing_clock": "time.perf_counter"
+  },
+  "generated_at": "2026-08-27T14:44:26.119085Z",
+  "reference": {
+    "backend": "python_reference",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.cv.cpcv.reference",
+    "checksum": "8b1ec8d6f413fcad524107cb0be0406ce55949f16b058c754dbd688be05178bc",
+    "incremental_peak_rss_bytes": 0,
+    "input_copy_bytes": null,
+    "maximum_seconds": 0.20113375000073574,
+    "median_absolute_deviation_seconds": 0.00844358399626799,
+    "median_seconds": 0.18460454199521337,
+    "minimum_seconds": 0.17616095799894538,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 0.18460454199521337,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 2654322688,
+    "python_traced_peak_bytes": 105769216,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 8125477.216258816,
+    "throughput_unit": "role_evaluations/second",
+    "timings_seconds": [
+      0.17732670799887273,
+      0.17616095799894538,
+      0.18226616700121667,
+      0.199093958013691,
+      0.18460454199521337,
+      0.19331462499394547,
+      0.20113375000073574
+    ]
+  },
+  "run_url": null,
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "d3f85df505609dc8d934bfbda7ff67e6b0a770d1",
+  "target": {
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": "migration.cv.cpcv.native",
+    "candidate_id": "R-05",
+    "effective_dimensions": {
+      "combinations": 15,
+      "embargo": 2,
+      "groups": 6,
+      "held_out_groups": 2,
+      "role_evaluations": 1500000,
+      "rows": 100000
+    },
+    "public_latency_share": 0.53,
+    "public_operation": "cv.CombinatorialPurgedKFold.split",
+    "public_rss_share": null,
+    "reference_case": "migration.cv.cpcv.reference"
+  },
+  "version": 1
+}

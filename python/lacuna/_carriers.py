@@ -16,16 +16,6 @@ UInt8Matrix: TypeAlias = npt.NDArray[np.uint8]
 Int64Vector: TypeAlias = npt.NDArray[np.int64]
 
 
-def _checked_int64_vector(value: object, *, name: str) -> Int64Vector:
-    vector = cast(Int64Vector, np.asarray(value))
-    if vector.dtype != np.dtype(np.int64) or vector.ndim != 1:
-        raise DataContractError(f"{name} must be a one-dimensional int64 array")
-    if not vector.flags.c_contiguous:
-        raise DataContractError(f"{name} must be C-contiguous")
-    vector.setflags(write=False)
-    return vector
-
-
 @dataclass(frozen=True, slots=True)
 class CostComponentBatch:
     """Contiguous cost-component values plus explicit validity and Python-owned names."""
@@ -172,119 +162,6 @@ class ResampleBatch:
     @property
     def resamples(self) -> int:
         return int(self.offsets.size - 1)
-
-
-@dataclass(frozen=True, slots=True)
-class CompactFoldBuffer:
-    """CSR role indices and CPCV path incidence behind the public fold types."""
-
-    row_count: int
-    group_count: int
-    train_indices: Int64Vector
-    train_offsets: Int64Vector
-    test_indices: Int64Vector
-    test_offsets: Int64Vector
-    purged_indices: Int64Vector
-    purged_offsets: Int64Vector
-    embargoed_indices: Int64Vector
-    embargoed_offsets: Int64Vector
-    path_fold_by_group: Int64Vector
-    path_offsets: Int64Vector
-
-    def __post_init__(self) -> None:
-        if self.row_count < 1 or self.group_count < 2:
-            raise DataContractError("compact fold dimensions must contain rows and two groups")
-        names = (
-            "train_indices",
-            "train_offsets",
-            "test_indices",
-            "test_offsets",
-            "purged_indices",
-            "purged_offsets",
-            "embargoed_indices",
-            "embargoed_offsets",
-            "path_fold_by_group",
-            "path_offsets",
-        )
-        vectors = {name: _checked_int64_vector(getattr(self, name), name=name) for name in names}
-        role_names = ("train", "test", "purged", "embargoed")
-        offset_sizes: set[int] = set()
-        for role in role_names:
-            indices = vectors[f"{role}_indices"]
-            offsets = vectors[f"{role}_offsets"]
-            if offsets.size < 2 or offsets[0] != 0 or offsets[-1] != indices.size:
-                raise DataContractError(f"{role} offsets must span the complete index buffer")
-            if bool((np.diff(offsets) < 0).any()):
-                raise DataContractError(f"{role} offsets must be non-decreasing")
-            if bool((indices < 0).any()) or bool((indices >= self.row_count).any()):
-                raise DataContractError(f"{role} indices must point inside the source frame")
-            offset_sizes.add(int(offsets.size))
-        if len(offset_sizes) != 1:
-            raise DataContractError("all CPCV role buffers must describe the same fold count")
-
-        fold_count = next(iter(offset_sizes)) - 1
-        assignment_counts: npt.NDArray[np.uint8] = np.empty(self.row_count, dtype=np.uint8)
-        for fold in range(fold_count):
-            role_slices = [
-                self._slice(vectors[f"{role}_indices"], vectors[f"{role}_offsets"], fold)
-                for role in role_names
-            ]
-            for role, role_slice in zip(role_names, role_slices, strict=True):
-                if bool((np.diff(role_slice) <= 0).any()):
-                    raise DataContractError(f"{role} indices must be unique and source ordered")
-            if sum(role_slice.size for role_slice in role_slices) != self.row_count:
-                raise DataContractError("every source row must have exactly one role in every fold")
-            assignment_counts.fill(0)
-            for role_slice in role_slices:
-                assignment_counts[role_slice] += 1
-            if not bool(np.all(assignment_counts == 1)):
-                raise DataContractError("every source row must have exactly one role in every fold")
-
-        paths = vectors["path_fold_by_group"]
-        path_offsets = vectors["path_offsets"]
-        if path_offsets.size < 2 or path_offsets[0] != 0 or path_offsets[-1] != paths.size:
-            raise DataContractError("path offsets must span the complete incidence buffer")
-        if bool((np.diff(path_offsets) != self.group_count).any()):
-            raise DataContractError("every CPCV path must contain exactly one fold per group")
-        if bool((paths < 0).any()) or bool((paths >= fold_count).any()):
-            raise DataContractError("path incidence must point to an existing fold")
-        for name, vector in vectors.items():
-            object.__setattr__(self, name, vector)
-
-    @staticmethod
-    def _slice(indices: Int64Vector, offsets: Int64Vector, position: int) -> Int64Vector:
-        start = int(offsets[position])
-        end = int(offsets[position + 1])
-        return indices[start:end]
-
-    @property
-    def fold_count(self) -> int:
-        return int(self.train_offsets.size - 1)
-
-    @property
-    def path_count(self) -> int:
-        return int(self.path_offsets.size - 1)
-
-    def role(self, fold: int, name: str) -> tuple[int, ...]:
-        """Project one checked role slice into the stable public tuple representation."""
-
-        if not 0 <= fold < self.fold_count:
-            raise IndexError("fold index is out of range")
-        if name not in {"train", "test", "purged", "embargoed"}:
-            raise ValueError("unknown fold role")
-        indices = cast(Int64Vector, getattr(self, f"{name}_indices"))
-        offsets = cast(Int64Vector, getattr(self, f"{name}_offsets"))
-        return cast(tuple[int, ...], tuple(self._slice(indices, offsets, fold).tolist()))
-
-    def path(self, position: int) -> tuple[int, ...]:
-        """Project one checked path-incidence slice into the public tuple representation."""
-
-        if not 0 <= position < self.path_count:
-            raise IndexError("path index is out of range")
-        return cast(
-            tuple[int, ...],
-            tuple(self._slice(self.path_fold_by_group, self.path_offsets, position).tolist()),
-        )
 
 
 __all__: list[str] = []

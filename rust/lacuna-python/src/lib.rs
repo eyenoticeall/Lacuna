@@ -16,18 +16,6 @@ mod _native {
         Bound<'py, PyArray1<u8>>,
         Bound<'py, PyArray1<u8>>,
     );
-    type CpcvOutput<'py> = (
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-        Bound<'py, PyArray1<i64>>,
-    );
 
     fn copy_f64(array: &PyReadonlyArray1<'_, f64>, name: &str) -> PyResult<Vec<f64>> {
         let values = array.as_slice().map_err(|error| {
@@ -87,20 +75,6 @@ mod _native {
             ))
         })?;
         checked_usize(values, name)
-    }
-
-    fn checked_i64(values: Vec<usize>, name: &str) -> PyResult<Vec<i64>> {
-        values
-            .into_iter()
-            .enumerate()
-            .map(|(index, value)| {
-                i64::try_from(value).map_err(|_| {
-                    PyValueError::new_err(format!(
-                        "{name}[{index}] exceeds the maximum representable int64 value"
-                    ))
-                })
-            })
-            .collect()
     }
 
     /// Return the version of the compiled extension.
@@ -217,58 +191,6 @@ mod _native {
             result.logit.into_pyarray(py),
             result.selection_tie.into_pyarray(py),
             result.underperformed_median.into_pyarray(py),
-        ))
-    }
-
-    /// Assemble complete CPCV roles and path incidence into compact CSR buffers.
-    #[pyfunction]
-    // The private binding mirrors one coarse-grained kernel contract.
-    #[allow(clippy::needless_pass_by_value, clippy::too_many_arguments)]
-    fn cpcv_fold_assembly<'py>(
-        py: Python<'py>,
-        row_groups: PyReadonlyArray1<'py, i64>,
-        row_periods: PyReadonlyArray1<'py, i64>,
-        starts: PyReadonlyArray1<'py, i64>,
-        ends: PyReadonlyArray1<'py, i64>,
-        group_end_periods: PyReadonlyArray1<'py, i64>,
-        combination_groups: PyReadonlyArray2<'py, i64>,
-        embargo: usize,
-    ) -> PyResult<CpcvOutput<'py>> {
-        let combination_shape = combination_groups.shape();
-        let groups_per_combination = combination_shape[1];
-        // Snapshot every borrowed array before detaching. The Rust core never
-        // observes a Python-owned buffer while another thread can mutate it.
-        let row_groups = copy_usize(&row_groups, "row_groups")?;
-        let row_periods = copy_usize(&row_periods, "row_periods")?;
-        let starts = copy_i64(&starts, "starts")?;
-        let ends = copy_i64(&ends, "ends")?;
-        let group_end_periods = copy_usize(&group_end_periods, "group_end_periods")?;
-        let combination_groups = copy_usize_matrix(&combination_groups, "combination_groups")?;
-        let result = py
-            .detach(move || {
-                lacuna_core::cpcv_fold_assembly(lacuna_core::CpcvAssemblyInput {
-                    row_groups: &row_groups,
-                    row_periods: &row_periods,
-                    starts: &starts,
-                    ends: &ends,
-                    group_end_periods: &group_end_periods,
-                    combination_groups: &combination_groups,
-                    groups_per_combination,
-                    embargo,
-                })
-            })
-            .map_err(|error| PyValueError::new_err(error.to_string()))?;
-        Ok((
-            checked_i64(result.train_indices, "train_indices")?.into_pyarray(py),
-            checked_i64(result.train_offsets, "train_offsets")?.into_pyarray(py),
-            checked_i64(result.test_indices, "test_indices")?.into_pyarray(py),
-            checked_i64(result.test_offsets, "test_offsets")?.into_pyarray(py),
-            checked_i64(result.purged_indices, "purged_indices")?.into_pyarray(py),
-            checked_i64(result.purged_offsets, "purged_offsets")?.into_pyarray(py),
-            checked_i64(result.embargoed_indices, "embargoed_indices")?.into_pyarray(py),
-            checked_i64(result.embargoed_offsets, "embargoed_offsets")?.into_pyarray(py),
-            checked_i64(result.path_fold_by_group, "path_fold_by_group")?.into_pyarray(py),
-            checked_i64(result.path_offsets, "path_offsets")?.into_pyarray(py),
         ))
     }
 

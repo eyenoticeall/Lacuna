@@ -5,8 +5,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from lacuna import cv as cv_module
-from lacuna.cv import CombinatorialPurgedKFold, PurgedKFold
+from lacuna.cv import PurgedKFold
 from lacuna.signal import ic
 from lacuna.validation import bootstrap
 
@@ -115,44 +114,3 @@ def test_native_and_reference_interval_purge_match_random_panels(
     native = PurgedKFold(n_splits=splits, embargo=embargo, use_native=True).split(frame)
     reference = PurgedKFold(n_splits=splits, embargo=embargo, use_native=False).split(frame)
     assert native.folds == reference.folds
-
-
-@settings(max_examples=30, deadline=None)
-@given(
-    st.lists(st.integers(min_value=1, max_value=8), min_size=6, max_size=24),
-    st.integers(min_value=3, max_value=6),
-    st.integers(min_value=1, max_value=2),
-    st.integers(min_value=0, max_value=3),
-)
-def test_complete_native_cpcv_matches_reference_for_random_unsorted_panels(
-    lengths: list[int], requested_groups: int, requested_test_groups: int, embargo: int
-) -> None:
-    periods = list(range(len(lengths)))
-    source_order = periods[::2] + periods[1::2]
-    frame = pl.DataFrame(
-        {
-            "observation_time": source_order,
-            "label_start": source_order,
-            "label_end": [period + lengths[period] for period in source_order],
-        }
-    )
-    n_groups = min(requested_groups, len(periods))
-    n_test_groups = min(requested_test_groups, n_groups - 1)
-    splitter = {
-        "n_groups": n_groups,
-        "n_test_groups": n_test_groups,
-        "embargo": embargo,
-    }
-    reference = CombinatorialPurgedKFold(**splitter, use_native=False).split(frame)
-    prior_threshold = cv_module._CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD
-    cv_module._CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD = 0
-    try:
-        native = CombinatorialPurgedKFold(**splitter, use_native=True).split(frame)
-    finally:
-        cv_module._CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD = prior_threshold
-
-    assert native.folds == reference.folds
-    assert native.paths == reference.paths
-    assert native.evidence.metrics == reference.evidence.metrics
-    for name in ("groups", "combinations", "folds", "paths"):
-        assert native.evidence.table(name) == reference.evidence.table(name)

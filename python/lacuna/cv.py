@@ -16,16 +16,14 @@ import numpy as np
 import numpy.typing as npt
 import polars as pl
 
-from lacuna._carriers import CompactFoldBuffer
 from lacuna._frames import eager_frame, series_time_i64
-from lacuna._native_arrays import readonly_int64, readonly_int64_matrix
+from lacuna._native_arrays import readonly_int64
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
 
 Duration: TypeAlias = str | int
 TimeValue: TypeAlias = int | date | datetime
 _DURATION_PATTERN = re.compile(r"^(?P<count>[1-9][0-9]*)(?P<unit>D|W|M|Y)$", re.IGNORECASE)
-_CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD = 100_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -451,80 +449,6 @@ def _purge_mask(
     )
 
 
-def _native_cpcv_assembly(
-    *,
-    row_groups: npt.NDArray[np.int64],
-    row_periods: npt.NDArray[np.int64],
-    starts: npt.NDArray[np.int64],
-    ends: npt.NDArray[np.int64],
-    group_end_periods: npt.NDArray[np.int64],
-    combination_groups: npt.NDArray[np.int64],
-    embargo: int,
-    group_count: int,
-) -> CompactFoldBuffer | None:
-    """Call the optional coarse-grained native assembler with checked typed buffers."""
-
-    try:
-        from lacuna import _native
-
-        native_assembly = _native.cpcv_fold_assembly
-    except (ImportError, AttributeError):
-        return None
-    normalized = (
-        readonly_int64(row_groups, name="row_groups").values,
-        readonly_int64(row_periods, name="row_periods").values,
-        readonly_int64(starts, name="starts").values,
-        readonly_int64(ends, name="ends").values,
-        readonly_int64(group_end_periods, name="group_end_periods").values,
-        readonly_int64_matrix(combination_groups, name="combination_groups").values,
-    )
-    try:
-        output = native_assembly(*normalized, embargo)
-    except ValueError as error:
-        raise DataContractError(f"native CPCV assembly failed validation: {error}") from error
-    return CompactFoldBuffer(
-        row_count=int(row_groups.size),
-        group_count=group_count,
-        train_indices=output[0],
-        train_offsets=output[1],
-        test_indices=output[2],
-        test_offsets=output[3],
-        purged_indices=output[4],
-        purged_offsets=output[5],
-        embargoed_indices=output[6],
-        embargoed_offsets=output[7],
-        path_fold_by_group=output[8],
-        path_offsets=output[9],
-    )
-
-
-def _project_native_cpcv(
-    buffer: CompactFoldBuffer,
-    *,
-    group_rows: Sequence[Sequence[int]],
-) -> tuple[list[Fold], tuple[CPCVPath, ...]]:
-    folds = [
-        Fold(
-            fold=fold,
-            train_indices=buffer.role(fold, "train"),
-            test_indices=buffer.role(fold, "test"),
-            purged_indices=buffer.role(fold, "purged"),
-            embargoed_indices=buffer.role(fold, "embargoed"),
-        )
-        for fold in range(buffer.fold_count)
-    ]
-    path_test_indices = tuple(index for rows in group_rows for index in rows)
-    paths = tuple(
-        CPCVPath(
-            path=path,
-            fold_by_group=buffer.path(path),
-            test_indices=path_test_indices,
-        )
-        for path in range(buffer.path_count)
-    )
-    return folds, paths
-
-
 @dataclass(frozen=True, slots=True)
 class PurgedKFold:
     """Chronological K-fold splitter with interval purging and optional embargo."""
@@ -743,117 +667,86 @@ class CombinatorialPurgedKFold:
         test_combinations = tuple(combinations(range(self.n_groups), self.n_test_groups))
         start_array: npt.NDArray[np.int64] = np.asarray(starts, dtype=np.int64)
         end_array: npt.NDArray[np.int64] = np.asarray(ends, dtype=np.int64)
-        combination_array: npt.NDArray[np.int64] = np.asarray(
-            test_combinations,
-            dtype=np.int64,
-        )
-        group_end_periods: npt.NDArray[np.int64] = np.fromiter(
-            (
-                max(period_positions[value] for value in group_times)
-                for group_times in period_groups
-            ),
-            dtype=np.int64,
-            count=self.n_groups,
-        )
-        role_evaluations = len(source_times) * len(test_combinations)
-        native_buffer = (
-            _native_cpcv_assembly(
-                row_groups=row_groups,
-                row_periods=row_period_positions,
-                starts=start_array,
-                ends=end_array,
-                group_end_periods=group_end_periods,
-                combination_groups=combination_array,
-                embargo=self.embargo,
-                group_count=self.n_groups,
+        folds: list[Fold] = []
+        backends: set[str] = set()
+
+        for fold_number, test_groups in enumerate(test_combinations):
+            test_group_array: npt.NDArray[np.int64] = np.fromiter(
+                test_groups,
+                dtype=np.int64,
             )
-            if self.use_native and role_evaluations >= _CPCV_NATIVE_ROLE_EVALUATION_THRESHOLD
-            else None
-        )
-        backends: set[str]
-        if native_buffer is not None:
-            folds, paths = _project_native_cpcv(native_buffer, group_rows=group_rows)
-            backends = {"rust_native"}
-        else:
-            folds = []
-            backends = set()
-            for fold_number, test_groups in enumerate(test_combinations):
-                test_group_array: npt.NDArray[np.int64] = np.fromiter(
-                    test_groups,
+            test_row_mask: npt.NDArray[np.bool_] = np.isin(row_groups, test_group_array)
+            test_index_array: npt.NDArray[np.intp] = np.flatnonzero(test_row_mask)
+            candidate_index_array: npt.NDArray[np.intp] = np.flatnonzero(~test_row_mask)
+            test_indices = test_index_array.tolist()
+            mask, backend = _purge_mask(
+                start_array[candidate_index_array],
+                end_array[candidate_index_array],
+                start_array[test_index_array],
+                end_array[test_index_array],
+                use_native=self.use_native,
+            )
+            backends.add(backend)
+            overlap_mask: npt.NDArray[np.bool_] = np.asarray(mask, dtype=np.bool_)
+            purged = candidate_index_array[overlap_mask].tolist()
+            retained_array = candidate_index_array[~overlap_mask]
+
+            embargo_positions: set[int] = set()
+            if self.embargo:
+                for group in test_groups:
+                    final_period = max(period_positions[value] for value in period_groups[group])
+                    embargo_positions.update(
+                        range(
+                            final_period + 1,
+                            min(final_period + 1 + self.embargo, len(unique_times)),
+                        )
+                    )
+            if embargo_positions:
+                embargo_position_array: npt.NDArray[np.int64] = np.fromiter(
+                    sorted(embargo_positions),
                     dtype=np.int64,
                 )
-                test_row_mask: npt.NDArray[np.bool_] = np.isin(row_groups, test_group_array)
-                test_index_array: npt.NDArray[np.intp] = np.flatnonzero(test_row_mask)
-                candidate_index_array: npt.NDArray[np.intp] = np.flatnonzero(~test_row_mask)
-                test_indices = test_index_array.tolist()
-                mask, backend = _purge_mask(
-                    start_array[candidate_index_array],
-                    end_array[candidate_index_array],
-                    start_array[test_index_array],
-                    end_array[test_index_array],
-                    use_native=self.use_native,
+                embargo_mask: npt.NDArray[np.bool_] = np.isin(
+                    row_period_positions[retained_array],
+                    embargo_position_array,
                 )
-                backends.add(backend)
-                overlap_mask: npt.NDArray[np.bool_] = np.asarray(mask, dtype=np.bool_)
-                purged = candidate_index_array[overlap_mask].tolist()
-                retained_array = candidate_index_array[~overlap_mask]
-
-                embargo_positions: set[int] = set()
-                if self.embargo:
-                    for group in test_groups:
-                        final_period = int(group_end_periods[group])
-                        embargo_positions.update(
-                            range(
-                                final_period + 1,
-                                min(final_period + 1 + self.embargo, len(unique_times)),
-                            )
-                        )
-                if embargo_positions:
-                    embargo_position_array: npt.NDArray[np.int64] = np.fromiter(
-                        sorted(embargo_positions),
-                        dtype=np.int64,
-                    )
-                    embargo_mask: npt.NDArray[np.bool_] = np.isin(
-                        row_period_positions[retained_array],
-                        embargo_position_array,
-                    )
-                    embargoed = retained_array[embargo_mask].tolist()
-                    retained = retained_array[~embargo_mask].tolist()
-                else:
-                    embargoed = []
-                    retained = retained_array.tolist()
-                folds.append(
-                    Fold(
-                        fold=fold_number,
-                        train_indices=tuple(retained),
-                        test_indices=tuple(test_indices),
-                        purged_indices=tuple(purged),
-                        embargoed_indices=tuple(embargoed),
-                    )
+                embargoed = retained_array[embargo_mask].tolist()
+                retained = retained_array[~embargo_mask].tolist()
+            else:
+                embargoed = []
+                retained = retained_array.tolist()
+            folds.append(
+                Fold(
+                    fold=fold_number,
+                    train_indices=tuple(retained),
+                    test_indices=tuple(test_indices),
+                    purged_indices=tuple(purged),
+                    embargoed_indices=tuple(embargoed),
                 )
-
-            n_paths = comb(self.n_groups - 1, self.n_test_groups - 1)
-            fold_by_path = [[-1] * self.n_groups for _ in range(n_paths)]
-            for group in range(self.n_groups):
-                group_folds = [
-                    fold_number
-                    for fold_number, test_groups in enumerate(test_combinations)
-                    if group in test_groups
-                ]
-                if len(group_folds) != n_paths:  # pragma: no cover - combinatorial invariant
-                    raise RuntimeError("invalid CPCV group incidence count")
-                for path_index, fold_number in enumerate(group_folds):
-                    fold_by_path[path_index][group] = fold_number
-
-            path_test_indices = tuple(index for rows in group_rows for index in rows)
-            paths = tuple(
-                CPCVPath(
-                    path=path_index,
-                    fold_by_group=tuple(fold_numbers),
-                    test_indices=path_test_indices,
-                )
-                for path_index, fold_numbers in enumerate(fold_by_path)
             )
+
+        n_paths = comb(self.n_groups - 1, self.n_test_groups - 1)
+        fold_by_path = [[-1] * self.n_groups for _ in range(n_paths)]
+        for group in range(self.n_groups):
+            group_folds = [
+                fold_number
+                for fold_number, test_groups in enumerate(test_combinations)
+                if group in test_groups
+            ]
+            if len(group_folds) != n_paths:  # pragma: no cover - combinatorial invariant
+                raise RuntimeError("invalid CPCV group incidence count")
+            for path_index, fold_number in enumerate(group_folds):
+                fold_by_path[path_index][group] = fold_number
+
+        path_test_indices = tuple(index for rows in group_rows for index in rows)
+        paths = tuple(
+            CPCVPath(
+                path=path_index,
+                fold_by_group=tuple(fold_numbers),
+                test_indices=path_test_indices,
+            )
+            for path_index, fold_numbers in enumerate(fold_by_path)
+        )
         path_rows: list[dict[str, JsonValue]] = []
         for cpcv_path in paths:
             for group, fold_number in enumerate(cpcv_path.fold_by_group):

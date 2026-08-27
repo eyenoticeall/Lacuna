@@ -26,12 +26,6 @@ pub enum NumericError {
     InvalidDimensions,
     /// A PBO partition combination is not sorted, unique, or in range.
     InvalidCombination { index: usize },
-    /// CPCV buffers, dimensions, or group boundaries are inconsistent.
-    InvalidCpcvDimensions,
-    /// A CPCV row has an invalid chronological group or period code.
-    InvalidCpcvGroup { index: usize },
-    /// A CPCV held-out combination is not sorted, unique, or in range.
-    InvalidCpcvCombination { index: usize },
     /// A built-in statistic is undefined for at least one strategy.
     UndefinedStatistic,
     /// Finite inputs produced a non-finite intermediate result.
@@ -64,17 +58,6 @@ impl Display for NumericError {
             Self::InvalidCombination { index } => write!(
                 formatter,
                 "partition combination {index} must contain sorted, unique, in-range group codes",
-            ),
-            Self::InvalidCpcvDimensions => formatter.write_str(
-                "CPCV dimensions and group boundaries must describe a non-empty valid split",
-            ),
-            Self::InvalidCpcvGroup { index } => write!(
-                formatter,
-                "CPCV row {index} must contain in-range chronological group and period codes",
-            ),
-            Self::InvalidCpcvCombination { index } => write!(
-                formatter,
-                "CPCV combination {index} must contain sorted, unique, in-range group codes",
             ),
             Self::UndefinedStatistic => formatter.write_str(
                 "PBO Sharpe statistic is undefined for a constant strategy",
@@ -123,52 +106,6 @@ pub struct PboSplitBuffer {
     pub selection_tie: Vec<u8>,
     /// One when the selected strategy's out-of-sample logit is non-positive.
     pub underperformed_median: Vec<u8>,
-}
-
-/// CSR-style role indices and compact CPCV path incidence.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CompactFoldBuffer {
-    /// Concatenated source-order training indices.
-    pub train_indices: Vec<usize>,
-    /// Offsets delimiting one training slice per fold.
-    pub train_offsets: Vec<usize>,
-    /// Concatenated source-order test indices.
-    pub test_indices: Vec<usize>,
-    /// Offsets delimiting one test slice per fold.
-    pub test_offsets: Vec<usize>,
-    /// Concatenated source-order purged indices.
-    pub purged_indices: Vec<usize>,
-    /// Offsets delimiting one purge slice per fold.
-    pub purged_offsets: Vec<usize>,
-    /// Concatenated source-order embargoed indices.
-    pub embargoed_indices: Vec<usize>,
-    /// Offsets delimiting one embargo slice per fold.
-    pub embargoed_offsets: Vec<usize>,
-    /// Path-major fold numbers, one for each chronological group.
-    pub path_fold_by_group: Vec<usize>,
-    /// Offsets delimiting one group-incidence slice per path.
-    pub path_offsets: Vec<usize>,
-}
-
-/// Borrowed, validated-at-use buffers for complete CPCV assembly.
-#[derive(Debug, Clone, Copy)]
-pub struct CpcvAssemblyInput<'a> {
-    /// Chronological group code for each source row.
-    pub row_groups: &'a [usize],
-    /// Chronological observation-period code for each source row.
-    pub row_periods: &'a [usize],
-    /// Half-open label interval starts.
-    pub starts: &'a [i64],
-    /// Half-open label interval ends.
-    pub ends: &'a [i64],
-    /// Final chronological period code in each group.
-    pub group_end_periods: &'a [usize],
-    /// Flattened, sorted held-out group combinations.
-    pub combination_groups: &'a [usize],
-    /// Held-out groups in every combination.
-    pub groups_per_combination: usize,
-    /// Observation-period embargo after every held-out group.
-    pub embargo: usize,
 }
 
 /// Compute a checked arithmetic mean using Neumaier compensated summation.
@@ -607,212 +544,6 @@ pub fn pbo_partition_splits(
     })
 }
 
-fn merged_selected_intervals(starts: &[i64], ends: &[i64], selected: &[usize]) -> Vec<(i64, i64)> {
-    let mut intervals: Vec<(i64, i64)> = selected
-        .iter()
-        .map(|index| (starts[*index], ends[*index]))
-        .collect();
-    intervals.sort_unstable();
-    let mut merged: Vec<(i64, i64)> = Vec::with_capacity(intervals.len());
-    for (start, end) in intervals {
-        if let Some(last) = merged.last_mut() {
-            if start <= last.1 {
-                last.1 = last.1.max(end);
-                continue;
-            }
-        }
-        merged.push((start, end));
-    }
-    merged
-}
-
-fn interval_overlaps(merged: &[(i64, i64)], start: i64, end: i64) -> bool {
-    let candidate = merged.partition_point(|(_, test_end)| *test_end <= start);
-    candidate < merged.len() && merged[candidate].0 < end
-}
-
-fn validate_cpcv_input(input: &CpcvAssemblyInput<'_>) -> Result<(usize, usize), NumericError> {
-    let row_count = input.row_groups.len();
-    let group_count = input.group_end_periods.len();
-    if row_count == 0
-        || input.row_periods.len() != row_count
-        || input.starts.len() != row_count
-        || input.ends.len() != row_count
-        || group_count < 2
-        || input.groups_per_combination == 0
-        || input.groups_per_combination >= group_count
-        || input.combination_groups.is_empty()
-        || input.combination_groups.len() % input.groups_per_combination != 0
-        || input
-            .group_end_periods
-            .windows(2)
-            .any(|window| window[0] >= window[1])
-    {
-        return Err(NumericError::InvalidCpcvDimensions);
-    }
-    for (index, (start, end)) in input.starts.iter().zip(input.ends).enumerate() {
-        if end <= start {
-            return Err(NumericError::InvalidInterval { index });
-        }
-    }
-    for index in 0..row_count {
-        let group = input.row_groups[index];
-        if group >= group_count {
-            return Err(NumericError::InvalidCpcvGroup { index });
-        }
-        let lower = if group == 0 {
-            0
-        } else {
-            input.group_end_periods[group - 1].saturating_add(1)
-        };
-        if input.row_periods[index] < lower
-            || input.row_periods[index] > input.group_end_periods[group]
-        {
-            return Err(NumericError::InvalidCpcvGroup { index });
-        }
-    }
-    for (combination, groups) in input
-        .combination_groups
-        .chunks_exact(input.groups_per_combination)
-        .enumerate()
-    {
-        if groups.iter().any(|group| *group >= group_count)
-            || groups.windows(2).any(|window| window[0] >= window[1])
-        {
-            return Err(NumericError::InvalidCpcvCombination { index: combination });
-        }
-    }
-    Ok((row_count, group_count))
-}
-
-fn cpcv_path_incidence(
-    group_count: usize,
-    combination_groups: &[usize],
-    groups_per_combination: usize,
-) -> Result<(Vec<usize>, Vec<usize>), NumericError> {
-    let mut group_folds = vec![Vec::new(); group_count];
-    for (fold, groups) in combination_groups
-        .chunks_exact(groups_per_combination)
-        .enumerate()
-    {
-        for group in groups {
-            group_folds[*group].push(fold);
-        }
-    }
-    let path_count = group_folds[0].len();
-    if path_count == 0 || group_folds.iter().any(|folds| folds.len() != path_count) {
-        return Err(NumericError::InvalidCpcvDimensions);
-    }
-    let mut path_fold_by_group = Vec::with_capacity(path_count * group_count);
-    let mut path_offsets = Vec::with_capacity(path_count + 1);
-    path_offsets.push(0);
-    for path in 0..path_count {
-        for folds in &group_folds {
-            path_fold_by_group.push(folds[path]);
-        }
-        path_offsets.push(path_fold_by_group.len());
-    }
-    Ok((path_fold_by_group, path_offsets))
-}
-
-/// Assemble complete CPCV train/test/purge/embargo index sets and path incidence.
-///
-/// Row groups and period codes are zero-based chronological codes resolved by
-/// the caller. `combination_groups` contains flattened, sorted held-out group
-/// codes. All role indices preserve original source-row order.
-///
-/// # Errors
-///
-/// Returns checked errors for misaligned buffers, invalid intervals, group or
-/// period codes, malformed combinations, or inconsistent group boundaries.
-pub fn cpcv_fold_assembly(input: CpcvAssemblyInput<'_>) -> Result<CompactFoldBuffer, NumericError> {
-    let (row_count, group_count) = validate_cpcv_input(&input)?;
-    let fold_count = input.combination_groups.len() / input.groups_per_combination;
-    let mut train_indices = Vec::new();
-    let mut test_indices = Vec::new();
-    let mut purged_indices = Vec::new();
-    let mut embargoed_indices = Vec::new();
-    let mut train_offsets = Vec::with_capacity(fold_count + 1);
-    let mut test_offsets = Vec::with_capacity(fold_count + 1);
-    let mut purged_offsets = Vec::with_capacity(fold_count + 1);
-    let mut embargoed_offsets = Vec::with_capacity(fold_count + 1);
-    train_offsets.push(0);
-    test_offsets.push(0);
-    purged_offsets.push(0);
-    embargoed_offsets.push(0);
-    let mut held_group = vec![0_u8; group_count];
-    let mut selected_test_indices = Vec::new();
-
-    for groups in input
-        .combination_groups
-        .chunks_exact(input.groups_per_combination)
-    {
-        held_group.fill(0);
-        for group in groups {
-            held_group[*group] = 1;
-        }
-        selected_test_indices.clear();
-        selected_test_indices.extend(
-            input
-                .row_groups
-                .iter()
-                .enumerate()
-                .filter_map(|(index, group)| (held_group[*group] == 1).then_some(index)),
-        );
-        let merged = merged_selected_intervals(input.starts, input.ends, &selected_test_indices);
-        let fold_test_start = test_indices.len();
-        for index in 0..row_count {
-            let group = input.row_groups[index];
-            if held_group[group] == 1 {
-                test_indices.push(index);
-                continue;
-            }
-            if interval_overlaps(&merged, input.starts[index], input.ends[index]) {
-                purged_indices.push(index);
-                continue;
-            }
-            let period = input.row_periods[index];
-            let embargoed = input.embargo > 0
-                && groups.iter().any(|group| {
-                    let final_period = input.group_end_periods[*group];
-                    period > final_period && period <= final_period.saturating_add(input.embargo)
-                });
-            if embargoed {
-                embargoed_indices.push(index);
-            } else {
-                train_indices.push(index);
-            }
-        }
-        debug_assert_eq!(
-            test_indices.len() - fold_test_start,
-            selected_test_indices.len()
-        );
-        train_offsets.push(train_indices.len());
-        test_offsets.push(test_indices.len());
-        purged_offsets.push(purged_indices.len());
-        embargoed_offsets.push(embargoed_indices.len());
-    }
-
-    let (path_fold_by_group, path_offsets) = cpcv_path_incidence(
-        group_count,
-        input.combination_groups,
-        input.groups_per_combination,
-    )?;
-
-    Ok(CompactFoldBuffer {
-        train_indices,
-        train_offsets,
-        test_indices,
-        test_offsets,
-        purged_indices,
-        purged_offsets,
-        embargoed_indices,
-        embargoed_offsets,
-        path_fold_by_group,
-        path_offsets,
-    })
-}
-
 /// Mark each training interval that overlaps at least one test interval.
 ///
 /// Intervals are half-open: `[start, end)`. Touching boundaries do not overlap.
@@ -870,9 +601,8 @@ pub fn interval_purge(
 #[cfg(test)]
 mod tests {
     use super::{
-        CpcvAssemblyInput, NumericError, PboStatistic, bootstrap_means, checked_mean,
-        cpcv_fold_assembly, grouped_rank_ic, grouped_rank_ic_buffer, interval_purge,
-        pbo_partition_splits,
+        NumericError, PboStatistic, bootstrap_means, checked_mean, grouped_rank_ic,
+        grouped_rank_ic_buffer, interval_purge, pbo_partition_splits,
     };
 
     #[test]
@@ -1089,84 +819,6 @@ mod tests {
                 PboStatistic::Sharpe,
             ),
             Err(NumericError::UndefinedStatistic)
-        );
-    }
-
-    #[test]
-    fn cpcv_fold_assembly_preserves_roles_and_path_incidence() {
-        let combinations = [0, 1, 0, 2, 0, 3, 1, 2, 1, 3, 2, 3];
-        let result = cpcv_fold_assembly(CpcvAssemblyInput {
-            row_groups: &[0, 0, 1, 1, 2, 2, 3, 3],
-            row_periods: &[0, 1, 2, 3, 4, 5, 6, 7],
-            starts: &[0, 1, 2, 3, 4, 5, 6, 7],
-            ends: &[1, 2, 3, 4, 5, 6, 7, 8],
-            group_end_periods: &[1, 3, 5, 7],
-            combination_groups: &combinations,
-            groups_per_combination: 2,
-            embargo: 1,
-        })
-        .expect("valid CPCV input");
-
-        assert_eq!(
-            &result.test_indices[result.test_offsets[0]..result.test_offsets[1]],
-            &[0, 1, 2, 3]
-        );
-        assert_eq!(
-            &result.train_indices[result.train_offsets[0]..result.train_offsets[1]],
-            &[5, 6, 7]
-        );
-        assert_eq!(
-            &result.purged_indices[result.purged_offsets[0]..result.purged_offsets[1]],
-            &[]
-        );
-        assert_eq!(
-            &result.embargoed_indices[result.embargoed_offsets[0]..result.embargoed_offsets[1]],
-            &[4]
-        );
-        assert_eq!(
-            result.path_fold_by_group,
-            vec![0, 0, 1, 2, 1, 3, 3, 4, 2, 4, 5, 5]
-        );
-        assert_eq!(result.path_offsets, vec![0, 4, 8, 12]);
-    }
-
-    #[test]
-    fn cpcv_fold_assembly_purges_half_open_overlaps() {
-        let result = cpcv_fold_assembly(CpcvAssemblyInput {
-            row_groups: &[0, 0, 1, 1, 2, 2, 3, 3],
-            row_periods: &[0, 1, 2, 3, 4, 5, 6, 7],
-            starts: &[0, 1, 2, 3, 4, 5, 6, 7],
-            ends: &[2, 3, 4, 5, 6, 7, 8, 9],
-            group_end_periods: &[1, 3, 5, 7],
-            combination_groups: &[0, 1, 0, 2, 0, 3, 1, 2, 1, 3, 2, 3],
-            groups_per_combination: 2,
-            embargo: 0,
-        })
-        .expect("valid overlapping CPCV input");
-        assert_eq!(
-            &result.purged_indices[result.purged_offsets[0]..result.purged_offsets[1]],
-            &[4]
-        );
-        assert_eq!(
-            &result.train_indices[result.train_offsets[0]..result.train_offsets[1]],
-            &[5, 6, 7]
-        );
-    }
-
-    #[test]
-    fn cpcv_fold_assembly_rejects_invalid_group_codes() {
-        assert_eq!(
-            cpcv_fold_assembly(CpcvAssemblyInput {
-                row_groups: &[0, 2],
-                row_periods: &[0, 1],
-                starts: &[0, 1],
-                ends: &[1, 2],
-                group_end_periods: &[0, 1],
-                combination_groups: &[0],
-                groups_per_combination: 1,
-                embargo: 0,
-            }),
-            Err(NumericError::InvalidCpcvGroup { index: 1 })
         );
     }
 
