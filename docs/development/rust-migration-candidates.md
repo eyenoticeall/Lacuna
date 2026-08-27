@@ -261,7 +261,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | one-plan Polars reference |
 | R-10 | Membership portion of turnover | KEEP_PYTHON | P1 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | endpoint self-joins |
 | R-11 | Prior-only expanding/rolling regime quantiles | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | exact Polars order statistics |
-| R-12 | Event-window alignment/path extraction | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | range/as-of reference |
+| R-12 | Event-window alignment/path extraction | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars range/as-of plan |
 | R-13 | Event-response cluster resampling | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
 | R-14 | Diagnostic portfolio allocation core | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | columnar allocator reference |
 | R-15 | Universe membership transitions | POLARS_FIRST | P2 | Medium | High | Medium | PROPOSED | encoded-ID self-join reference |
@@ -500,19 +500,22 @@ result carrier or representative workload makes threshold calculation material a
 
 ### R-12: event-window alignment and extraction
 
-This is **POLARS_FIRST** because as-of alignment and range extraction are general temporal
-operations. Build an equivalent sorted Polars plan using instrument keys and next-observation
-semantics, then measure it against the current event loop.
-
-If a residual quant-specific path remains material, a native kernel may consume sorted price
-buffers, instrument/price offsets, event anchor buffers, price validity, and before/after widths.
-It would return event-to-anchor row indices, path row indices, offsets, and censor/status codes.
+Event alignment now assigns per-instrument observation indices, forward-as-of joins each explicit
+anchor to the first finite price, expands integer offsets, and joins paths and coverage in Polars.
 Python retains anchor policy, availability/lookahead findings, corporate-action declaration,
 overlap policy and clustering, attrition, and the `EventWindowResult`.
 
-Test missing instruments, null anchor prices, duplicate-key rejection, left/right censoring,
-irregular calendars, same-time events, high event concentration in one instrument, and exact
-next-observation behavior.
+At 100,000 price rows, 5,000 events, and 80,000 requested path rows, the exact public checksum was
+preserved while median latency fell from 182.93 ms to 61.94 ms (2.95 times faster). Incremental RSS
+fell by 85.1% and traced Python peak memory fell by 84.8%. In an instrumented optimized call, the
+residual as-of/path joins and coverage aggregation together were under 10% of public-call time;
+validation, deterministic projection, evidence freezing, and other retained work dominate. R-12 is
+`OPTIMIZED_NON_NATIVE`. Reopen only with a representative profile isolating a material residual
+alignment/extraction kernel.
+
+Differential coverage includes missing instruments, null and exhausted anchors, left/right
+censoring, missing path prices, irregular calendars, input permutation and chunking, duplicate-key
+rejection, same-time events, and exact next-observation behavior.
 
 ### R-13: event-response resampling
 
