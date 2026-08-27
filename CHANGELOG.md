@@ -10,6 +10,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 - Publish future core distributions under the unambiguous PyPI name `lacuna-quant` while
   preserving the `lacuna` import package and `lacuna` command.
+- Split OIDC publication across protected `pypi` and `pypi-options` GitHub environments so each
+  PyPI project has a unique trusted-publisher identity without storing registry credentials.
 - Add an installation diagnostic that fails clearly when the conflicting `lacuna` distribution is
   installed beside `lacuna-quant`, preserving diagnostic schema and method version 1.
 - License the repository and all future core and extension distributions under MIT only. Releases

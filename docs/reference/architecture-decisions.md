@@ -324,7 +324,9 @@ Python package would create broad migration cost without improving analytical cl
 **Decision:** publish core as the distribution `lacuna-quant` while preserving the Python import
 package and CLI as `lacuna`. Publish the optional extension as `lacuna-options`; from extension
 `0.2.0`, its dependency is `lacuna-quant>=0.13,<0.14`. Registry publication uses PyPI Trusted
-Publishing from the tag-only `release.yml` workflow and `pypi` GitHub environment.
+Publishing from the tag-only `release.yml` workflow and protected GitHub environments. Core uses
+`pypi`; the extension uses `pypi-options` because PyPI requires distinct pending-publisher identity
+tuples for separate project names.
 
 **Consequences:**
 

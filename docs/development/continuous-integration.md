@@ -153,6 +153,6 @@ builds and jointly smoke-tests the independently versioned universal options dis
 both source distributions and every packaged resource as one set, generates checksums and provenance,
 and creates a GitHub prerelease for SemVer candidate tags or a normal release for stable tags. It
 then publishes only the verified `lacuna-quant` and `lacuna-options` subsets through sequential,
-OIDC-only jobs in the `pypi` environment and requires a clean exact-version installation from the
-registry. See [Release engineering](release.md) for the publisher identity, permission, retry, tag,
-and artifact contracts.
+OIDC-only jobs in the protected `pypi` and `pypi-options` environments, respectively, and requires
+a clean exact-version installation from the registry. See [Release engineering](release.md) for the
+publisher identity, permission, retry, tag, and artifact contracts.

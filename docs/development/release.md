@@ -146,8 +146,11 @@ extension publishes independently as `lacuna-options` and depends on
 `lacuna-quant>=0.13,<0.14` from its `0.2.0` release onward.
 
 Registry publication uses PyPI Trusted Publishing only—no long-lived API token is stored. Both
-PyPI projects authorize repository `eyenoticeall/Lacuna`, workflow `release.yml`, and GitHub
-environment `pypi`. Publication begins only after the complete release set passes archive
+PyPI projects authorize repository `eyenoticeall/Lacuna` and workflow `release.yml`. The core
+publisher is bound to the protected GitHub environment `pypi`; the independently named extension
+publisher is bound to `pypi-options`. PyPI requires distinct pending-publisher identity tuples for
+different project names, so the environment split is part of the trust contract rather than a
+release-method difference. Publication begins only after the complete release set passes archive
 verification and is attached to GitHub:
 
 1. isolate and publish the five verified `lacuna-quant` distributions;
