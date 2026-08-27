@@ -22,6 +22,14 @@ pub enum NumericError {
     IndexOutOfBounds { index: usize },
     /// An interval has its end before its start.
     InvalidInterval { index: usize },
+    /// Matrix dimensions, partitions, or statistic configuration are invalid.
+    InvalidDimensions,
+    /// A PBO partition combination is not sorted, unique, or in range.
+    InvalidCombination { index: usize },
+    /// A built-in statistic is undefined for at least one strategy.
+    UndefinedStatistic,
+    /// Finite inputs produced a non-finite intermediate result.
+    NonFiniteComputation,
 }
 
 impl Display for NumericError {
@@ -44,6 +52,19 @@ impl Display for NumericError {
             Self::InvalidInterval { index } => {
                 write!(formatter, "interval {index} must end after it starts")
             }
+            Self::InvalidDimensions => formatter.write_str(
+                "matrix dimensions and partition configuration must describe a non-empty, evenly partitioned matrix",
+            ),
+            Self::InvalidCombination { index } => write!(
+                formatter,
+                "partition combination {index} must contain sorted, unique, in-range group codes",
+            ),
+            Self::UndefinedStatistic => formatter.write_str(
+                "PBO Sharpe statistic is undefined for a constant strategy",
+            ),
+            Self::NonFiniteComputation => {
+                formatter.write_str("finite inputs produced a non-finite statistic")
+            }
         }
     }
 }
@@ -57,6 +78,34 @@ pub struct NullableF64Buffer {
     pub values: Vec<f64>,
     /// One marks a defined value and zero marks an undefined value.
     pub validity: Vec<u8>,
+}
+
+/// Built-in performance statistic supported by the compact PBO kernel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PboStatistic {
+    /// Arithmetic mean performance.
+    Mean,
+    /// Arithmetic mean divided by sample standard deviation.
+    Sharpe,
+}
+
+/// Compact per-combination output from the PBO split reducer.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PboSplitBuffer {
+    /// Selected in-sample strategy index for each combination.
+    pub selected_strategy: Vec<usize>,
+    /// Selected strategy's in-sample performance.
+    pub in_sample_performance: Vec<f64>,
+    /// Selected strategy's out-of-sample performance.
+    pub out_of_sample_performance: Vec<f64>,
+    /// Average out-of-sample rank of the selected strategy.
+    pub out_of_sample_rank: Vec<f64>,
+    /// Logit of the selected strategy's relative rank.
+    pub logit: Vec<f64>,
+    /// One when multiple strategies shared the maximum in-sample performance.
+    pub selection_tie: Vec<u8>,
+    /// One when the selected strategy's out-of-sample logit is non-positive.
+    pub underperformed_median: Vec<u8>,
 }
 
 /// Compute a checked arithmetic mean using Neumaier compensated summation.
@@ -272,6 +321,229 @@ pub fn bootstrap_means(
         .collect()
 }
 
+#[derive(Debug, Clone, Copy)]
+struct Moments {
+    count: usize,
+    mean: f64,
+    m2: f64,
+}
+
+impl Moments {
+    fn empty() -> Self {
+        Self {
+            count: 0,
+            mean: 0.0,
+            m2: 0.0,
+        }
+    }
+
+    fn update(&mut self, value: f64) {
+        self.count += 1;
+        #[allow(clippy::cast_precision_loss)]
+        let count = self.count as f64;
+        let delta = value - self.mean;
+        self.mean += delta / count;
+        self.m2 += delta * (value - self.mean);
+    }
+
+    fn combine(&mut self, other: Self) {
+        if other.count == 0 {
+            return;
+        }
+        if self.count == 0 {
+            *self = other;
+            return;
+        }
+        let combined_count = self.count + other.count;
+        #[allow(clippy::cast_precision_loss)]
+        let left_count = self.count as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let right_count = other.count as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let combined_count_float = combined_count as f64;
+        let delta = other.mean - self.mean;
+        self.mean += delta * (right_count / combined_count_float);
+        self.m2 += other.m2 + delta * delta * (left_count * right_count / combined_count_float);
+        self.count = combined_count;
+    }
+
+    fn performance(self, statistic: PboStatistic) -> Result<f64, NumericError> {
+        let result = match statistic {
+            PboStatistic::Mean => self.mean,
+            PboStatistic::Sharpe => {
+                if self.count < 2 || self.m2 <= 0.0 {
+                    return Err(NumericError::UndefinedStatistic);
+                }
+                #[allow(clippy::cast_precision_loss)]
+                let denominator = (self.m2 / ((self.count - 1) as f64)).sqrt();
+                self.mean / denominator
+            }
+        };
+        if result.is_finite() {
+            Ok(result)
+        } else {
+            Err(NumericError::NonFiniteComputation)
+        }
+    }
+}
+
+// Exact equality defines PBO rank ties and intentionally treats signed zero as tied.
+#[allow(clippy::float_cmp)]
+fn selected_average_rank(values: &[f64], selected: usize) -> f64 {
+    let selected_value = values[selected];
+    let less = values
+        .iter()
+        .filter(|value| **value < selected_value)
+        .count();
+    let equal = values
+        .iter()
+        .filter(|value| **value == selected_value)
+        .count();
+    #[allow(clippy::cast_precision_loss)]
+    let rank = less as f64 + (equal + 1) as f64 / 2.0;
+    rank
+}
+
+// Exact equality preserves the public tie policy; a tolerance would change the estimand.
+#[allow(clippy::float_cmp)]
+fn selected_maximum(values: &[f64]) -> (usize, bool) {
+    let mut selected = 0;
+    for index in 1..values.len() {
+        if values[index] > values[selected] {
+            selected = index;
+        }
+    }
+    let selected_value = values[selected];
+    let tie = values
+        .iter()
+        .filter(|value| **value == selected_value)
+        .count()
+        > 1;
+    (selected, tie)
+}
+
+/// Reduce CSCV partition combinations for built-in PBO statistics.
+///
+/// `values` is a row-major `rows x columns` matrix. `combination_groups`
+/// contains flattened, sorted in-sample partition codes; each combination has
+/// exactly `groups_per_combination` codes. The complement defines its
+/// out-of-sample groups. Policy, combination enumeration, and public result
+/// construction remain caller responsibilities.
+///
+/// # Errors
+///
+/// Returns checked errors for invalid dimensions, non-finite input, invalid
+/// group codes, undefined Sharpe statistics, or non-finite computation.
+pub fn pbo_partition_splits(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    partitions: usize,
+    combination_groups: &[usize],
+    groups_per_combination: usize,
+    statistic: PboStatistic,
+) -> Result<PboSplitBuffer, NumericError> {
+    if rows == 0
+        || columns < 2
+        || partitions < 2
+        || partitions % 2 != 0
+        || rows % partitions != 0
+        || groups_per_combination != partitions / 2
+        || groups_per_combination == 0
+        || combination_groups.is_empty()
+        || combination_groups.len() % groups_per_combination != 0
+        || rows.checked_mul(columns) != Some(values.len())
+    {
+        return Err(NumericError::InvalidDimensions);
+    }
+    for (index, value) in values.iter().copied().enumerate() {
+        if !value.is_finite() {
+            return Err(NumericError::NonFiniteValue { index });
+        }
+    }
+
+    let combination_count = combination_groups.len() / groups_per_combination;
+    for (combination, groups) in combination_groups
+        .chunks_exact(groups_per_combination)
+        .enumerate()
+    {
+        if groups.iter().any(|group| *group >= partitions)
+            || groups.windows(2).any(|window| window[0] >= window[1])
+        {
+            return Err(NumericError::InvalidCombination { index: combination });
+        }
+    }
+
+    let group_size = rows / partitions;
+    let mut partition_moments = vec![Moments::empty(); partitions * columns];
+    for group in 0..partitions {
+        for row_in_group in 0..group_size {
+            let row = group * group_size + row_in_group;
+            for column in 0..columns {
+                partition_moments[group * columns + column].update(values[row * columns + column]);
+            }
+        }
+    }
+
+    let mut selected_strategy = Vec::with_capacity(combination_count);
+    let mut in_sample_performance = Vec::with_capacity(combination_count);
+    let mut out_of_sample_performance = Vec::with_capacity(combination_count);
+    let mut out_of_sample_rank = Vec::with_capacity(combination_count);
+    let mut logits = Vec::with_capacity(combination_count);
+    let mut selection_tie = Vec::with_capacity(combination_count);
+    let mut underperformed_median = Vec::with_capacity(combination_count);
+    let mut included = vec![false; partitions];
+    let mut in_sample = vec![0.0; columns];
+    let mut out_of_sample = vec![0.0; columns];
+
+    for groups in combination_groups.chunks_exact(groups_per_combination) {
+        included.fill(false);
+        for group in groups {
+            included[*group] = true;
+        }
+        for column in 0..columns {
+            let mut in_moments = Moments::empty();
+            let mut out_moments = Moments::empty();
+            for group in 0..partitions {
+                let moments = partition_moments[group * columns + column];
+                if included[group] {
+                    in_moments.combine(moments);
+                } else {
+                    out_moments.combine(moments);
+                }
+            }
+            in_sample[column] = in_moments.performance(statistic)?;
+            out_of_sample[column] = out_moments.performance(statistic)?;
+        }
+
+        let (selected, tied) = selected_maximum(&in_sample);
+        let rank = selected_average_rank(&out_of_sample, selected);
+        #[allow(clippy::cast_precision_loss)]
+        let relative_rank = rank / ((columns + 1) as f64);
+        let logit = (relative_rank / (1.0 - relative_rank)).ln();
+        if !logit.is_finite() {
+            return Err(NumericError::NonFiniteComputation);
+        }
+        selected_strategy.push(selected);
+        in_sample_performance.push(in_sample[selected]);
+        out_of_sample_performance.push(out_of_sample[selected]);
+        out_of_sample_rank.push(rank);
+        logits.push(logit);
+        selection_tie.push(u8::from(tied));
+        underperformed_median.push(u8::from(logit <= 0.0));
+    }
+
+    Ok(PboSplitBuffer {
+        selected_strategy,
+        in_sample_performance,
+        out_of_sample_performance,
+        out_of_sample_rank,
+        logit: logits,
+        selection_tie,
+        underperformed_median,
+    })
+}
+
 /// Mark each training interval that overlaps at least one test interval.
 ///
 /// Intervals are half-open: `[start, end)`. Touching boundaries do not overlap.
@@ -329,8 +601,8 @@ pub fn interval_purge(
 #[cfg(test)]
 mod tests {
     use super::{
-        NumericError, bootstrap_means, checked_mean, grouped_rank_ic, grouped_rank_ic_buffer,
-        interval_purge,
+        NumericError, PboStatistic, bootstrap_means, checked_mean, grouped_rank_ic,
+        grouped_rank_ic_buffer, interval_purge, pbo_partition_splits,
     };
 
     #[test]
@@ -419,6 +691,134 @@ mod tests {
         assert_eq!(
             bootstrap_means(&[1.0], &[1], &[0, 1]),
             Err(NumericError::IndexOutOfBounds { index: 1 })
+        );
+    }
+
+    fn literal_performance(values: &[f64], columns: usize, rows: &[usize]) -> Vec<f64> {
+        (0..columns)
+            .map(|column| {
+                let selected: Vec<f64> = rows
+                    .iter()
+                    .map(|row| values[row * columns + column])
+                    .collect();
+                #[allow(clippy::cast_precision_loss)]
+                let count = selected.len() as f64;
+                let mean = selected.iter().sum::<f64>() / count;
+                let variance = selected
+                    .iter()
+                    .map(|value| (value - mean).powi(2))
+                    .sum::<f64>()
+                    / (count - 1.0);
+                mean / variance.sqrt()
+            })
+            .collect()
+    }
+
+    #[test]
+    #[allow(clippy::cast_precision_loss)]
+    fn pbo_partition_splits_match_literal_row_selection() {
+        let rows = 24;
+        let columns = 5;
+        let partitions = 6;
+        let group_size = rows / partitions;
+        let values: Vec<f64> = (0..rows)
+            .flat_map(|row| {
+                (0..columns).map(move |column| {
+                    ((row * 17 + column * 31) as f64 * 0.071).sin() + (column as f64 * 0.03)
+                })
+            })
+            .collect();
+        let combinations = [0, 1, 2, 0, 1, 3, 0, 1, 4, 0, 1, 5];
+        let result = pbo_partition_splits(
+            &values,
+            rows,
+            columns,
+            partitions,
+            &combinations,
+            3,
+            PboStatistic::Sharpe,
+        )
+        .expect("valid PBO input");
+
+        for (combination_index, groups) in combinations.chunks_exact(3).enumerate() {
+            let mut in_rows = Vec::new();
+            let mut out_rows = Vec::new();
+            for group in 0..partitions {
+                let target = if groups.contains(&group) {
+                    &mut in_rows
+                } else {
+                    &mut out_rows
+                };
+                target.extend(group * group_size..(group + 1) * group_size);
+            }
+            let in_performance = literal_performance(&values, columns, &in_rows);
+            let out_performance = literal_performance(&values, columns, &out_rows);
+            let selected = in_performance
+                .iter()
+                .enumerate()
+                .max_by(|left, right| left.1.total_cmp(right.1))
+                .map(|(index, _)| index)
+                .expect("strategies exist");
+            assert_eq!(result.selected_strategy[combination_index], selected);
+            assert!(
+                (result.in_sample_performance[combination_index] - in_performance[selected]).abs()
+                    < 1e-12
+            );
+            assert!(
+                (result.out_of_sample_performance[combination_index] - out_performance[selected])
+                    .abs()
+                    < 1e-12
+            );
+        }
+    }
+
+    #[test]
+    fn pbo_partition_splits_report_ties_and_mean_ranks() {
+        let result = pbo_partition_splits(
+            &[1.0, 1.0, 0.0, 2.0, 2.0, 0.0, 3.0, 3.0, 0.0, 4.0, 4.0, 0.0],
+            4,
+            3,
+            2,
+            &[0],
+            1,
+            PboStatistic::Mean,
+        )
+        .expect("valid tied PBO input");
+        assert_eq!(result.selected_strategy, vec![0]);
+        assert_eq!(result.selection_tie, vec![1]);
+        assert_eq!(result.out_of_sample_rank, vec![2.5]);
+        assert_eq!(result.underperformed_median, vec![0]);
+    }
+
+    #[test]
+    fn pbo_partition_splits_reject_invalid_combinations() {
+        assert_eq!(
+            pbo_partition_splits(
+                &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0],
+                4,
+                2,
+                4,
+                &[0, 0],
+                2,
+                PboStatistic::Mean,
+            ),
+            Err(NumericError::InvalidCombination { index: 0 })
+        );
+    }
+
+    #[test]
+    fn pbo_partition_splits_reject_constant_sharpe() {
+        assert_eq!(
+            pbo_partition_splits(
+                &[1.0, 0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0],
+                4,
+                2,
+                2,
+                &[0],
+                1,
+                PboStatistic::Sharpe,
+            ),
+            Err(NumericError::UndefinedStatistic)
         );
     }
 
