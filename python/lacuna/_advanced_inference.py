@@ -692,7 +692,7 @@ def _average_ranks(values: FloatArray) -> FloatArray:
     return ranks
 
 
-def _pbo_for_partitions(
+def _reference_pbo_for_partitions(
     matrix: FloatArray,
     names: tuple[str, ...],
     *,
@@ -729,6 +729,114 @@ def _pbo_for_partitions(
         out_of_sample_indices = np.concatenate([groups[group] for group in out_of_sample_groups])
         in_sample_performance = _performance(matrix[in_sample_indices], statistic)
         out_of_sample_performance = _performance(matrix[out_of_sample_indices], statistic)
+        best = np.flatnonzero(in_sample_performance == in_sample_performance.max())
+        if best.size > 1:
+            tie_count += 1
+            if tie_break == "raise":
+                raise DataContractError(
+                    "PBO in-sample selection has a tie; use tie_break='first' only when the "
+                    "declared strategy order is a defensible deterministic rule"
+                )
+        selected = int(best[0])
+        rank = float(_average_ranks(out_of_sample_performance)[selected])
+        relative_rank = rank / (matrix.shape[1] + 1.0)
+        logit = math.log(relative_rank / (1.0 - relative_rank))
+        rows.append(
+            {
+                "combination": combination_index,
+                "in_sample_groups": tuple(in_sample_groups),
+                "out_of_sample_groups": out_of_sample_groups,
+                "selected_strategy": names[selected],
+                "selected_strategy_index": selected,
+                "in_sample_performance": float(in_sample_performance[selected]),
+                "out_of_sample_performance": float(out_of_sample_performance[selected]),
+                "out_of_sample_rank": rank,
+                "relative_rank": relative_rank,
+                "logit": logit,
+                "underperformed_median": logit <= 0.0,
+            }
+        )
+    pbo = sum(bool(row["underperformed_median"]) for row in rows) / len(rows)
+    return pbo, rows, tie_count
+
+
+def _combined_partition_performance(
+    partition_means: FloatArray,
+    partition_m2: FloatArray,
+    groups: tuple[int, ...],
+    *,
+    group_size: int,
+    statistic: PBOStatistic,
+) -> FloatArray:
+    """Combine stable per-partition moments without reconstructing selected rows."""
+
+    mean = np.zeros(partition_means.shape[1], dtype=np.float64)
+    m2 = np.zeros(partition_means.shape[1], dtype=np.float64)
+    count = 0
+    for group in groups:
+        next_count = count + group_size
+        delta = partition_means[group] - mean
+        mean = mean + delta * (group_size / next_count)
+        if count:
+            m2 = m2 + partition_m2[group] + delta * delta * (count * group_size / next_count)
+        else:
+            m2 = partition_m2[group].copy()
+        count = next_count
+    if statistic == "mean":
+        return mean
+    variance = m2 / (count - 1)
+    if np.any(variance <= 0.0) or not np.isfinite(variance).all():
+        raise DataContractError("PBO Sharpe statistic is undefined for a constant strategy")
+    return mean / np.sqrt(variance)
+
+
+def _pbo_for_partitions(
+    matrix: FloatArray,
+    names: tuple[str, ...],
+    *,
+    partitions: int,
+    statistic: PBOStatistic,
+    tie_break: PBOTieBreak,
+    max_combinations: int,
+) -> tuple[float, list[dict[str, JsonValue]], int]:
+    if isinstance(partitions, bool) or not isinstance(partitions, int):
+        raise MethodContractError("PBO partitions must be an integer")
+    if partitions < 2 or partitions % 2:
+        raise MethodContractError("PBO partitions must be an even integer of at least 2")
+    if matrix.shape[0] % partitions:
+        raise DataContractError("PBO requires equal partitions; row count must divide partitions")
+    combination_count = math.comb(partitions, partitions // 2)
+    if combination_count > max_combinations:
+        raise MethodContractError(
+            "PBO combination count exceeds max_combinations; reduce partitions or raise the "
+            "explicit safety limit"
+        )
+    group_size = matrix.shape[0] // partitions
+    partitioned = matrix.reshape(partitions, group_size, matrix.shape[1])
+    partition_means = partitioned.mean(axis=1)
+    centered = partitioned - partition_means[:, np.newaxis, :]
+    partition_m2 = np.einsum("pgm,pgm->pm", centered, centered)
+    rows: list[dict[str, JsonValue]] = []
+    tie_count = 0
+    all_groups = set(range(partitions))
+    for combination_index, in_sample_groups in enumerate(
+        combinations(range(partitions), partitions // 2)
+    ):
+        out_of_sample_groups = tuple(sorted(all_groups.difference(in_sample_groups)))
+        in_sample_performance = _combined_partition_performance(
+            partition_means,
+            partition_m2,
+            in_sample_groups,
+            group_size=group_size,
+            statistic=statistic,
+        )
+        out_of_sample_performance = _combined_partition_performance(
+            partition_means,
+            partition_m2,
+            out_of_sample_groups,
+            group_size=group_size,
+            statistic=statistic,
+        )
         best = np.flatnonzero(in_sample_performance == in_sample_performance.max())
         if best.size > 1:
             tie_count += 1
@@ -859,6 +967,7 @@ def probability_of_backtest_overfitting(
                 "tie_break": tie_break,
                 "max_combinations": max_combinations,
                 "partitioning": "equal_contiguous_synchronous_rows",
+                "backend": "numpy_partition_moments",
                 "input": source,
             },
             input_fingerprint=fingerprint(matrix, namespace="pbo-input"),

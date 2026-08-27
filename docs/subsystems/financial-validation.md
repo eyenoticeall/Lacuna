@@ -258,9 +258,12 @@ method metadata and warnings
   indexed-column-mean reference;
 - built-in Pearson permutation reuses invariant centered norms and performs one NumPy dot product
   per transformed sample; transformation streams and custom callables remain unchanged;
-- CPCV and PBO currently use validated NumPy/Python reference paths. A multi-column
-  Rust reducer is admitted only after the optimized reference remains material in the private v0.14
-  full-call benchmark. No native RNG is used.
+- PBO preaggregates stable mean and second-moment state for each contiguous partition, then combines
+  those moments for each CSCV split without reconstructing the underlying return rows. The literal
+  matrix-slicing implementation remains as a differential reference. A compact native split reducer
+  is considered only because the optimized reference remains material in the private v0.14 full-call
+  benchmark;
+- CPCV currently uses the validated Python/NumPy reference path. No native RNG is used.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.
 

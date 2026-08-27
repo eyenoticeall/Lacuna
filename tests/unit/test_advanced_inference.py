@@ -8,6 +8,7 @@ import polars as pl
 import pytest
 
 import lacuna as lc
+from lacuna._advanced_inference import _reference_pbo_for_partitions
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.validation import (
     joint_stationary_bootstrap,
@@ -201,6 +202,45 @@ def test_pbo_exposes_selection_rank_logit_and_partition_sensitivity() -> None:
     assert {row["selected_strategy"] for row in result.table("combinations")} == {"strategy_0"}
     assert all(row["relative_rank"] == 0.75 for row in result.table("combinations"))
     assert [row["partitions"] for row in result.table("partition_sensitivity")] == [4, 2]
+
+
+@pytest.mark.parametrize("statistic", ["mean", "sharpe"])
+def test_pbo_partition_moments_match_literal_matrix_slicing(statistic: str) -> None:
+    rng = np.random.default_rng(812)
+    matrix = rng.normal(size=(24, 5)) + np.arange(5) * 0.03
+    names = tuple(f"strategy_{index}" for index in range(matrix.shape[1]))
+    expected_pbo, expected_rows, expected_ties = _reference_pbo_for_partitions(
+        matrix,
+        names,
+        partitions=6,
+        statistic=statistic,  # type: ignore[arg-type]
+        tie_break="first",
+        max_combinations=20_000,
+    )
+    result = probability_of_backtest_overfitting(
+        matrix,
+        partitions=6,
+        statistic=statistic,  # type: ignore[arg-type]
+        tie_break="first",
+    )
+    observed_rows = result.table("combinations")
+
+    assert result.metrics["pbo"] == expected_pbo
+    assert result.metrics["selection_ties"] == expected_ties
+    for observed, expected in zip(observed_rows, expected_rows, strict=True):  # type: ignore[arg-type]
+        for field in (
+            "combination",
+            "selected_strategy",
+            "selected_strategy_index",
+            "out_of_sample_rank",
+            "relative_rank",
+            "underperformed_median",
+        ):
+            assert observed[field] == expected[field]
+        for field in ("in_sample_groups", "out_of_sample_groups"):
+            assert tuple(observed[field]) == expected[field]  # type: ignore[arg-type]
+        for field in ("in_sample_performance", "out_of_sample_performance", "logit"):
+            assert observed[field] == pytest.approx(expected[field], rel=1e-12, abs=1e-12)
 
 
 def test_pbo_refuses_ambiguous_selection_and_unequal_partitions() -> None:
