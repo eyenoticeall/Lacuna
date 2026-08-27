@@ -260,9 +260,10 @@ method metadata and warnings
   per transformed sample; transformation streams and custom callables remain unchanged;
 - PBO preaggregates stable mean and second-moment state for each contiguous partition, then combines
   those moments for each CSCV split without reconstructing the underlying return rows. The literal
-  matrix-slicing implementation remains as a differential reference. A compact native split reducer
-  is considered only because the optimized reference remains material in the private v0.14 full-call
-  benchmark;
+  matrix-slicing implementation remains as a differential reference. At 512 or more combinations,
+  an available native extension uses the admitted compact split reducer for built-in mean and Sharpe
+  statistics; smaller workloads retain the NumPy partition-moment path. Python continues to own
+  combination enumeration, tie policy, findings, provenance, and result construction;
 - CPCV currently uses the validated Python/NumPy reference path. No native RNG is used.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.

@@ -60,6 +60,19 @@ Native functions accept primitive arrays, Arrow-compatible buffers, offsets, and
 
 Return columnar arrays or compact summaries. If detailed row-level output is needed, return one contiguous buffer or table representation.
 
+### v0.14 admitted kernels
+
+- grouped rank IC uses the typed bulk-array boundary and remains provisionally admitted pending the
+  pinned-Linux and release-preflight reproductions;
+- built-in PBO/CSCV mean and Sharpe reduction dispatches to a compact, single-threaded native
+  kernel at 512 or more combinations. Python enumerates the combinations, owns exact tie policy,
+  projects the compact arrays, and constructs all evidence. The local full-call result is 3.65× the
+  optimized partition-moment reference with an exact equivalence checksum; it remains provisional
+  until authoritative CI reproduces that gate.
+
+Neither path changes public signatures, analytical method versions, canonical identities, or result
+schemas. Their benchmark artifacts live in `benchmarks/native-migration/`.
+
 ## Arrow integration
 
 The long-term boundary is the Arrow C Data or C Stream interface where compatible. It is a trusted in-process pointer boundary.
@@ -161,7 +174,7 @@ callbacks, null bitmaps, chunking, and unsafe-pointer validation require their o
 The binding uses `numpy` crate 0.29.0 with PyO3 0.29.2. The crate is BSD-2-Clause licensed, has an
 MSRV of Rust 1.83 (within Lacuna's Rust 1.85 contract), and shares Lacuna's existing PyO3 minor.
 NumPy is already a mandatory Python dependency, so this adds no Python runtime extra. The boundary
-accepts only aligned, C-contiguous, native-endian one-dimensional `float64` and `int64` arrays and
+accepts only aligned, C-contiguous, native-endian one- or two-dimensional `float64` and `int64` arrays and
 returns `float64` values with `uint8` validity/status arrays. It does not use Python object arrays.
 
 The Python caller first attempts Polars' no-copy, non-writable NumPy conversion. Dtype, chunking,
