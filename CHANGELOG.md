@@ -18,6 +18,10 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   separate operational decision ledger, byte-identical c14n-v1 and public-carrier boundaries, and
   an accepted architecture decision preserving `abi3-py311`, Python-owned RNG, and single-threaded
   native execution.
+- Add the private `lacuna.native-migration-benchmark` v1 sidecar, isolated alternating-backend
+  runner, raw timing/RSS evidence, mechanical materiality and admission evaluator, clean-source
+  enforcement, artifact validation, and deterministic correctness checks without changing the
+  public benchmark-v6 API.
 
 ## [0.13.0] - 2026-08-27
 

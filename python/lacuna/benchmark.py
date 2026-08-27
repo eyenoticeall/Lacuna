@@ -186,6 +186,18 @@ class BenchmarkSuite:
         return json.dumps(self.to_dict(), indent=indent, sort_keys=True)
 
 
+@dataclass(frozen=True, slots=True)
+class _BenchmarkTrace:
+    """Private raw measurement evidence used by the migration sidecar."""
+
+    name: str
+    timings_seconds: tuple[float, ...]
+    baseline_rss_bytes: int | None
+    process_peak_rss_bytes: int | None
+    incremental_peak_rss_bytes: int | None
+    python_traced_peak_bytes: int
+
+
 def benchmark_config_for_tier(
     tier: str,
     *,
@@ -340,7 +352,10 @@ def _measure(
     work_items: int,
     throughput_unit: str,
     config: BenchmarkConfig,
+    trace_sink: list[_BenchmarkTrace] | None = None,
 ) -> BenchmarkCase:
+    baseline_rss_bytes = _current_rss_bytes()
+    baseline_peak_rss_bytes = _process_peak_rss_bytes()
     for _ in range(config.warmups):
         operation()
     timings: list[float] = []
@@ -368,7 +383,7 @@ def _measure(
         raise RuntimeError(f"benchmark case {name!r} changed during memory measurement")
 
     median_seconds = statistics.median(timings)
-    return BenchmarkCase(
+    case = BenchmarkCase(
         name=name,
         backend=backend,
         median_seconds=median_seconds,
@@ -379,6 +394,40 @@ def _measure(
         python_traced_peak_bytes=peak_bytes,
         checksum=checksums.pop(),
     )
+    if trace_sink is not None:
+        process_peak_rss_bytes = _process_peak_rss_bytes()
+        incremental_peak_rss_bytes = None
+        if process_peak_rss_bytes is not None:
+            baseline = baseline_peak_rss_bytes or baseline_rss_bytes
+            if baseline is not None:
+                incremental_peak_rss_bytes = max(0, process_peak_rss_bytes - baseline)
+        trace_sink.append(
+            _BenchmarkTrace(
+                name=name,
+                timings_seconds=tuple(timings),
+                baseline_rss_bytes=baseline_rss_bytes,
+                process_peak_rss_bytes=process_peak_rss_bytes,
+                incremental_peak_rss_bytes=incremental_peak_rss_bytes,
+                python_traced_peak_bytes=peak_bytes,
+            )
+        )
+    return case
+
+
+def _current_rss_bytes() -> int | None:
+    """Return current Linux RSS when available without adding a runtime dependency."""
+
+    if platform.system() != "Linux":
+        return None
+    try:
+        with open("/proc/self/status", encoding="utf-8") as status:
+            for line in status:
+                if line.startswith("VmRSS:"):
+                    fields = line.split()
+                    return int(fields[1]) * 1024
+    except OSError:  # pragma: no cover - procfs may be unavailable in containers
+        return None
+    return None
 
 
 def _process_peak_rss_bytes() -> int | None:
@@ -493,10 +542,12 @@ def _standard_audit_workflow(
     return report
 
 
-def run_benchmarks(
+def _run_benchmarks(
     config: BenchmarkConfig | None = None,
     *,
     use_native: bool = True,
+    case_names: frozenset[str] | None = None,
+    trace_sink: list[_BenchmarkTrace] | None = None,
 ) -> BenchmarkSuite:
     """Measure released public workflows without enforcing machine-specific speed budgets."""
 
@@ -854,6 +905,14 @@ def run_benchmarks(
                 ),
             ]
         )
+    if case_names is not None:
+        available_names = {name for name, _, _, _ in cases}
+        missing_names = sorted(case_names - available_names)
+        if missing_names:
+            raise MethodContractError(
+                f"benchmark cases are unavailable under this backend: {missing_names}"
+            )
+        cases = [case for case in cases if case[0] in case_names]
     measurements = tuple(
         _measure(
             name,
@@ -861,6 +920,7 @@ def run_benchmarks(
             work_items=work_items,
             throughput_unit=unit,
             config=resolved,
+            trace_sink=trace_sink,
         )
         for name, operation, work_items, unit in cases
     )
@@ -885,6 +945,36 @@ def run_benchmarks(
             ),
         },
     )
+
+
+def _run_benchmark_case_detailed(
+    name: str,
+    config: BenchmarkConfig,
+    *,
+    use_native: bool,
+) -> tuple[BenchmarkCase, _BenchmarkTrace, Mapping[str, object]]:
+    """Measure one prepared public case for an isolated migration worker."""
+
+    traces: list[_BenchmarkTrace] = []
+    suite = _run_benchmarks(
+        config,
+        use_native=use_native,
+        case_names=frozenset({name}),
+        trace_sink=traces,
+    )
+    if len(suite.cases) != 1 or len(traces) != 1:
+        raise RuntimeError(f"isolated benchmark case {name!r} did not produce one measurement")
+    return suite.cases[0], traces[0], suite.environment
+
+
+def run_benchmarks(
+    config: BenchmarkConfig | None = None,
+    *,
+    use_native: bool = True,
+) -> BenchmarkSuite:
+    """Measure released public workflows without enforcing machine-specific speed budgets."""
+
+    return _run_benchmarks(config, use_native=use_native)
 
 
 __all__ = [

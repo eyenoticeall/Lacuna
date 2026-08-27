@@ -4,6 +4,11 @@ import json
 
 import pytest
 
+from lacuna._migration_benchmark import (
+    MigrationBenchmarkTarget,
+    run_isolated_migration_benchmark,
+    validate_artifact,
+)
 from lacuna.benchmark import BenchmarkConfig, benchmark_config_for_tier, run_benchmarks
 from lacuna.exceptions import MethodContractError
 
@@ -102,3 +107,32 @@ def test_minimum_valid_benchmark_shape_exercises_new_cases() -> None:
             "events.event_windows",
         }
     )
+
+
+def test_native_migration_sidecar_isolates_reference_and_candidate() -> None:
+    config = BenchmarkConfig(
+        periods=8,
+        instruments=5,
+        horizons=(1, 2),
+        quantiles=3,
+        bootstrap_resamples=100,
+        repetitions=1,
+        warmups=0,
+        seed=7,
+    )
+    artifact = run_isolated_migration_benchmark(
+        MigrationBenchmarkTarget(
+            candidate_id="R-01",
+            public_operation="signal.ic",
+            reference_case="signal.ic.reference",
+            candidate_case="signal.ic.native",
+            effective_dimensions={"rows": config.rows, "groups": config.periods},
+        ),
+        config,
+        source_commit="test-commit",
+    )
+    payload = artifact.to_dict()
+    validate_artifact(payload)
+    assert artifact.candidate is not None
+    assert artifact.reference.checksum == artifact.candidate.checksum
+    assert artifact.environment["native_threads"] == 1
