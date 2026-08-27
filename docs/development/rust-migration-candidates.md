@@ -250,14 +250,14 @@ but they must be named as separate shape dimensions rather than presented as ful
 
 | ID | Public path or internal area | Disposition | Priority | Benefit | Semantic risk | Packaging risk | Evidence | Main prerequisite |
 |---|---|---|---|---|---|---|---|---|
-| R-01 | `signal.ic`, existing grouped rank IC | IMPLEMENTED_NATIVE | P1 | Medium | Medium | High | PROPOSED | F-01 |
-| R-02 | Built-in cost estimates and `costs.stress`, `O(SN)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | optimized algebra, F-01/F-03a |
-| R-03 | `costs.capacity_curve`, currently up to `O(SCN)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | scaling algebra, new benchmark |
-| R-04 | `costs.break_even_cost` repeated reductions | POLARS_FIRST | P2 | Medium | Medium | Low | PROPOSED | period preaggregation |
+| R-01 | `signal.ic`, existing grouped rank IC | IMPLEMENTED_NATIVE | P1 | Medium | Medium | High | ADMITTED | F-01, pinned wheel evidence |
+| R-02 | Built-in cost estimates and `costs.stress`, `O(SN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | optimized algebra |
+| R-03 | `costs.capacity_curve`, currently up to `O(SCN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | scaling algebra |
+| R-04 | `costs.break_even_cost` repeated reductions | KEEP_PYTHON | P2 | Medium | Medium | Low | OPTIMIZED_NON_NATIVE | period preaggregation |
 | R-05 | Purged/CPCV split assembly, up to `O(KN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | F-01/F-03a |
-| R-06 | Shared resampling reduction, `O(RN)`/`O(RNM)` | MIGRATE_AFTER_PROFILE | P1 | High | High | Medium | PROPOSED | F-01, Python-owned RNG |
-| R-07 | Built-in permutation schemes/statistics | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | R-06 |
-| R-08 | PBO/CSCV combination evaluation, `O(KNM)` | MIGRATE_AFTER_PROFILE | P2 | Medium | High | Medium | PROPOSED | compact output, representative `M` |
+| R-06 | Shared resampling reduction, `O(RN)`/`O(RNM)` | KEEP_PYTHON | P1 | High | High | Medium | NOT_MIGRATING | Python-owned RNG |
+| R-07 | Built-in permutation schemes/statistics | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | vectorized reference |
+| R-08 | PBO/CSCV combination evaluation, `O(KNM)` | IMPLEMENTED_NATIVE | P2 | Medium | High | Medium | ADMITTED | F-01, pinned wheel evidence |
 | R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | one-plan Polars reference |
 | R-10 | Membership portion of turnover | KEEP_PYTHON | P1 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | endpoint self-joins |
 | R-11 | Prior-only expanding/rolling regime quantiles | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | exact Polars order statistics |
@@ -265,7 +265,7 @@ but they must be named as separate shape dimensions rather than presented as ful
 | R-13 | Event-response cluster resampling | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | cluster sufficient statistics |
 | R-14 | Diagnostic portfolio allocation core | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars window allocator |
 | R-15 | Universe membership transitions | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | Polars snapshot self-joins |
-| R-16 | c14n-v1 semantic frame fingerprint | MIGRATE_AFTER_PROFILE | P0 | High | High | Low | PROPOSED | F-02a exact Python streaming |
+| R-16 | c14n-v1 semantic frame fingerprint | KEEP_PYTHON | P0 | High | High | Low | OPTIMIZED_NON_NATIVE | F-02a exact Python streaming |
 
 ### Audit coverage by subsystem
 
