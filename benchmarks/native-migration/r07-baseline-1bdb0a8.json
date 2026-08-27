@@ -1,0 +1,107 @@
+{
+  "admission": {
+    "correctness_match": null,
+    "latency_regression_fraction": null,
+    "material": true,
+    "reasons": [
+      "reference measured; no candidate backend was supplied"
+    ],
+    "rss_reduction_fraction": null,
+    "state": "MEASURED",
+    "throughput_ratio": null
+  },
+  "candidate": null,
+  "config": {
+    "bootstrap_resamples": 1000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 500,
+    "periods": 200,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "environment": {
+    "checksum_normalization": "backend excluded; finite floats rounded to 12 significant digits",
+    "copy_measurement": "null until the selected boundary reports exact byte counters",
+    "isolation": "one child process per measured backend",
+    "machine": "arm64",
+    "memory_measurement": "tracemalloc peak; native allocations may not be attributed",
+    "mkl_threads": 1,
+    "native_available": false,
+    "native_threads": 1,
+    "native_version": null,
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "polars": "1.44.0",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 183074816,
+    "processor": "arm",
+    "python": "3.13.12",
+    "timing_clock": "time.perf_counter",
+    "timing_caveat": "Local macOS development evidence; pinned Linux nightly and preflight remain release authority."
+  },
+  "generated_at": "2026-08-27T13:36:28.414274Z",
+  "reference": {
+    "backend": "polars",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.validation.permutation.public",
+    "checksum": "84c866a1d64076be4bfbc9f984d8d9e46b64653fa687b9d85a7495675155f0c7",
+    "incremental_peak_rss_bytes": 2736128,
+    "input_copy_bytes": null,
+    "maximum_seconds": 0.08964999999443535,
+    "median_absolute_deviation_seconds": 0.0007289580098586157,
+    "median_seconds": 0.0838321250048466,
+    "minimum_seconds": 0.08126829199318308,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 0.0838321250048466,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 185925632,
+    "python_traced_peak_bytes": 164973,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 4866869.353203348,
+    "throughput_unit": "permuted_rows/second",
+    "timings_seconds": [
+      0.08964999999443535,
+      0.0833286249981029,
+      0.08572775000357069,
+      0.08310316699498799,
+      0.0838321250048466,
+      0.08126829199318308,
+      0.08419266701093875
+    ]
+  },
+  "run_url": null,
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "1bdb0a86120300c904c09d59ec20fd84056ad529",
+  "target": {
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": null,
+    "candidate_id": "R-07",
+    "effective_dimensions": {
+      "permutations": 2000,
+      "rows": 204,
+      "scheme": "unrestricted",
+      "statistic": "pearson"
+    },
+    "public_latency_share": 1,
+    "public_operation": "lacuna.validation.permutation_test",
+    "public_rss_share": null,
+    "reference_case": "migration.validation.permutation.public"
+  },
+  "version": 1
+}
