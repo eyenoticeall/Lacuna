@@ -2,7 +2,7 @@
   <table>
     <tr>
       <td align="center" bgcolor="#0b0d0e">
-        <img src="logos/lacuna-logo-lockup.png" alt="Lacuna" width="520" />
+        <img src="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-lockup.png" alt="Lacuna" width="520" />
       </td>
     </tr>
   </table>
@@ -14,10 +14,10 @@
     <a href="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml"><img src="https://github.com/eyenoticeall/Lacuna/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>&nbsp;&nbsp;
     <a href="https://github.com/eyenoticeall/Lacuna/releases/latest"><img src="https://img.shields.io/github/v/release/eyenoticeall/Lacuna?display_name=tag&amp;sort=semver&amp;style=flat" alt="Latest release" /></a>&nbsp;&nbsp;
     <a href="https://pypi.org/project/lacuna-quant/"><img src="https://img.shields.io/pypi/v/lacuna-quant?label=PyPI&amp;logo=pypi&amp;logoColor=white&amp;style=flat" alt="PyPI" /></a>&nbsp;&nbsp;
-    <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&amp;logoColor=white&amp;style=flat" alt="Python 3.11+" /></a>&nbsp;&nbsp;
-    <a href="Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024-000000?logo=rust&amp;logoColor=white&amp;style=flat" alt="Rust 2024" /></a>&nbsp;&nbsp;
-    <a href="docs/development/data-boundary.md"><img src="https://img.shields.io/badge/Arrow-compatible-2563EB?logo=apachearrow&amp;logoColor=white&amp;style=flat" alt="Arrow compatible" /></a>&nbsp;&nbsp;
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-3DA639?style=flat" alt="MIT License" /></a>
+    <a href="https://github.com/eyenoticeall/Lacuna/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&amp;logoColor=white&amp;style=flat" alt="Python 3.11+" /></a>&nbsp;&nbsp;
+    <a href="https://github.com/eyenoticeall/Lacuna/blob/main/Cargo.toml"><img src="https://img.shields.io/badge/Rust-2024-000000?logo=rust&amp;logoColor=white&amp;style=flat" alt="Rust 2024" /></a>&nbsp;&nbsp;
+    <a href="https://github.com/eyenoticeall/Lacuna/blob/main/docs/development/data-boundary.md"><img src="https://img.shields.io/badge/Arrow-compatible-2563EB?logo=apachearrow&amp;logoColor=white&amp;style=flat" alt="Arrow compatible" /></a>&nbsp;&nbsp;
+    <a href="https://github.com/eyenoticeall/Lacuna/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-3DA639?style=flat" alt="MIT License" /></a>
   </p>
 </div>
 
@@ -37,6 +37,42 @@ Lacuna is the validation and diagnostics layer between a quantitative research i
 > Install the core project from PyPI as `lacuna-quant`; Python code continues to use
 > `import lacuna`. The PyPI project named `lacuna` is unrelated and must not be installed beside
 > `lacuna-quant` because both own the same import-package path.
+
+## Get started
+
+Install the current release from PyPI, then verify the package, native extension, dependency
+metadata, bundled schemas, and platform support in one command:
+
+```bash
+python -m pip install lacuna-quant
+lacuna doctor --strict
+```
+
+The distribution is named `lacuna-quant`; Python code and the command line continue to use
+`lacuna`. Stable-ABI wheels support CPython 3.11 and later on Linux x86-64 and arm64, macOS arm64,
+and Windows x86-64.
+
+Install only the optional method families you need:
+
+```bash
+python -m pip install "lacuna-quant[statistics,report,pandas]"
+python -m pip install lacuna-options
+```
+
+Start with the [guided signal audit](https://github.com/eyenoticeall/Lacuna/blob/main/docs/getting-started/index.md),
+review the [v0.13.0 release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.13.0), or use the
+[Alphalens migration guide](https://github.com/eyenoticeall/Lacuna/blob/main/docs/getting-started/alphalens-migration.md)
+when bringing an existing factor workflow.
+
+If you installed a historical GitHub wheel whose distribution metadata was `lacuna`, remove it
+before migrating; the unrelated PyPI project with that name is not Lacuna:
+
+```bash
+python -m pip uninstall lacuna lacuna-options
+python -m pip install --upgrade lacuna-quant
+```
+
+Reinstall `lacuna-options` afterward only if your research uses the extension.
 
 ## Why Lacuna?
 
@@ -103,62 +139,11 @@ overlapping holdings, simulate orders or fills, route trades, or run live strate
 not infer calendars, execution timing, data availability, or backtester semantics from convenient
 defaults.
 
-## Install and quick start
+## Research workflows
 
-Install Lacuna from PyPI. The distribution is named `lacuna-quant`; the import package and command
-remain `lacuna`:
-
-```bash
-python -m pip install lacuna-quant
-lacuna doctor --strict
-```
-
-The `cp311-abi3` wheels support CPython 3.11 and later on the published Linux x86-64/Linux arm64,
-macOS arm64, and Windows x86-64 targets. Optional dependencies are grouped as `statistics`,
-`report`, `pandas`, `duckdb`, and `ml`; see [`pyproject.toml`](pyproject.toml) for their exact bounds.
-The decay-fit and interactive-report calls below require SciPy, Jinja2, and Plotly from the
-`statistics` and `report` groups.
-
-```bash
-python -m pip install "lacuna-quant[statistics,report,pandas]"
-python -m pip install lacuna-options
-```
-
-If you previously installed a GitHub Release wheel whose distribution metadata was `lacuna`, remove
-it before installing from PyPI. Installing both distributions leaves ownership of `import lacuna`
-ambiguous, and `lacuna doctor` reports that state as a failure.
-
-```bash
-python -m pip uninstall lacuna lacuna-options
-python -m pip install --upgrade lacuna-quant lacuna-options
-```
-
-The same seven checksummed, provenance-attested distributions remain attached to the
-[`v0.13.0` GitHub Release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.13.0).
-
-For development, Lacuna uses [uv](https://docs.astral.sh/uv/) for Python environments and Cargo for
-the Rust workspace:
-
-```bash
-git clone https://github.com/eyenoticeall/Lacuna.git
-cd Lacuna
-
-uv sync --group dev --group docs --extra pandas --extra statistics --extra report
-uv run lacuna doctor
-uv run pytest
-cargo test --workspace
-```
-
-Inspect the runtime in machine-readable form:
-
-```bash
-uv run lacuna doctor --json --strict
-```
-
-The versioned diagnostic report checks package/native identity, the supported Python and wheel
-matrix, dependency metadata, packaged schemas, and runtime configuration. Stable check codes and
-nonzero strict-mode exits make it suitable for CI without reading research data or activating
-plugins.
+Lacuna accepts explicit research artifacts and returns structured evidence before rendering a
+report. The complete study below uses the `statistics` and `report` extras installed in the
+[Get started](#get-started) section.
 
 Turn a cross-sectional signal and price panel into structured evidence:
 
@@ -408,7 +393,7 @@ residuals = lo.empirical_residual(chain, expected="fair_iv")
 For local Parquet, CSV, Arrow IPC, or Feather files:
 
 ```bash
-uv run lacuna signal \
+lacuna signal \
   --signal factor.parquet \
   --prices prices.parquet \
   --horizon 1D --horizon 5D --horizon 20D \
@@ -421,9 +406,9 @@ uv run lacuna signal \
   --html-renderer plotly \
   --bundle study.lacuna
 
-uv run lacuna bundle verify study.lacuna
+lacuna bundle verify study.lacuna
 
-uv run lacuna audit \
+lacuna audit \
   --scope strategy \
   --evidence split=purged-split.json \
   --evidence costs=cost-stress.json \
@@ -455,34 +440,38 @@ uv run lacuna audit \
 
 ## Roadmap and maturity
 
-The planned `0.1`–`0.12` milestones are implemented, compatibility-fixtured, and released. The
-current `0.12` line includes the full factor-research sequence while retaining Lacuna's explicit
-no-backtester boundary.
+The planned `0.1`–`0.13` milestones are implemented, compatibility-fixtured, and released. The
+current `0.13` line adds verified PyPI distribution while retaining the complete factor-research
+sequence and Lacuna's explicit no-backtester boundary.
 
 Every repository-controlled item in the v1 readiness ledger has implementation evidence. `1.0.0`
 remains blocked by one intentionally external requirement: real users must apply Lacuna to
 independent research stacks. Until then, work should emphasize adoption feedback, compatibility,
 correctness, and measured performance rather than accumulating speculative features.
 
-See the [implementation roadmap](docs/development/roadmap.md) for the phase-to-version progression
-and the [v1 readiness ledger](docs/development/v1-readiness.md) for the remaining gate. The full
-[technical specification](LACUNA_TECHNICAL_SPEC.md) defines the architecture and statistical scope.
+See the [implementation roadmap](https://github.com/eyenoticeall/Lacuna/blob/main/docs/development/roadmap.md)
+for the phase-to-version progression and the
+[v1 readiness ledger](https://github.com/eyenoticeall/Lacuna/blob/main/docs/development/v1-readiness.md)
+for the remaining gate. The full
+[technical specification](https://github.com/eyenoticeall/Lacuna/blob/main/LACUNA_TECHNICAL_SPEC.md)
+defines the architecture and statistical scope.
 
 ## Engineering handbook
 
 The technical specification is backed by implementation-oriented documentation:
 
-- [architecture and dependency boundaries](docs/concepts/architecture.md);
-- [semantic time, identity, and table contracts](docs/concepts/data-model.md);
-- [structured evidence and finding contracts](docs/concepts/evidence-model.md);
-- [developer workflow, testing, native, performance, and release guides](docs/development/index.md);
-- [subsystem contracts with formulas, invariants, failure modes, and tests](docs/subsystems/signal-labels.md);
-- [factor-research migration from Alphalens Reloaded](docs/getting-started/alphalens-migration.md);
-- [coding-agent playbooks and review checklist](docs/agents/index.md).
+- [architecture and dependency boundaries](https://github.com/eyenoticeall/Lacuna/blob/main/docs/concepts/architecture.md);
+- [semantic time, identity, and table contracts](https://github.com/eyenoticeall/Lacuna/blob/main/docs/concepts/data-model.md);
+- [structured evidence and finding contracts](https://github.com/eyenoticeall/Lacuna/blob/main/docs/concepts/evidence-model.md);
+- [developer workflow, testing, native, performance, and release guides](https://github.com/eyenoticeall/Lacuna/blob/main/docs/development/index.md);
+- [subsystem contracts with formulas, invariants, failure modes, and tests](https://github.com/eyenoticeall/Lacuna/blob/main/docs/subsystems/signal-labels.md);
+- [factor-research migration from Alphalens Reloaded](https://github.com/eyenoticeall/Lacuna/blob/main/docs/getting-started/alphalens-migration.md);
+- [coding-agent playbooks and review checklist](https://github.com/eyenoticeall/Lacuna/blob/main/docs/agents/index.md).
 
-The documentation distinguishes released v0.1–v0.12 behavior from later contracts. Contributors
-and coding agents should begin with [AGENTS.md](AGENTS.md), then read the relevant methodology and
-subsystem pages before changing a method.
+The documentation distinguishes released v0.1–v0.13 behavior from later contracts. Contributors
+and coding agents should begin with
+[AGENTS.md](https://github.com/eyenoticeall/Lacuna/blob/main/AGENTS.md), then read the relevant
+methodology and subsystem pages before changing a method.
 
 ## Principles
 
@@ -494,6 +483,15 @@ subsystem pages before changing a method.
 - **Interoperate instead of replacing.** Lacuna complements existing research stacks.
 
 ## Development
+
+Lacuna uses [uv](https://docs.astral.sh/uv/) for Python environments and Cargo for the Rust
+workspace:
+
+```bash
+git clone https://github.com/eyenoticeall/Lacuna.git
+cd Lacuna
+uv sync --group dev --group docs --extra pandas --extra statistics --extra report
+```
 
 ```bash
 # Format and lint
@@ -518,24 +516,28 @@ cargo bench --bench kernels
 Pull requests pass through formatting, lint, strict typing, Python 3.11–3.14 on Linux, Python 3.13
 on macOS and Windows, Rust, optional dataframe/reference integrations, strict documentation, and a
 minimum-Rust check, plus a clean source-distribution-to-wheel smoke test. See the
-[CI architecture](docs/development/continuous-integration.md) for the job graph and branch-protection
-contract.
+[CI architecture](https://github.com/eyenoticeall/Lacuna/blob/main/docs/development/continuous-integration.md)
+for the job graph and branch-protection contract.
 
 Version-matching tags additionally build target-smoke-tested stable-ABI wheels for Linux x86_64,
 Linux aarch64, macOS arm64, and Windows x86_64, then publish checksums and GitHub provenance. See the
-[release engineering contract](docs/development/release.md).
+[release engineering contract](https://github.com/eyenoticeall/Lacuna/blob/main/docs/development/release.md).
 
-Contribution guidance lives in [CONTRIBUTING.md](CONTRIBUTING.md). The complete local documentation site can be built with `uv run mkdocs serve`. Security concerns should follow [SECURITY.md](SECURITY.md).
+Contribution guidance lives in
+[CONTRIBUTING.md](https://github.com/eyenoticeall/Lacuna/blob/main/CONTRIBUTING.md). The complete local
+documentation site can be built with `uv run mkdocs serve`. Security concerns should follow
+[SECURITY.md](https://github.com/eyenoticeall/Lacuna/blob/main/SECURITY.md).
 
 ## License
 
-The current repository and future distributions are released under the [MIT License](LICENSE).
+The current repository and future distributions are released under the
+[MIT License](https://github.com/eyenoticeall/Lacuna/blob/main/LICENSE).
 Artifacts published before the MIT-only change retain the grants under which they were released;
-see the [changelog](CHANGELOG.md).
+see the [changelog](https://github.com/eyenoticeall/Lacuna/blob/main/CHANGELOG.md).
 
 ---
 
 <div align="center">
-  <img src="logos/lacuna-logo-icon.webp" alt="Lacuna mark" width="72" />
+  <img src="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-icon.webp" alt="Lacuna mark" width="72" />
   <p><strong>Bring a signal or backtest. Lacuna will try to find the gaps in the evidence.</strong></p>
 </div>

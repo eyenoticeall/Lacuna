@@ -14,11 +14,26 @@ Lacuna is an open-source quantitative research validation library for discoverin
     interoperability, and the v0.13 PyPI distribution migration. It remains pre-1.0: later minor
     APIs may change through documented migrations.
 
+## Install Lacuna
+
+The current verified releases are [`lacuna-quant` 0.13.0](https://pypi.org/project/lacuna-quant/)
+and the optional [`lacuna-options` 0.2.0](https://pypi.org/project/lacuna-options/). Install the
+core distribution, then verify the runtime:
+
+```bash
+python -m pip install lacuna-quant
+lacuna doctor --strict
+```
+
+The distribution name is `lacuna-quant`; the Python import and command remain `lacuna`. Do not
+install the unrelated PyPI project named `lacuna`. See [Getting started](getting-started/index.md)
+for extras, supported wheels, migration guidance, and a first signal audit.
+
 ## Choose a path
 
 | If you want to… | Start here |
 | --- | --- |
-| build and inspect the current package | [Getting started](getting-started/index.md) |
+| install Lacuna and run a first signal audit | [Getting started](getting-started/index.md) |
 | understand ownership and data flow | [Architecture](concepts/architecture.md) |
 | implement or review a change | [Engineering handbook](development/index.md) |
 | understand time and table semantics | [Semantic data model](concepts/data-model.md) |
@@ -30,7 +45,7 @@ Lacuna is an open-source quantitative research validation library for discoverin
 | direct a coding agent | [Agent handbook](agents/index.md) |
 | look up project terminology | [Glossary](reference/glossary.md) |
 
-## What Lacuna will validate
+## What Lacuna validates
 
 - signal information, quantile behavior, decay, turnover, and neutralization;
 - time-aware validation, purging, embargo, bootstrap, and selection-aware inference;

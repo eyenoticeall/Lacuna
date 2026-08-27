@@ -4,6 +4,14 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Documentation
+
+- Promote a PyPI-first **Get started** path near the top of the README, distinguish installed
+  commands from repository `uv run` commands, and align the documentation landing and quickstart
+  pages with the published `lacuna-quant` 0.13.0 and `lacuna-options` 0.2.0 releases.
+- Use repository-absolute README assets and handbook links so future PyPI descriptions retain
+  working brand imagery and navigation.
+
 ## [0.13.0] - 2026-08-27
 
 ### Changed
