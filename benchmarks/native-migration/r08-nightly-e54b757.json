@@ -1,0 +1,154 @@
+{
+  "admission": {
+    "correctness_match": true,
+    "latency_regression_fraction": -0.7886615586474728,
+    "material": true,
+    "reasons": [
+      "end-to-end throughput is at least 1.5x the optimized reference"
+    ],
+    "rss_reduction_fraction": null,
+    "state": "ADMITTED",
+    "throughput_ratio": 4.7317468303456005
+  },
+  "candidate": {
+    "backend": "rust_native",
+    "baseline_rss_bytes": 3752509440,
+    "case_name": "migration.validation.pbo.native",
+    "checksum": "528b6b4f2893d9c2b95b3271662ed26d7d1fb80ec00f56eec6413fa134c0a998",
+    "incremental_peak_rss_bytes": 0,
+    "input_copy_bytes": 288960,
+    "maximum_seconds": 0.08818806400000767,
+    "median_absolute_deviation_seconds": 0.0012156580000350914,
+    "median_seconds": 0.08570753899999772,
+    "minimum_seconds": 0.08449188099996263,
+    "output_copy_bytes": 0,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": 0.003266805000066597,
+      "normalization": 2.598899993699888e-05,
+      "public_call_total": 0.08570753899999772,
+      "result_construction": 0.07149538499993469,
+      "result_projection": 0.0062883100000590275
+    },
+    "process_peak_rss_bytes": 4129026048,
+    "python_traced_peak_bytes": 5243892,
+    "result_projection_bytes": 144144,
+    "temporary_workspace_bytes": 4238,
+    "throughput": 40043.1518632228,
+    "throughput_unit": "combinations/second",
+    "timings_seconds": [
+      0.08548051299999315,
+      0.08818806400000767,
+      0.08570753899999772,
+      0.08785137199998871,
+      0.08697628100003385,
+      0.08509714900003473,
+      0.08449188099996263
+    ]
+  },
+  "config": {
+    "bootstrap_resamples": 2000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 5000,
+    "periods": 1000,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "correctness": {
+    "absolute_tolerance": 1e-12,
+    "exact_checksum_match": false,
+    "first_mismatch_path": null,
+    "match": true,
+    "maximum_absolute_error": 1.6653345369377348e-16,
+    "maximum_relative_error": 9.144191012901767e-15,
+    "numeric_values_compared": 17163,
+    "reason": "structure is exact and every finite numerical value is within tolerance; normalized equivalence checksums differ",
+    "relative_tolerance": 1e-12
+  },
+  "environment": {
+    "checksum_normalization": "backend excluded; finite floats rounded to 12 significant digits",
+    "copy_measurement": "exact logical boundary and compact-carrier bytes when candidate telemetry is available; null for uninstrumented backends",
+    "isolation": "one child process per measured backend",
+    "machine": "x86_64",
+    "memory_measurement": "tracemalloc peak; native allocations may not be attributed",
+    "mkl_threads": 1,
+    "native_available": true,
+    "native_threads": 1,
+    "native_version": "0.14.0",
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+    "polars": "1.44.1",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 4131627008,
+    "processor": "x86_64",
+    "python": "3.13.15",
+    "timing_clock": "time.perf_counter"
+  },
+  "generated_at": "2026-08-27T18:31:19.550493Z",
+  "reference": {
+    "backend": "numpy_partition_moments",
+    "baseline_rss_bytes": 3746668544,
+    "case_name": "migration.validation.pbo.reference",
+    "checksum": "4347517607068a587a3554c7fd9408369c38b954bf9de69edf4c49910d84256a",
+    "incremental_peak_rss_bytes": 0,
+    "input_copy_bytes": null,
+    "maximum_seconds": 0.4198552209999207,
+    "median_absolute_deviation_seconds": 0.0058561180000538116,
+    "median_seconds": 0.40554637599996113,
+    "minimum_seconds": 0.3942401729999574,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": 2.716100004818145e-05,
+      "public_call_total": 0.40554637599996113,
+      "result_construction": 0.07057941899995512,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 4132077568,
+    "python_traced_peak_bytes": 5252588,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 8462.657301616053,
+    "throughput_unit": "combinations/second",
+    "timings_seconds": [
+      0.41140249400001494,
+      0.40391008000000284,
+      0.407907444999978,
+      0.3993468389999748,
+      0.3942401729999574,
+      0.4198552209999207,
+      0.40554637599996113
+    ]
+  },
+  "run_url": "https://github.com/eyenoticeall/Lacuna/actions/runs/33103119927",
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "e54b7576558eb2257bebfc25b0969c0be8df26ff",
+  "target": {
+    "absolute_tolerance": 1e-12,
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": "migration.validation.pbo.native",
+    "candidate_id": "R-08",
+    "effective_dimensions": {
+      "combinations": 3432,
+      "partitions": 14,
+      "rows": 1008,
+      "strategies": 12
+    },
+    "public_latency_share": 1.0,
+    "public_operation": "validation.probability_of_backtest_overfitting",
+    "public_rss_share": null,
+    "reference_case": "migration.validation.pbo.reference",
+    "relative_tolerance": 1e-12
+  },
+  "version": 1
+}

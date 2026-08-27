@@ -261,11 +261,12 @@ versions, c14n-v1 identities, and deterministic RNG streams. It profiles every r
 migration candidate against an already optimized NumPy or Polars reference and ships native code
 only after correctness plus an end-to-end throughput, memory, or bounded-completion gate.
 
-The implementation phase is complete. Most candidates finish as `OPTIMIZED_NON_NATIVE`; shared
-resampling is `NOT_MIGRATING`, and deferred identity/public-carrier work is `BLOCKED`. Grouped-rank
-IC and PBO/CSCV remain release-gated until pinned Linux evidence, the same `cp311-abi3` wheel on
-Python 3.11–3.14, every target wheel, and the exact-SHA non-publishing preflight reproduce their
-admission. The tag workflow refuses any non-terminal decision.
+The implementation and candidate-admission phases are complete. Most candidates finish as
+`OPTIMIZED_NON_NATIVE`; shared resampling is `NOT_MIGRATING`, and deferred identity/public-carrier
+work is `BLOCKED`. Grouped-rank IC and PBO/CSCV are `SHIPPED_NATIVE` after pinned Linux evidence,
+the same `cp311-abi3` wheel on Python 3.11–3.14, and every target-wheel smoke job reproduced their
+contracts. The exact-SHA non-publishing preflight remains a tag gate, and the tag workflow refuses
+any non-terminal decision.
 
 Native work stays single-threaded. Python retains timing semantics, methodology, validation,
 findings, provenance, RNG, and public result construction. Arrow C Data, native RNG/scheduling,

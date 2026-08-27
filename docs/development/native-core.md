@@ -60,18 +60,21 @@ Native functions accept primitive arrays, Arrow-compatible buffers, offsets, and
 
 Return columnar arrays or compact summaries. If detailed row-level output is needed, return one contiguous buffer or table representation.
 
-### v0.14 admitted kernels
+### v0.14 shipped kernels
 
-- grouped rank IC uses the typed bulk-array boundary and remains provisionally admitted pending the
-  pinned-Linux and release-preflight reproductions;
+- grouped rank IC uses the typed bulk-array boundary. The pinned Linux workload measured a 5.749
+  times end-to-end improvement over the optimized NumPy reference with exact structure, checksum,
+  and numerical output;
 - built-in PBO/CSCV mean and Sharpe reduction dispatches to a compact, single-threaded native
   kernel at 512 or more combinations. Python enumerates the combinations, owns exact tie policy,
-  projects the compact arrays, and constructs all evidence. The local full-call result is 3.65× the
-  optimized partition-moment reference with an exact equivalence checksum; it remains provisional
-  until authoritative CI reproduces that gate.
+  projects the compact arrays, and constructs all evidence. The pinned Linux workload measured a
+  4.732 times full-call improvement over the optimized partition-moment reference; structure is
+  exact and 17,163 finite comparisons agree within 1e-12.
 
 Neither path changes public signatures, analytical method versions, canonical identities, or result
 schemas. Their benchmark artifacts live in `benchmarks/native-migration/`.
+Both reproduced in nightly CI, the same Linux `cp311-abi3` wheel passed Python 3.11–3.14, and all
+target-wheel smoke jobs passed. The exact-SHA release preflight repeats those gates before tagging.
 
 ## Arrow integration
 

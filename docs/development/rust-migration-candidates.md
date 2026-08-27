@@ -145,26 +145,31 @@ necessary boundary change justifies work before a threshold is met.
 
 These items determine whether later Rust work produces a real user-visible benefit.
 
-### F-01: typed buffer and Arrow boundary
+### F-01: typed native array boundary
 
-**Disposition:** P0, **MIGRATE_AFTER_PROFILE**.
+**Disposition:** P0, **SHIPPED_NATIVE**.
 
-Replace analytical `Vec` extraction from Python lists with one or both of:
+The shipped boundary replaces analytical `Vec` extraction from Python lists with checked,
+contiguous NumPy arrays:
 
-- borrowed typed contiguous buffers for normalized NumPy-compatible arrays;
-- Arrow C Data or C Stream inputs for columnar, nullable, and chunked data.
+- Python first attempts a zero-copy, read-only Polars-to-NumPy view and explicitly records any
+  normalization or copy required by dtype, nulls, chunks, or layout;
+- PyO3 validates dtype, dimensions, native endianness, contiguity, alignment, lengths, offsets,
+  masks, and integer ranges while holding the interpreter lock;
+- Rust owns a single copied snapshot before detached computation and returns compact numeric arrays
+  for projection into the unchanged Python results.
 
-The binding must validate dtype, length, offsets, null bitmaps, contiguity, alignment, and lifetime
-before detaching from Python. It must return arrays, bitmaps, offsets, or an Arrow-compatible table,
-not a list of Python scalars. A copy is acceptable when required by sorting, chunk consolidation, or
-dtype normalization, but the copy must be measured and reported.
+This is a bulk-copy safety boundary, not a zero-copy claim. It is used by grouped rank IC and the
+built-in PBO/CSCV reducer, keeps `checked_mean` as the native smoke primitive, remains
+single-threaded, and passes the same Linux `cp311-abi3` wheel on Python 3.11–3.14 plus every target
+wheel in the release matrix.
 
-Apply this first to existing IC, bootstrap-mean, and interval-purge calls. It provides a clean
-crossover measurement before adding more kernels.
+Arrow C Data/C Stream integration is not part of F-01 and remains a separate future project with
+its own ownership, release-callback, unsafe-code, and lifetime review.
 
 ### F-02a: byte-identical streaming c14n-v1 identity
 
-**Disposition:** P0, **MIGRATE_AFTER_PROFILE**.
+**Disposition:** P0, **OPTIMIZED_NON_NATIVE**.
 
 `frame_records()` currently turns a frame into Python dictionaries, and multiple analytical paths
 then serialize those records for `fingerprint()`. At quant scale this can dominate both memory and
@@ -197,7 +202,7 @@ performance milestone.
 
 ### F-03a: compact internal result carriers
 
-**Disposition:** P0, **MIGRATE_AFTER_PROFILE**.
+**Disposition:** P0, **OPTIMIZED_NON_NATIVE**.
 
 Several candidates currently recreate `O(N)` Python objects after computation:
 
@@ -221,7 +226,7 @@ v0.13 public carriers exactly.
 
 ### F-04: effective execution budgets and dispatch
 
-**Disposition:** P0 prerequisite; mostly **KEEP_PYTHON** orchestration.
+**Disposition:** P0, **OPTIMIZED_NON_NATIVE** Python orchestration.
 
 Make the resolved memory limit operational and thread use observable. v0.14 native kernels are
 single-threaded: this foundation blocks native parallelism, not independent single-thread kernels.
@@ -239,7 +244,7 @@ than implying that Lacuna controls third-party pools.
 
 ### F-05: representative native benchmark coverage
 
-**Disposition:** P0 prerequisite; **KEEP_PYTHON** benchmark infrastructure.
+**Disposition:** P0, **OPTIMIZED_NON_NATIVE** benchmark infrastructure.
 
 Add native and reference cases at the same effective shape. The current 5-million-row tier still
 caps interval input at 100,000 rows, strategy count at 12, and event instruments at 8; its bootstrap
@@ -250,14 +255,14 @@ but they must be named as separate shape dimensions rather than presented as ful
 
 | ID | Public path or internal area | Disposition | Priority | Benefit | Semantic risk | Packaging risk | Evidence | Main prerequisite |
 |---|---|---|---|---|---|---|---|---|
-| R-01 | `signal.ic`, existing grouped rank IC | IMPLEMENTED_NATIVE | P1 | Medium | Medium | High | ADMITTED | F-01, pinned wheel evidence |
+| R-01 | `signal.ic`, existing grouped rank IC | IMPLEMENTED_NATIVE | P1 | Medium | Medium | High | SHIPPED_NATIVE | F-01, pinned wheel evidence |
 | R-02 | Built-in cost estimates and `costs.stress`, `O(SN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | optimized algebra |
 | R-03 | `costs.capacity_curve`, currently up to `O(SCN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | scaling algebra |
 | R-04 | `costs.break_even_cost` repeated reductions | KEEP_PYTHON | P2 | Medium | Medium | Low | OPTIMIZED_NON_NATIVE | period preaggregation |
 | R-05 | Purged/CPCV split assembly, up to `O(KN)` | KEEP_PYTHON | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | F-01/F-03a |
 | R-06 | Shared resampling reduction, `O(RN)`/`O(RNM)` | KEEP_PYTHON | P1 | High | High | Medium | NOT_MIGRATING | Python-owned RNG |
 | R-07 | Built-in permutation schemes/statistics | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | vectorized reference |
-| R-08 | PBO/CSCV combination evaluation, `O(KNM)` | IMPLEMENTED_NATIVE | P2 | Medium | High | Medium | ADMITTED | F-01, pinned wheel evidence |
+| R-08 | PBO/CSCV combination evaluation, `O(KNM)` | IMPLEMENTED_NATIVE | P2 | Medium | High | Medium | SHIPPED_NATIVE | F-01, pinned wheel evidence |
 | R-09 | Grouped bucket assignment | POLARS_FIRST | P1 | High | High | Medium | OPTIMIZED_NON_NATIVE | one-plan Polars reference |
 | R-10 | Membership portion of turnover | KEEP_PYTHON | P1 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | endpoint self-joins |
 | R-11 | Prior-only expanding/rolling regime quantiles | KEEP_PYTHON | P2 | Medium | High | Medium | OPTIMIZED_NON_NATIVE | exact Polars order statistics |
@@ -292,23 +297,24 @@ but they must be named as separate shape dimensions rather than presented as ful
 
 ### R-01: finish the grouped rank-IC migration
 
-**Current path.** Polars validates, joins, sorts, and identifies groups. Python constructs lists for
-signal values, labels, and offsets before `grouped_rank_ic` runs. Rust implements average ties and
-returns `None` for undersized or zero-variance groups.
+**Shipped path.** Polars validates, joins, sorts, identifies groups, and produces checked contiguous
+arrays. Rust implements average ties and returns compact values and validity/status arrays for
+undersized or zero-variance groups. Python reconstructs the unchanged evidence rows.
 
-**Proposed native boundary.**
+**Native boundary.**
 
 - Input: borrowed `f64` signal/label buffers, validity information, and group offsets.
 - Output: one `f64` result buffer plus a validity bitmap and optional per-group diagnostic code.
-- Optional later work: parallel independent groups above a measured minimum-work threshold.
+- Parallel independent groups remain deferred; v0.14 uses one native thread.
 
 **Python retains.** Column selection, temporal join policy, null eligibility, sorting, method
 selection, result rows, warnings, and backend provenance.
 
 **Required equivalence.** Preserve average ties, signed-zero ties, finite-value policy, group
 ordering, undefined groups, float tolerances, and deterministic results across thread counts.
-Benchmark by both `N` and the group-size distribution; one large group and thousands of tiny
-groups have different crossover points.
+The pinned nightly case covers 1,625,750 rows and 1,000 deliberately skewed groups. It measured
+11.935 seconds for the optimized NumPy reference and 2.076 seconds for native execution, a 5.749
+times full-call improvement with an exact checksum and all 2,989 numerical comparisons exact.
 
 ### R-02: fused built-in cost estimation and stress reduction
 
@@ -425,18 +431,20 @@ high-cardinality strata as well as unstratified arrays.
 
 ### R-08: PBO/CSCV combination evaluation
 
-**Current path.** The reference enumerates symmetric combinations, concatenates in-sample and
-out-of-sample indices, slices an `N × M` matrix, evaluates strategies, and ranks the selected
-strategy for every combination.
+**Shipped path.** Python validates the input, enumerates the exact symmetric combinations, and
+passes a contiguous `N × M` return matrix plus partition/combination codes to the built-in native
+mean/Sharpe reducer. The reference partition-moment implementation remains directly testable.
 
-**Proposed native boundary.** Consume a contiguous returns matrix, partition offsets, enumerated
+**Native boundary.** Consume a contiguous returns matrix, partition offsets, enumerated
 combination codes, and a built-in statistic identifier. Return selected strategy indices,
 out-of-sample ranks/logits, and small per-combination metrics. Python retains strategy names,
 combination safety limits, findings, distribution summaries, and evidence.
 
-The current benchmark caps `M` at 12, so it is not admission evidence for a quant's broad strategy
-search. Test ties, non-finite rejection, constant strategies, partition imbalance, memory layout,
-and the explicit maximum-combination guard. Custom statistics stay on the reference path.
+The pinned nightly case covers 1,008 rows, 12 strategies, 14 partitions, and 3,432 combinations. It
+measured 405.55 ms for the optimized reference and 85.71 ms for native execution, a 4.732 times
+full-call improvement. Structure is exact and all 17,163 finite values agree within the declared
+1e-12 tolerance (maximum absolute error 1.67e-16). Exact checksums remain visible separately.
+Dispatch begins at 512 combinations; custom statistics stay on the reference path.
 
 ### R-09: grouped bucket and quantile assignment
 
