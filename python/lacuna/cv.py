@@ -10,9 +10,10 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from itertools import combinations
 from math import comb
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 
 from lacuna._frames import eager_frame, series_time_i64
@@ -194,9 +195,8 @@ def _role_rows(
     )
     for role, indices in roles:
         if indices:
-            times = [source_times[index] for index in indices]
-            start: TimeValue | None = min(times)
-            end: TimeValue | None = max(times)
+            start: TimeValue | None = min(source_times[index] for index in indices)
+            end: TimeValue | None = max(source_times[index] for index in indices)
         else:
             start = None
             end = None
@@ -364,7 +364,7 @@ def _merged_intervals(starts: Sequence[int], ends: Sequence[int]) -> list[tuple[
     return merged
 
 
-def _reference_purge_mask(
+def _literal_purge_mask(
     train_starts: Sequence[int],
     train_ends: Sequence[int],
     test_starts: Sequence[int],
@@ -379,6 +379,39 @@ def _reference_purge_mask(
         index = bisect_right(merged_ends, train_start)
         result.append(index < len(merged) and merged[index][0] < train_end)
     return result
+
+
+def _reference_purge_mask(
+    train_starts: Sequence[int],
+    train_ends: Sequence[int],
+    test_starts: Sequence[int],
+    test_ends: Sequence[int],
+) -> list[bool]:
+    """Vectorized half-open interval oracle retaining the literal differential path."""
+
+    train_start_array: npt.NDArray[np.int64] = np.asarray(train_starts, dtype=np.int64)
+    train_end_array: npt.NDArray[np.int64] = np.asarray(train_ends, dtype=np.int64)
+    test_start_array: npt.NDArray[np.int64] = np.asarray(test_starts, dtype=np.int64)
+    test_end_array: npt.NDArray[np.int64] = np.asarray(test_ends, dtype=np.int64)
+    if train_start_array.shape != train_end_array.shape:
+        raise DataContractError("aligned training interval arrays must have equal lengths")
+    if test_start_array.shape != test_end_array.shape:
+        raise DataContractError("aligned test interval arrays must have equal lengths")
+    if np.any(train_end_array <= train_start_array) or np.any(test_end_array <= test_start_array):
+        raise DataContractError("label intervals must satisfy label_start < label_end")
+    if test_start_array.size == 0:
+        return cast(list[bool], np.zeros(train_start_array.size, dtype=np.bool_).tolist())
+
+    order: npt.NDArray[np.intp] = np.lexsort((test_end_array, test_start_array))
+    ordered_starts: npt.NDArray[np.int64] = test_start_array[order]
+    prefix_max_end: npt.NDArray[np.int64] = np.maximum.accumulate(test_end_array[order])
+    eligible_position: npt.NDArray[np.intp] = (
+        np.searchsorted(ordered_starts, train_end_array, side="left") - 1
+    )
+    overlaps: npt.NDArray[np.bool_] = np.zeros(train_start_array.size, dtype=np.bool_)
+    eligible: npt.NDArray[np.bool_] = eligible_position >= 0
+    overlaps[eligible] = prefix_max_end[eligible_position[eligible]] > train_start_array[eligible]
+    return cast(list[bool], overlaps.tolist())
 
 
 def _purge_mask(
@@ -607,69 +640,81 @@ class CombinatorialPurgedKFold:
         period_groups = [
             tuple(group.tolist()) for group in np.array_split(unique_times, self.n_groups)
         ]
-        group_time_sets = [set(group) for group in period_groups]
-        group_rows = [
-            tuple(
-                indexed.filter(pl.col(time).is_in(group_times))
-                .sort([time, "_source_index"])
-                .get_column("_source_index")
-                .to_list()
-            )
-            for group_times in group_time_sets
-        ]
-        test_combinations = tuple(combinations(range(self.n_groups), self.n_test_groups))
+        # Every unique value was validated above, so the source-order projection
+        # cannot introduce a new temporal type.
+        source_times = cast(list[TimeValue], indexed.get_column(time).to_list())
+        time_to_group = {
+            value: group for group, group_times in enumerate(period_groups) for value in group_times
+        }
         period_positions = {value: position for position, value in enumerate(unique_times)}
+        row_groups: npt.NDArray[np.int64] = np.fromiter(
+            (time_to_group[value] for value in source_times),
+            dtype=np.int64,
+            count=len(source_times),
+        )
+        row_period_positions: npt.NDArray[np.int64] = np.fromiter(
+            (period_positions[value] for value in source_times),
+            dtype=np.int64,
+            count=len(source_times),
+        )
+        ordered_source_indices: list[int] = (
+            indexed.sort([time, "_source_index"]).get_column("_source_index").to_list()
+        )
+        mutable_group_rows: list[list[int]] = [[] for _ in range(self.n_groups)]
+        for source_index in ordered_source_indices:
+            mutable_group_rows[int(row_groups[source_index])].append(source_index)
+        group_rows = [tuple(rows) for rows in mutable_group_rows]
+        test_combinations = tuple(combinations(range(self.n_groups), self.n_test_groups))
+        start_array: npt.NDArray[np.int64] = np.asarray(starts, dtype=np.int64)
+        end_array: npt.NDArray[np.int64] = np.asarray(ends, dtype=np.int64)
         folds: list[Fold] = []
         backends: set[str] = set()
 
         for fold_number, test_groups in enumerate(test_combinations):
-            test_time_set: set[TimeValue] = set()
-            for group in test_groups:
-                test_time_set.update(group_time_sets[group])
-            test_indices: list[int] = (
-                indexed.filter(pl.col(time).is_in(test_time_set))
-                .get_column("_source_index")
-                .to_list()
+            test_group_array: npt.NDArray[np.int64] = np.fromiter(
+                test_groups,
+                dtype=np.int64,
             )
-            candidate_indices: list[int] = (
-                indexed.filter(~pl.col(time).is_in(test_time_set))
-                .get_column("_source_index")
-                .to_list()
-            )
+            test_row_mask: npt.NDArray[np.bool_] = np.isin(row_groups, test_group_array)
+            test_index_array: npt.NDArray[np.intp] = np.flatnonzero(test_row_mask)
+            candidate_index_array: npt.NDArray[np.intp] = np.flatnonzero(~test_row_mask)
+            test_indices = test_index_array.tolist()
             mask, backend = _purge_mask(
-                [starts[index] for index in candidate_indices],
-                [ends[index] for index in candidate_indices],
-                [starts[index] for index in test_indices],
-                [ends[index] for index in test_indices],
+                start_array[candidate_index_array],
+                end_array[candidate_index_array],
+                start_array[test_index_array],
+                end_array[test_index_array],
                 use_native=self.use_native,
             )
             backends.add(backend)
-            purged = [
-                index for index, overlaps in zip(candidate_indices, mask, strict=True) if overlaps
-            ]
-            retained = [
-                index
-                for index, overlaps in zip(candidate_indices, mask, strict=True)
-                if not overlaps
-            ]
+            overlap_mask: npt.NDArray[np.bool_] = np.asarray(mask, dtype=np.bool_)
+            purged = candidate_index_array[overlap_mask].tolist()
+            retained_array = candidate_index_array[~overlap_mask]
 
-            embargo_times: set[TimeValue] = set()
+            embargo_positions: set[int] = set()
             if self.embargo:
                 for group in test_groups:
                     final_period = max(period_positions[value] for value in period_groups[group])
-                    embargo_times.update(
-                        unique_times[final_period + 1 : final_period + 1 + self.embargo]
+                    embargo_positions.update(
+                        range(
+                            final_period + 1,
+                            min(final_period + 1 + self.embargo, len(unique_times)),
+                        )
                     )
-                embargo_times.difference_update(test_time_set)
-            embargoed = (
-                indexed.filter(
-                    pl.col("_source_index").is_in(retained) & pl.col(time).is_in(embargo_times)
+            if embargo_positions:
+                embargo_position_array: npt.NDArray[np.int64] = np.fromiter(
+                    sorted(embargo_positions),
+                    dtype=np.int64,
                 )
-                .get_column("_source_index")
-                .to_list()
-            )
-            embargoed_set = set(embargoed)
-            retained = [index for index in retained if index not in embargoed_set]
+                embargo_mask: npt.NDArray[np.bool_] = np.isin(
+                    row_period_positions[retained_array],
+                    embargo_position_array,
+                )
+                embargoed = retained_array[embargo_mask].tolist()
+                retained = retained_array[~embargo_mask].tolist()
+            else:
+                embargoed = []
+                retained = retained_array.tolist()
             folds.append(
                 Fold(
                     fold=fold_number,
@@ -693,15 +738,15 @@ class CombinatorialPurgedKFold:
             for path_index, fold_number in enumerate(group_folds):
                 fold_by_path[path_index][group] = fold_number
 
+        path_test_indices = tuple(index for rows in group_rows for index in rows)
         paths = tuple(
             CPCVPath(
                 path=path_index,
                 fold_by_group=tuple(fold_numbers),
-                test_indices=tuple(index for rows in group_rows for index in rows),
+                test_indices=path_test_indices,
             )
             for path_index, fold_numbers in enumerate(fold_by_path)
         )
-        source_times = _validated_times(indexed.sort("_source_index").get_column(time).to_list())
         path_rows: list[dict[str, JsonValue]] = []
         for cpcv_path in paths:
             for group, fold_number in enumerate(cpcv_path.fold_by_group):

@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from datetime import date
 
+import numpy as np
 import polars as pl
 import pytest
 
-from lacuna.cv import CombinatorialPurgedKFold, PurgedKFold, WalkForward
+from lacuna.cv import (
+    CombinatorialPurgedKFold,
+    PurgedKFold,
+    WalkForward,
+    _literal_purge_mask,
+    _reference_purge_mask,
+)
 from lacuna.exceptions import DataContractError, MethodContractError
 
 
@@ -118,6 +125,21 @@ def test_native_and_reference_purge_paths_match() -> None:
     reference = PurgedKFold(n_splits=3, embargo=1, use_native=False).split(_intervals())
     assert native.folds == reference.folds
     assert native.evidence.metadata.parameters["backend"] == "rust_native"
+
+
+def test_vectorized_purge_reference_matches_literal_for_unsorted_intervals() -> None:
+    rng = np.random.default_rng(505)
+    for _ in range(20):
+        train_starts = rng.integers(-20, 40, size=31, dtype="int64")
+        train_ends = train_starts + rng.integers(1, 12, size=31, dtype="int64")
+        test_starts = rng.integers(-20, 40, size=17, dtype="int64")
+        test_ends = test_starts + rng.integers(1, 12, size=17, dtype="int64")
+        assert _reference_purge_mask(
+            train_starts,
+            train_ends,
+            test_starts,
+            test_ends,
+        ) == _literal_purge_mask(train_starts, train_ends, test_starts, test_ends)
 
 
 def test_cpcv_exposes_every_combination_and_complete_paths() -> None:

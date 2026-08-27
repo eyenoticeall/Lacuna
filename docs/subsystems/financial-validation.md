@@ -264,7 +264,10 @@ method metadata and warnings
   an available native extension uses the admitted compact split reducer for built-in mean and Sharpe
   statistics; smaller workloads retain the NumPy partition-moment path. Python continues to own
   combination enumeration, tie policy, findings, provenance, and result construction;
-- CPCV currently uses the validated Python/NumPy reference path. No native RNG is used.
+- CPCV assigns source rows to contiguous chronological groups once and uses a vectorized NumPy
+  half-open interval oracle; the literal interval scan remains available to differential tests. A
+  complete compact fold-assembly native spike is evaluated separately because public tuple/path
+  projection still dominates representative large calls. No native RNG is used.
 
 SciPy remains the default for mature distribution functions and standard linear algebra.
 
