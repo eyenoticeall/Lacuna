@@ -88,6 +88,7 @@ _PRIVATE_MIGRATION_REGIME_CASES = {
     "migration.regime.quantiles.rolling",
 }
 _PRIVATE_MIGRATION_EVENT_CASES = {
+    "migration.events.response.public",
     "migration.events.windows.public",
 }
 
@@ -1160,6 +1161,41 @@ def _run_benchmarks(
                 ),
                 migration_events.height * 16,
                 "window_rows/second",
+            )
+        )
+    if "migration.events.response.public" in requested_private_event_cases:
+        response_anchors = list(range(2, max(3, resolved.periods - 2), 5))
+        response_instruments = range(min(resolved.instruments, 500))
+        response_events = pl.DataFrame(
+            [
+                {
+                    "event_id": f"response-{instrument_id}-{anchor_time}",
+                    "instrument": instrument_id,
+                    "event_time": anchor_time,
+                    "available_time": anchor_time,
+                }
+                for instrument_id in response_instruments
+                for anchor_time in response_anchors
+            ]
+        )
+        response_windows = events.event_windows(
+            response_events,
+            prices,
+            before=1,
+            after=2,
+            price_adjustment="raw",
+        )
+        cases.append(
+            (
+                "migration.events.response.public",
+                partial(
+                    events.event_response,
+                    response_windows,
+                    resamples=resolved.bootstrap_resamples,
+                    seed=resolved.seed,
+                ),
+                len(response_anchors) * resolved.bootstrap_resamples * 4,
+                "cluster_offset_resamples/second",
             )
         )
     native = native_status()

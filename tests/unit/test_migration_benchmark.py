@@ -229,6 +229,7 @@ def test_instrumented_native_pbo_reconciles_boundary_and_projection_bytes() -> N
         "migration.signal.turnover.multilag",
         "migration.regime.quantiles.rolling",
         "migration.events.windows.public",
+        "migration.events.response.public",
     ),
 )
 def test_private_migration_cases_measure_public_calls_without_extending_benchmark_v6(
