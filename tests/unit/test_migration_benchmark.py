@@ -227,6 +227,7 @@ def test_instrumented_native_pbo_reconciles_boundary_and_projection_bytes() -> N
         "migration.validation.pbo.native",
         "migration.cv.cpcv.reference",
         "migration.signal.turnover.multilag",
+        "migration.signal.portfolio.grouped_rank",
         "migration.regime.quantiles.rolling",
         "migration.events.windows.public",
         "migration.events.response.public",

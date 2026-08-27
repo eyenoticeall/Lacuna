@@ -82,6 +82,7 @@ _PRIVATE_MIGRATION_CV_CASES = {
     "migration.cv.cpcv.reference",
 }
 _PRIVATE_MIGRATION_SIGNAL_CASES = {
+    "migration.signal.portfolio.grouped_rank",
     "migration.signal.turnover.multilag",
 }
 _PRIVATE_MIGRATION_REGIME_CASES = {
@@ -1101,6 +1102,29 @@ def _run_benchmarks(
                 ),
                 resolved.rows * len(resolved.horizons) * resolved.quantiles,
                 "membership_cells/second",
+            )
+        )
+    if "migration.signal.portfolio.grouped_rank" in requested_private_signal_cases:
+        grouped_bucketed = signal.bucketize(
+            diagnostic_observations,
+            spec=bucket_spec,
+            by=("time", "sector"),
+        )
+        cases.append(
+            (
+                "migration.signal.portfolio.grouped_rank",
+                partial(
+                    signal.portfolio_projection,
+                    grouped_bucketed,
+                    labels,
+                    horizon=resolved.horizon_names[0],
+                    long_buckets=(resolved.quantiles,),
+                    short_buckets=(1,),
+                    weighting="rank",
+                    group_neutral="sector",
+                ),
+                resolved.rows,
+                "input_rows/second",
             )
         )
     requested_private_regime_cases = (
