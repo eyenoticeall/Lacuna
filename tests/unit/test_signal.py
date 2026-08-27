@@ -194,6 +194,57 @@ def test_turnover_multi_lag_uses_exact_global_period_endpoints() -> None:
     ]
 
 
+def test_turnover_membership_self_join_matches_literal_sets_with_universe_churn() -> None:
+    rows: list[dict[str, object]] = []
+    for period in range(7):
+        for instrument in range(period % 3, 9 - (period + 1) % 3):
+            rows.append(
+                {
+                    "time": period,
+                    "instrument": instrument,
+                    "signal": float((instrument * 7 + period * 3) % 11),
+                }
+            )
+    signal = pl.DataFrame(rows).reverse()
+    quantile_count = 4
+    lags = (1, 2, 4)
+    result = turnover(signal, quantiles=quantile_count, lags=lags)
+
+    memberships: dict[int, dict[int, set[int]]] = {}
+    for period in range(7):
+        ordered = sorted(
+            (row for row in rows if row["time"] == period),
+            key=lambda row: (row["signal"], row["instrument"]),
+        )
+        memberships[period] = {bucket: set() for bucket in range(1, quantile_count + 1)}
+        for ordinal, row in enumerate(ordered):
+            bucket = int(ordinal * quantile_count / len(ordered)) + 1
+            memberships[period][bucket].add(int(row["instrument"]))
+
+    expected: list[dict[str, object]] = []
+    for lag in lags:
+        for period in range(lag, 7):
+            for bucket in range(1, quantile_count + 1):
+                previous = memberships[period - lag][bucket]
+                current = memberships[period][bucket]
+                denominator = len(previous) + len(current)
+                expected.append(
+                    {
+                        "lag": lag,
+                        "previous_observation_time": period - lag,
+                        "observation_time": period,
+                        "bucket": bucket,
+                        "membership_turnover": (
+                            len(previous.symmetric_difference(current)) / denominator
+                            if denominator
+                            else None
+                        ),
+                    }
+                )
+
+    assert result.table("membership_turnover_by_period_lag") == expected
+
+
 @pytest.mark.parametrize("lags", [(), (2,), (0, 1), (1, 1)])
 def test_turnover_rejects_invalid_lag_contracts(lags: tuple[int, ...]) -> None:
     signal, _ = _panel(periods=3, instruments=3)

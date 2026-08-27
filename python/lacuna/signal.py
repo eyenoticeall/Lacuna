@@ -1038,25 +1038,18 @@ def turnover(
             ).alias("quantile")
         )
     )
-    bucket_sets: dict[int, dict[int, set[object]]] = {}
-    for group in full_ranked.partition_by("_period_index", maintain_order=True):
-        period_index = int(group.get_column("_period_index")[0])
-        bucket_sets[period_index] = {
-            bucket: set(
-                group.filter(pl.col("quantile") == bucket).get_column("instrument").to_list()
-            )
-            for bucket in range(1, quantiles + 1)
-        }
-
-    def symmetric_turnover(previous: set[object], current: set[object]) -> float | None:
-        denominator = len(previous) + len(current)
-        return len(previous.symmetric_difference(current)) / denominator if denominator else None
-
     transition_frames: list[pl.DataFrame] = []
-    membership_rows: list[dict[str, object]] = []
-    period_times = {
-        int(row["_period_index"]): row["observation_time"] for row in periods.to_dicts()
-    }
+    membership_frames: list[pl.DataFrame] = []
+    membership_base = full_ranked.select(
+        "_period_index",
+        "observation_time",
+        "instrument",
+        pl.col("quantile").alias("bucket"),
+    )
+    membership_sizes = membership_base.group_by(
+        ["_period_index", "bucket"], maintain_order=True
+    ).len(name="_current_size")
+    bucket_grid = pl.DataFrame({"bucket": np.arange(1, quantiles + 1, dtype=np.int32)})
     for lag in normalized_lags:
         previous = full_ranked.select(
             "instrument",
@@ -1091,23 +1084,69 @@ def turnover(
             .sort("_period_index")
         )
         transition_frames.append(transitions)
-        for period_index in range(lag, periods.height):
-            for bucket in range(1, quantiles + 1):
-                membership_rows.append(
-                    {
-                        "_period_index": period_index,
-                        "lag": lag,
-                        "previous_observation_time": period_times[period_index - lag],
-                        "observation_time": period_times[period_index],
-                        "bucket": bucket,
-                        "membership_turnover": symmetric_turnover(
-                            bucket_sets.get(period_index - lag, {}).get(bucket, set()),
-                            bucket_sets.get(period_index, {}).get(bucket, set()),
-                        ),
-                    }
+        prior_membership = membership_base.select(
+            (pl.col("_period_index") + lag).alias("_period_index"),
+            "instrument",
+            "bucket",
+        )
+        intersections = (
+            membership_base.join(
+                prior_membership,
+                on=["_period_index", "instrument", "bucket"],
+                how="inner",
+            )
+            .group_by(["_period_index", "bucket"], maintain_order=True)
+            .len(name="_intersection_size")
+        )
+        previous_sizes = membership_sizes.select(
+            (pl.col("_period_index") + lag).alias("_period_index"),
+            "bucket",
+            pl.col("_current_size").alias("_previous_size"),
+        )
+        endpoint_grid = (
+            periods.filter(pl.col("_period_index") >= lag)
+            .join(
+                periods.select(
+                    (pl.col("_period_index") + lag).alias("_period_index"),
+                    pl.col("observation_time").alias("previous_observation_time"),
+                ),
+                on="_period_index",
+                how="inner",
+            )
+            .join(bucket_grid, how="cross")
+            .join(membership_sizes, on=["_period_index", "bucket"], how="left")
+            .join(previous_sizes, on=["_period_index", "bucket"], how="left")
+            .join(intersections, on=["_period_index", "bucket"], how="left")
+            .with_columns(
+                pl.col("_current_size").fill_null(0),
+                pl.col("_previous_size").fill_null(0),
+                pl.col("_intersection_size").fill_null(0),
+            )
+        )
+        membership_denominator = pl.col("_previous_size") + pl.col("_current_size")
+        membership_frames.append(
+            endpoint_grid.with_columns(
+                pl.lit(lag).cast(pl.Int32).alias("lag"),
+                pl.when(membership_denominator > 0)
+                .then(
+                    (membership_denominator - 2 * pl.col("_intersection_size"))
+                    / membership_denominator
                 )
+                .otherwise(None)
+                .alias("membership_turnover"),
+            ).select(
+                "_period_index",
+                "lag",
+                "previous_observation_time",
+                "observation_time",
+                "bucket",
+                "membership_turnover",
+            )
+        )
     transitions_by_lag = pl.concat(transition_frames, how="vertical").sort(["lag", "_period_index"])
-    membership = pl.DataFrame(membership_rows).sort(["lag", "_period_index", "bucket"])
+    membership = pl.concat(membership_frames, how="vertical").sort(
+        ["lag", "_period_index", "bucket"]
+    )
     tails = membership.group_by(["lag", "_period_index"], maintain_order=True).agg(
         pl.col("membership_turnover")
         .filter(pl.col("bucket") == quantiles)
