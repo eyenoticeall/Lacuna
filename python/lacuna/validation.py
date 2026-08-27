@@ -28,6 +28,7 @@ from lacuna._advanced_inference import (
     sharpe_inference,
     superior_predictive_ability,
 )
+from lacuna._execution import resolve_execution_budget
 from lacuna._frames import (
     FrameDiagnostics,
     eager_frame,
@@ -258,7 +259,8 @@ def bootstrap(
     if resolved_block_length < 1 or resolved_block_length > values.size:
         raise MethodContractError("block length must be between 1 and the sample size")
 
-    resolved_seed = seed if seed is not None else get_config().seed
+    runtime_config = get_config()
+    resolved_seed = seed if seed is not None else runtime_config.seed
     if resolved_seed is None:
         resolved_seed = secrets.randbits(63)
     if resolved_seed < 0:
@@ -267,9 +269,22 @@ def bootstrap(
     observed = statistic_function(values)
     if not math.isfinite(observed):
         raise DataContractError("observed statistic is not finite")
-    distribution: FloatArray = np.empty(resamples, dtype=np.float64)
     bytes_per_resample = max(values.size * np.dtype(np.intp).itemsize, 1)
-    batch_size = max(1, min(resamples, batch_memory_bytes // bytes_per_resample))
+    execution_budget = resolve_execution_budget(
+        total_items=resamples,
+        required_fixed_allocation_bytes=resamples * np.dtype(np.float64).itemsize,
+        per_item_workspace_bytes=bytes_per_resample,
+        workspace_cap_bytes=batch_memory_bytes,
+        backend="rust_native_candidate" if use_native and statistic_name == "mean" else "numpy",
+        dispatch_reason=(
+            "built-in mean requested native reduction"
+            if use_native and statistic_name == "mean"
+            else "reference or custom statistic requires Python/NumPy reduction"
+        ),
+        configuration=runtime_config,
+    )
+    batch_size = execution_budget.selected_batch_size
+    distribution: FloatArray = np.empty(resamples, dtype=np.float64)
     backend = "numpy_reference"
     for batch_start in range(0, resamples, batch_size):
         batch_end = min(resamples, batch_start + batch_size)

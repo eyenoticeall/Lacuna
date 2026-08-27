@@ -246,9 +246,19 @@ Avoid:
 - allocating an `observations × resamples` matrix when a streamed reduction suffices;
 - returning one Python object per group or row.
 
+The private immutable `ResolvedExecutionBudget` parses an active `Config.memory_limit`, checks
+required fixed output bytes before allocation, and selects the largest batch fitting the remaining
+budget. With no configured limit, temporary batch workspace targets at most 64 MiB; a smaller
+public method cap still wins. An explicit limit is never ignored, and failure to fit the fixed
+output or one batch item raises `ConfigurationError` before that allocation. Bootstrap is the first
+consumer; other bounded operations adopt the same resolver as their allocation models stabilize.
+
 ## Thread budget
 
-Polars, Rayon, and BLAS may each own a thread pool. Lacuna exposes one effective budget and documents how it maps to backends. Nested workloads disable or cap inner parallelism to avoid oversubscription.
+Polars and BLAS may each own a thread pool. v0.14 does not claim to control those third-party pools:
+the resolved budget records the requested Lacuna setting plus observed Polars and BLAS
+configuration, while Lacuna's own native work stays single-threaded with `native_threads=1`.
+Rayon and any coordinated cross-library budget remain deferred.
 
 Benchmark both single-thread correctness baselines and parallel scaling. More threads are not assumed to be faster for small groups or memory-bound scans.
 

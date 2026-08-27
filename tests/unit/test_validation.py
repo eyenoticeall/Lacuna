@@ -7,7 +7,8 @@ import numpy as np
 import polars as pl
 import pytest
 
-from lacuna.exceptions import DataContractError, MethodContractError
+import lacuna as lc
+from lacuna.exceptions import ConfigurationError, DataContractError, MethodContractError
 from lacuna.experiment import ExperimentRegistry
 from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
 from lacuna.validation import _bootstrap_indices, bootstrap, multiple_testing, parameter_surface
@@ -59,6 +60,40 @@ def test_dependent_bootstraps_are_seeded_and_reproducible(method: str) -> None:
     )
     assert first.table("resample_distribution") == second.table("resample_distribution")
     assert first.metadata.seed == 9
+
+
+def test_bootstrap_honors_scoped_memory_limit_without_changing_rng_streams() -> None:
+    values = np.linspace(-0.02, 0.03, 40)
+    unrestricted = bootstrap(
+        values,
+        method="circular",
+        block_length=5,
+        resamples=150,
+        seed=9,
+        store_distribution=True,
+        use_native=True,
+    )
+    with lc.config(memory_limit="2KiB"):
+        bounded = bootstrap(
+            values,
+            method="circular",
+            block_length=5,
+            resamples=150,
+            seed=9,
+            store_distribution=True,
+            use_native=True,
+        )
+
+    assert bounded.metadata.parameters["batch_size"] == 2
+    assert bounded.table("resample_distribution") == unrestricted.table("resample_distribution")
+
+
+def test_bootstrap_rejects_memory_limit_before_fixed_output_allocation() -> None:
+    with (
+        lc.config(memory_limit="799B"),
+        pytest.raises(ConfigurationError, match="fixed output allocation"),
+    ):
+        bootstrap([1.0, 2.0, 3.0], resamples=100, seed=3)
 
 
 def test_native_and_reference_mean_bootstrap_agree() -> None:

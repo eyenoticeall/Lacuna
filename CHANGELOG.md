@@ -25,6 +25,9 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 - Replace private per-element PyO3 conversions with checked, bulk NumPy carriers for grouped IC,
   bootstrap means, and interval purging; snapshot inputs before releasing the interpreter lock,
   return dense arrays plus byte validity/status codes, and preserve every public result contract.
+- Add private immutable execution-budget resolution and make bootstrap honor scoped memory limits
+  before allocating fixed output or batches, while retaining deterministic replicate substreams,
+  the existing public signature, and single-threaded native execution.
 
 ## [0.13.0] - 2026-08-27
 

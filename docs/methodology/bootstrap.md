@@ -52,7 +52,10 @@ the scoped Lacuna seed. If neither exists, Lacuna draws 63 bits of system entrop
 resolved seed; the run can then be reproduced from its metadata.
 
 Indices are generated in bounded batches. The approximate batch count is limited by
-`batch_memory_bytes / (n × sizeof(intp))`, with a minimum memory budget of 1,024 bytes. Mean
+`batch_memory_bytes / (n × sizeof(intp))`, with a minimum memory budget of 1,024 bytes. The active
+`Config.memory_limit`, when present, is also a hard bound: Lacuna first reserves the fixed
+distribution output, then chooses the largest index batch fitting both limits and raises
+`ConfigurationError` before allocating when even the fixed output or one batch item cannot fit. Mean
 replicates can be reduced by the Rust kernel; index generation stays in Python so native and reference
 paths use identical streams.
 
