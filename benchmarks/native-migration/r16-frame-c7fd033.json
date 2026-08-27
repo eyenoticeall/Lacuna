@@ -1,0 +1,140 @@
+{
+  "admission": {
+    "correctness_match": true,
+    "latency_regression_fraction": -0.366545944649536,
+    "material": true,
+    "reasons": [
+      "end-to-end throughput is at least 1.5x the optimized reference"
+    ],
+    "rss_reduction_fraction": 0.27251324308416713,
+    "state": "ADMITTED",
+    "throughput_ratio": 1.5786464567611636
+  },
+  "candidate": {
+    "backend": "python_streaming",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.fingerprint.frame.streaming",
+    "checksum": "5769d3bc3c7a0615ba45a13dcfbbcd20f607ac3416684b4f4720015ff4ffbfc5",
+    "incremental_peak_rss_bytes": 40501248,
+    "input_copy_bytes": null,
+    "maximum_seconds": 2.429313374988851,
+    "median_absolute_deviation_seconds": 0.24174245799076743,
+    "median_seconds": 1.6593198329937877,
+    "minimum_seconds": 1.3261497500061523,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 1.6593198329937877,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 121077760,
+    "python_traced_peak_bytes": 36071917,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 241062.62822057016,
+    "throughput_unit": "cells/second",
+    "timings_seconds": [
+      1.6593198329937877,
+      1.3261497500061523,
+      1.838425666996045,
+      1.474462541998946,
+      1.4175773750030203,
+      2.2903522080014227,
+      2.429313374988851
+    ]
+  },
+  "config": {
+    "bootstrap_resamples": 1000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 500,
+    "periods": 200,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "environment": {
+    "checksum_normalization": "exact c14n-v1 digest identity",
+    "copy_measurement": "null until the selected boundary reports exact byte counters",
+    "isolation": "one child process per measured backend",
+    "machine": "arm64",
+    "memory_measurement": "tracemalloc plus process peak RSS",
+    "mkl_threads": 1,
+    "native_available": false,
+    "native_threads": 1,
+    "native_version": null,
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "polars": "1.44.0",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 132481024,
+    "processor": "arm",
+    "python": "3.13.12",
+    "timing_clock": "time.perf_counter"
+  },
+  "generated_at": "2026-08-27T12:39:01.410314Z",
+  "reference": {
+    "backend": "python_materialized_reference",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.fingerprint.frame.reference",
+    "checksum": "5769d3bc3c7a0615ba45a13dcfbbcd20f607ac3416684b4f4720015ff4ffbfc5",
+    "incremental_peak_rss_bytes": 55672832,
+    "input_copy_bytes": null,
+    "maximum_seconds": 3.8127339589991607,
+    "median_absolute_deviation_seconds": 0.1824225419841241,
+    "median_seconds": 2.6194793749891687,
+    "minimum_seconds": 2.399085874989396,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 2.6194793749891687,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 135692288,
+    "python_traced_peak_bytes": 53624201,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 152702.09943976137,
+    "throughput_unit": "cells/second",
+    "timings_seconds": [
+      2.711101292006788,
+      2.4370568330050446,
+      2.6194793749891687,
+      2.444902999995975,
+      2.399085874989396,
+      3.244249959010631,
+      3.8127339589991607
+    ]
+  },
+  "run_url": null,
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "c7fd0337b55e7884c47e85cf318f3bcef2a5a522",
+  "target": {
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": "migration.fingerprint.frame.streaming",
+    "candidate_id": "R-16",
+    "effective_dimensions": {
+      "columns": 4,
+      "input": "polars_frame",
+      "rows": 100000
+    },
+    "public_latency_share": null,
+    "public_operation": "lacuna.experiment.fingerprint",
+    "public_rss_share": null,
+    "reference_case": "migration.fingerprint.frame.reference"
+  },
+  "version": 1
+}

@@ -1,0 +1,141 @@
+{
+  "admission": {
+    "correctness_match": true,
+    "latency_regression_fraction": -0.9220762343343732,
+    "material": true,
+    "reasons": [
+      "end-to-end throughput is at least 1.5x the optimized reference",
+      "incremental RSS is at least 30% lower without >10% latency regression"
+    ],
+    "rss_reduction_fraction": 0.3811438784629133,
+    "state": "ADMITTED",
+    "throughput_ratio": 12.833055377367543
+  },
+  "candidate": {
+    "backend": "python_streaming",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.fingerprint.array.streaming",
+    "checksum": "50334b6937163cdecec5e83942f042c02d56e78e916a8e3b398ff0e6e8aa81a4",
+    "incremental_peak_rss_bytes": 22691840,
+    "input_copy_bytes": null,
+    "maximum_seconds": 0.11163816699991003,
+    "median_absolute_deviation_seconds": 0.0072756669978844,
+    "median_seconds": 0.09060841699829325,
+    "minimum_seconds": 0.08119391699437983,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 0.09060841699829325,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 97746944,
+    "python_traced_peak_bytes": 16254856,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 4414600.908517524,
+    "throughput_unit": "cells/second",
+    "timings_seconds": [
+      0.08119391699437983,
+      0.08333275000040885,
+      0.11163816699991003,
+      0.10647016699658707,
+      0.08644050000293646,
+      0.0944272080087103,
+      0.09060841699829325
+    ]
+  },
+  "config": {
+    "bootstrap_resamples": 1000,
+    "horizons": [
+      1,
+      5,
+      20
+    ],
+    "instruments": 500,
+    "periods": 200,
+    "quantiles": 5,
+    "repetitions": 7,
+    "seed": 42,
+    "warmups": 2
+  },
+  "environment": {
+    "checksum_normalization": "exact c14n-v1 digest identity",
+    "copy_measurement": "null until the selected boundary reports exact byte counters",
+    "isolation": "one child process per measured backend",
+    "machine": "arm64",
+    "memory_measurement": "tracemalloc plus process peak RSS",
+    "mkl_threads": 1,
+    "native_available": false,
+    "native_threads": 1,
+    "native_version": null,
+    "numpy": "2.5.2",
+    "omp_threads": 1,
+    "openblas_threads": 1,
+    "platform": "macOS-26.3.1-arm64-arm-64bit-Mach-O",
+    "polars": "1.44.0",
+    "polars_threads": 2,
+    "process_peak_rss_bytes": 109887488,
+    "processor": "arm",
+    "python": "3.13.12",
+    "timing_clock": "time.perf_counter"
+  },
+  "generated_at": "2026-08-27T12:40:02.925650Z",
+  "reference": {
+    "backend": "python_materialized_reference",
+    "baseline_rss_bytes": null,
+    "case_name": "migration.fingerprint.array.reference",
+    "checksum": "50334b6937163cdecec5e83942f042c02d56e78e916a8e3b398ff0e6e8aa81a4",
+    "incremental_peak_rss_bytes": 36667392,
+    "input_copy_bytes": null,
+    "maximum_seconds": 1.5150526669895044,
+    "median_absolute_deviation_seconds": 0.15599691700481344,
+    "median_seconds": 1.1627828329947079,
+    "minimum_seconds": 0.6452862919977633,
+    "output_copy_bytes": null,
+    "phase_seconds": {
+      "input_copy": null,
+      "kernel": null,
+      "normalization": null,
+      "public_call_total": 1.1627828329947079,
+      "result_construction": null,
+      "result_projection": null
+    },
+    "process_peak_rss_bytes": 113115136,
+    "python_traced_peak_bytes": 32536612,
+    "result_projection_bytes": null,
+    "temporary_workspace_bytes": null,
+    "throughput": 344002.3267025826,
+    "throughput_unit": "cells/second",
+    "timings_seconds": [
+      0.6452862919977633,
+      1.3926026669942075,
+      1.5150526669895044,
+      1.1627828329947079,
+      1.0199869580101222,
+      1.3187797499995213,
+      1.0856971250032075
+    ]
+  },
+  "run_url": null,
+  "schema": "lacuna.native-migration-benchmark",
+  "source_commit": "c7fd0337b55e7884c47e85cf318f3bcef2a5a522",
+  "target": {
+    "asymptotic_or_unbounded": false,
+    "bounded_memory_advantage": false,
+    "candidate_case": "migration.fingerprint.array.streaming",
+    "candidate_id": "R-16",
+    "effective_dimensions": {
+      "columns": 4,
+      "input": "float64_array",
+      "rows": 100000
+    },
+    "public_latency_share": null,
+    "public_operation": "lacuna.experiment.fingerprint",
+    "public_rss_share": null,
+    "reference_case": "migration.fingerprint.array.reference"
+  },
+  "version": 1
+}
