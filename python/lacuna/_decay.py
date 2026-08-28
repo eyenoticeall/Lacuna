@@ -262,7 +262,8 @@ def fit_decay(
         from scipy.optimize import curve_fit  # type: ignore[import-untyped]
     except ImportError as error:
         raise MethodContractError(
-            "fit_decay requires SciPy; install the 'statistics' extra with lacuna[statistics]"
+            "fit_decay requires SciPy; install it with python -m pip install "
+            '"lacuna-quant[statistics]"'
         ) from error
 
     x: FloatArray = np.asarray(horizons, dtype=np.float64)

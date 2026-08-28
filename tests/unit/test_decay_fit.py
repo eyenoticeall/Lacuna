@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import builtins
 import math
 
 import pytest
 
+from lacuna.exceptions import MethodContractError
 from lacuna.signal import fit_decay
 from lacuna.types import AnalysisResult, FindingState, ResultMetadata
 
@@ -92,3 +94,18 @@ def test_fit_decay_requires_joint_period_tables_and_valid_configuration() -> Non
 
     with pytest.raises(ValueError, match="resamples"):
         fit_decay(_decay_evidence(), resamples=99)
+
+
+def test_fit_decay_optional_dependency_error_names_published_distribution(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_import = builtins.__import__
+
+    def reject_scipy(name: str, *args: object, **kwargs: object) -> object:
+        if name == "scipy":
+            raise ImportError("missing for test")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", reject_scipy)
+    with pytest.raises(MethodContractError, match=r"lacuna-quant\[statistics\]"):
+        fit_decay(_decay_evidence(), resamples=100, seed=42)

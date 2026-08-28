@@ -534,7 +534,8 @@ def render_plotly_html(report: AuditReport, *, view: ReportView = "auto") -> str
         import plotly.io as pio
     except ImportError as error:
         raise ReportError(
-            "the Plotly renderer requires the 'report' extra; install lacuna[report]"
+            "the Plotly renderer requires its optional dependencies; install them with "
+            'python -m pip install "lacuna-quant[report]"'
         ) from error
 
     selected_view = _resolved_view(report, view)

@@ -295,7 +295,7 @@ def _parser() -> argparse.ArgumentParser:
         "--html-renderer",
         choices=("core", "plotly"),
         default="core",
-        help="HTML renderer; Plotly requires the report extra",
+        help="HTML renderer; Plotly requires lacuna-quant[report]",
     )
     audit.add_argument(
         "--bundle",
@@ -383,7 +383,7 @@ def _parser() -> argparse.ArgumentParser:
         "--html-renderer",
         choices=("core", "plotly"),
         default="core",
-        help="HTML renderer; Plotly requires the report extra",
+        help="HTML renderer; Plotly requires lacuna-quant[report]",
     )
     signal.add_argument(
         "--bundle",

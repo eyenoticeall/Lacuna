@@ -165,5 +165,5 @@ def test_plotly_renderer_has_actionable_optional_dependency_error(
         return original_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", reject_jinja)
-    with pytest.raises(ReportError, match=r"lacuna\[report\]"):
+    with pytest.raises(ReportError, match=r"lacuna-quant\[report\]"):
         _report().to_html(renderer="plotly")
