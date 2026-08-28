@@ -64,7 +64,7 @@ import lacuna as lc
 
 evidence = {
     "purged_split": split.evidence,
-    "experiment_registry": registry.snapshot(),
+    "experiment_registry": registry.to_result(),
     "parameter_surface": surface,
     "cost_stress": stressed_costs,
     "future_data": future_data_check,

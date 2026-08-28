@@ -11,6 +11,9 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   pages with the published `lacuna-quant` 0.13.0 and `lacuna-options` 0.2.0 releases.
 - Use repository-absolute README assets and handbook links so future PyPI descriptions retain
   working brand imagery and navigation.
+- Make the getting-started signal audit copy-pasteable and executable in CI; correct stale
+  experiment-registry, IC-column, Alphalens grouping, and keyword-only API examples; and name
+  `lacuna-quant` in current optional-dependency installation guidance and runtime errors.
 
 ## [0.14.0] - 2026-08-28
 

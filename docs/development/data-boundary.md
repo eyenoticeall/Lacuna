@@ -91,11 +91,13 @@ Domain APIs accept semantic column parameters, for example:
 
 ```python
 lc.signal.ic(
-    data,
-    time="date",
+    signal_data,
+    label_data,
+    signal_time="date",
+    label_time="date",
     instrument="asset_id",
-    signal="momentum",
-    forward_return="fwd_5d",
+    signal_value="momentum",
+    label_value="fwd_5d",
 )
 ```
 

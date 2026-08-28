@@ -12,6 +12,14 @@
 **Primary data model:** Apache Arrow-compatible columnar data  
 **License:** MIT
 
+> [!IMPORTANT]
+> This is the original design proposal, not the current usage reference. Statements using
+> “should,” conceptual package layouts, and Python snippets may describe target or rejected APIs
+> rather than the implemented `0.13` contract. Use the [README](README.md),
+> [getting-started guide](docs/getting-started/index.md), and
+> [public API reference](docs/reference/public-api.md) for executable current behavior. Current
+> subsystem documents explicitly distinguish implemented behavior from later contracts.
+
 ---
 
 ## Table of Contents
@@ -592,7 +600,7 @@ Making DuckDB mandatory would increase architectural coupling without improving 
 Recommended:
 
 ```bash
-pip install "lacuna[duckdb]"
+pip install "lacuna-quant[duckdb]"
 ```
 
 ## 7.7 Why DataFusion is optional

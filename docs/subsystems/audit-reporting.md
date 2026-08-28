@@ -72,7 +72,7 @@ analytical evidence, preserving its prior bundle behavior.
 ## Interactive evidence views
 
 HTML remains `renderer="core"` by default. `renderer="plotly"` is use-site optional through
-`lacuna[report]` and accepts `auto`, `audit`, `signal`, `portfolio`, or `event` views. A missing
+`lacuna-quant[report]` and accepts `auto`, `audit`, `signal`, `portfolio`, or `event` views. A missing
 Plotly/Jinja2 installation raises an actionable `ReportError`; importing `lacuna` never imports
 either dependency.
 
@@ -95,7 +95,7 @@ bundle-v1 evidence layout. Renderers never revise findings, thresholds, or metri
 report = lacuna.standard_audit(
     results={
         "split": split.evidence,
-        "trials": registry.snapshot(),
+        "trials": registry.to_result(),
         "surface": parameter_surface,
         "costs": cost_stress,
         "future_data": future_data,

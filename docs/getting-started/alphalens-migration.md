@@ -76,20 +76,26 @@ it came from `BucketSpec`. To obtain Lacuna's complete bucketing/attrition evide
 ## Grouped IC and availability
 
 ```python
-result = lacuna.signal.ic(
+import lacuna as lc
+
+result = lc.signal.ic(
     panel.frame,
     panel.frame,
     signal_time="observation_time",
     label_time="observation_time",
-    by=("observation_time", "horizon", "group"),
-    group_available_time="available_time",
+    by=("observation_time", "group"),
+    min_observations=2,
 )
 ```
 
-This only applies when the panel actually maps the named horizon and availability columns. A group
-label without timestamp evidence remains an unverified source declaration. A future-dated group
-classification is rejected by the analytical method; an unknown availability policy produces an
-`UNKNOWN` finding rather than an optimistic pass.
+The schema above imports one `5D` return column, so there is no separate horizon column to group by.
+The two-observation minimum matches the attributed compatibility fixture; use a more defensible
+minimum for substantive inference.
+For a normalized long panel, map its source horizon as `"horizon": "horizon"` and add `"horizon"`
+to `by`. Likewise, pass `group_available_time="available_time"` only when the schema maps an actual
+availability column. A group label without timestamp evidence remains an unverified source
+declaration. A future-dated group classification is rejected by the analytical method; an unknown
+availability policy produces an `UNKNOWN` finding rather than an optimistic pass.
 
 ## Diagnostic portfolio exposure differs deliberately
 

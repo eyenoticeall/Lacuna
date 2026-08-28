@@ -12,7 +12,7 @@ The supported top-level workflow is:
 ```python
 import lacuna as lc
 
-study = lc.SignalStudy(...)
+study = lc.SignalStudy(signal=signal, prices=prices)
 report = study.audit()
 ```
 

@@ -266,7 +266,7 @@ period/horizon rows. `fit_decay()` fits the direction-adjusted positive model
 A half-life estimate requires four positive horizons, twenty common periods, positive adjusted
 means, convergence away from the upper bound, a finite stationary-block-bootstrap interval, and the
 configured minimum `R²`. Failure returns `null` fields and a `WARN` or `UNKNOWN` finding. SciPy is
-loaded only at the call site through `lacuna[statistics]`; optimizer, bounds, dependency version,
+loaded only at the call site through `lacuna-quant[statistics]`; optimizer, bounds, dependency version,
 root entropy, substream derivation, and joint resampling policy are provenance.
 
 ## Diagnostic portfolio projection
