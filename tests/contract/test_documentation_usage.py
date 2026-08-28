@@ -25,7 +25,8 @@ STALE_EXTRA = re.compile(r"(?<!lacuna-quant)lacuna\[(?:statistics|report|pandas|
 
 def _python_blocks(paths: tuple[Path, ...]) -> Iterator[tuple[Path, int, str]]:
     for path in paths:
-        for index, match in enumerate(PYTHON_FENCE.finditer(path.read_text()), start=1):
+        text = path.read_text(encoding="utf-8")
+        for index, match in enumerate(PYTHON_FENCE.finditer(text), start=1):
             yield path, index, match.group(1)
 
 
@@ -87,7 +88,7 @@ def test_current_python_examples_match_root_signatures() -> None:
 
 
 def test_current_documentation_uses_current_distribution_and_registry_api() -> None:
-    text = "\n".join(path.read_text() for path in DOCUMENTS)
+    text = "\n".join(path.read_text(encoding="utf-8") for path in DOCUMENTS)
 
     assert not STALE_EXTRA.search(text)
     assert "registry.snapshot(" not in text
