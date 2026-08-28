@@ -6,6 +6,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ### Documentation
 
+- Add theme-aware README logo variants for GitHub and an opaque fallback that remains legible when
+  PyPI sanitizes responsive-image markup.
 - Promote a PyPI-first **Get started** path near the top of the README, distinguish installed
   commands from repository `uv run` commands, and align the documentation landing and quickstart
   pages with the published `lacuna-quant` 0.13.0 and `lacuna-options` 0.2.0 releases.

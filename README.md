@@ -1,11 +1,9 @@
 <div align="center">
-  <table>
-    <tr>
-      <td align="center" bgcolor="#0b0d0e">
-        <img src="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-lockup.png" alt="Lacuna" width="520" />
-      </td>
-    </tr>
-  </table>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-lockup-dark.png" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-lockup-light.png" />
+    <img src="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-lockup.png" alt="Lacuna" width="520" />
+  </picture>
 
   <p><strong>Stress-test your alpha before the market does.</strong></p>
   <p>Open-source quantitative research validation for finding where alpha breaks.</p>
