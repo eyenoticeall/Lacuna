@@ -53,11 +53,42 @@ provenance-attested files are attached to the
 
 ## Run a signal audit
 
-Given a signal table with `time`, `instrument`, and `signal` columns and a price table with `time`,
-`instrument`, and `close` columns:
+This complete example creates a small deterministic panel, computes signal diagnostics, assembles
+an audit, and writes a core HTML report. It uses only dependencies installed with the core
+distribution:
 
 ```python
+from datetime import date, timedelta
+
 import lacuna as lc
+import polars as pl
+
+instruments = ("A", "B", "C", "D", "E", "F")
+calendar_days = tuple(date(2025, 1, 2) + timedelta(days=offset) for offset in range(50))
+sessions = tuple(day for day in calendar_days if day.weekday() < 5)[:35]
+
+prices = pl.DataFrame(
+    {
+        "time": [session for instrument in instruments for session in sessions],
+        "instrument": [instrument for instrument in instruments for _ in sessions],
+        "close": [
+            100.0 + 4.0 * asset + day * (0.3 + 0.05 * asset) + 0.2 * ((day + asset) % 3)
+            for asset, _instrument in enumerate(instruments)
+            for day, _session in enumerate(sessions)
+        ],
+    }
+)
+signal = pl.DataFrame(
+    {
+        "time": [session for session in sessions for _ in instruments],
+        "instrument": [instrument for _session in sessions for instrument in instruments],
+        "signal": [
+            float(((day + 2 * asset) % 11) - 5)
+            for day, _session in enumerate(sessions)
+            for asset, _instrument in enumerate(instruments)
+        ],
+    }
+)
 
 study = lc.SignalStudy(
     signal=signal,
@@ -71,15 +102,26 @@ study = lc.SignalStudy(
 
 ic_result = study.ic()
 quantile_result = study.quantiles()
-report = study.audit(bootstrap_resamples=10_000, seed=42)
+report = study.audit(bootstrap_resamples=200, seed=42)
+
+print(ic_result.table("ic_by_horizon"))
+print(quantile_result.table("quantile_returns"))
+print(report.summary())
 report.to_html("lacuna-audit.html")
 ```
 
-Forward horizons are trading-observation counts, not calendar days. Unknown price adjustment,
-delisting, survivorship, trial-history, or purged-validation evidence remains visible as `UNKNOWN`;
-it is never silently treated as a pass.
+The `time`, `instrument`, and value-column names are explicit public contracts. Forward horizons
+are counts of successive observations per instrument, not calendar durations; Lacuna does not
+infer a trading calendar from the synthetic dates. The example uses 200 bootstrap resamples so it
+runs quickly. Use a research-appropriate resample count and validation design for substantive
+analysis. Unknown delisting, survivorship, trial-history, or purged-validation evidence remains
+visible as `UNKNOWN`; it is never silently treated as a pass.
 
-The same workflow is available for local Parquet, CSV, Arrow IPC, or Feather files:
+The same executable workflow is maintained as
+[`examples/quickstart.py`](https://github.com/eyenoticeall/Lacuna/blob/main/examples/quickstart.py).
+
+Use the same workflow with local Parquet, CSV, Arrow IPC, or Feather files whose columns satisfy
+the same contracts:
 
 ```bash
 lacuna signal \
@@ -91,13 +133,19 @@ lacuna signal \
   --signal-observed-at open \
   --entry current_close \
   --price-adjustment total_return_adjusted \
-  --bootstrap-resamples 10000 \
+  --bootstrap-resamples 200 \
   --seed 42 \
-  --out lacuna-audit.html
+  --out lacuna-audit.html \
+  --bundle study.lacuna
+
+lacuna bundle verify study.lacuna
 ```
 
 Use `--format json` without `--out` for clean machine-readable stdout. Reports use exclusive file
-creation unless `--overwrite` is explicit. See the
+creation unless `--overwrite` is explicit. Parquet and Arrow-family files preserve typed temporal
+columns. The CSV scanner does not infer ISO date strings: encode `time` as a whole-number
+observation index, or convert it to a Date/Datetime column before writing Parquet or Arrow IPC.
+See the
 [Alphalens migration guide](alphalens-migration.md) when converting an existing factor workflow.
 
 ## Configuration
