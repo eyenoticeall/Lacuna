@@ -197,6 +197,10 @@ Artifacts published before the MIT-only change retain their original grants.
 ---
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-icon.webp" alt="Lacuna mark" width="72" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-icon-dark.webp" />
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-icon-light.webp" />
+    <img src="https://raw.githubusercontent.com/eyenoticeall/Lacuna/main/logos/lacuna-logo-icon.webp" alt="Lacuna mark" width="72" />
+  </picture>
   <p><strong>Bring the research. Lacuna will look for the gaps in the evidence.</strong></p>
 </div>
