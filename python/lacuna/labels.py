@@ -142,7 +142,8 @@ def forward_returns(
     if signal_time == "close" and entry_lag == 0 and not allow_same_close:
         raise MethodContractError(
             "a close-observed signal cannot use the same close; use entry='next_open' or "
-            "entry='next_close', or explicitly set allow_same_close=True"
+            "entry='next_close' (horizons of at least 2D), or explicitly set "
+            "allow_same_close=True"
         )
 
     required = [time, instrument, entry_column, exit_column]
@@ -210,6 +211,12 @@ def forward_returns(
         if observations < entry_lag:
             raise MethodContractError(
                 f"horizon {name} ends before the configured entry observation"
+            )
+        if observations == entry_lag and entry_column == exit_column:
+            raise MethodContractError(
+                f"horizon {name} exits at the entry observation and price field, a "
+                f"zero-length holding period; entry={resolved_entry!r} requires a horizon of "
+                f"at least {entry_lag + 1}D"
             )
         expressions: list[pl.Expr] = [
             pl.col(time).alias("observation_time"),

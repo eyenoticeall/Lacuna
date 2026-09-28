@@ -63,6 +63,41 @@ def test_next_open_uses_the_next_observation_and_rejects_same_close() -> None:
         )
 
 
+def test_next_close_enters_at_the_next_close_and_exits_at_the_horizon() -> None:
+    labels = forward_returns(
+        _prices(),
+        horizon="2D",
+        signal_time="close",
+        entry="next_close",
+        price_adjustment="raw",
+    ).frame
+    first = labels.filter(pl.col("instrument") == "A").row(0, named=True)
+    assert first["label_start"] == 0
+    assert first["entry_time"] == 1
+    assert first["label_end"] == 2
+    assert first["forward_return"] == pytest.approx(12.5 / 11.5 - 1.0)
+
+
+@pytest.mark.parametrize(
+    ("entry", "exit"),
+    [("next_close", "close"), ("next_open", "open")],
+)
+def test_horizon_ending_at_the_entry_price_is_rejected_not_zero_filled(
+    entry: str, exit: str
+) -> None:
+    # Regression: a 1D horizon with a one-observation entry lag previously entered and
+    # exited at the same price, silently producing an all-zero label and undefined IC.
+    with pytest.raises(MethodContractError, match="zero-length holding period"):
+        forward_returns(
+            _prices(),
+            horizons=["1D", "2D"],
+            signal_time="close",
+            entry=entry,
+            exit=exit,
+            price_adjustment="raw",
+        )
+
+
 def test_missing_price_censors_a_horizon_without_collapsing_time() -> None:
     prices = pl.DataFrame(
         {

@@ -4,6 +4,14 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ## Unreleased
 
+### Fixed
+
+- `labels.forward_returns` now rejects a horizon that exits at the entry observation from the same
+  price field. Previously `entry="next_close"` with a `1D` horizon (including `SignalStudy`'s
+  default horizons) silently emitted all-zero labels and an entirely undefined 1D IC. `next_close`
+  requires horizons of at least `2D`; `next_open` with `1D` remains a valid open-to-close label.
+  Valid label calls are unchanged, so the `labels.forward_returns` method version stays 1.
+
 ### Documentation
 
 - Add theme-aware README lockup and footer-mark variants for GitHub, with baked-background

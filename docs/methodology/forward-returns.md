@@ -48,7 +48,10 @@ For observation position (j):
 
 A close-observed signal (`signal_time="close"`) cannot enter at the current close unless
 `allow_same_close=True` explicitly accepts that availability assumption. A horizon cannot end before
-the configured entry position.
+the configured entry position, and it cannot exit at the entry position from the same price field:
+that zero-length holding period is rejected rather than emitted as an all-zero label. `next_close`
+therefore requires horizons of at least `2D`, while `next_open` with a `1D` horizon is the next
+observation's open-to-close return.
 
 ## Label interval
 
