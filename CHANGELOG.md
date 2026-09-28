@@ -38,6 +38,8 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   coverage. Each guard pairs the method with the naive alternative it must beat.
 - Cover every bundle-verifier hostile-archive, manifest trust-contract, digest, report-identity, and
   canonical-encoding rejection, and every vendor and backtest adapter declaration rejection.
+- Record the intentional `study.audit` benchmark checksum change from the audit correction, with
+  same-machine timing evidence, in the performance regression policy.
 
 ### Documentation
 

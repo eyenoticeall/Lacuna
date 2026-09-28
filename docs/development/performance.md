@@ -233,6 +233,15 @@ threshold.
 
 An accepted regression may be appropriate for correctness, stronger validation, or clearer semantics, but it is documented rather than hidden.
 
+A deliberate semantic correction changes the affected checksum exactly once. The push that
+introduces it fails the same-runner guard by design, because the guard skips timing comparison for
+a case whose output changed. The correction is therefore recorded here with same-machine timing
+evidence, and later pushes compare against the corrected output.
+
+| Release | Case | Reason | Same-machine median, before → after |
+| --- | --- | --- | --- |
+| 0.14.1 | `study.audit` | Audit IC inference moved to one declared horizon over disjoint label intervals (`fe67d86`) | 907–949 ms → 726–772 ms (small tier, `--no-native`, three interleaved runs) |
+
 For v0.14, native admission additionally requires the result to reproduce in both scheduled CI and
 the exact-source non-publishing release preflight. Import latency above 115% of the v0.13 same-runner
 baseline or a core wheel more than 20% larger solely because of an unadmitted boundary experiment
