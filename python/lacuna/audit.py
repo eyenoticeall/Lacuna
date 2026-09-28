@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from math import isfinite
 from types import MappingProxyType
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from lacuna.types import (
     AnalysisResult,
@@ -223,21 +223,46 @@ class _TurnoverMeasuredRule(_ResultRule):
 class _DecayCoverageRule(_ResultRule):
     def evaluate(self, context: AuditContext) -> Finding:
         result = context.results[self.result_name]
-        raw = result.metrics.get("n_horizons")
-        count = int(raw) if isinstance(raw, int | float) else 0
+        rows = result.tables.get("ic_decay")
+        if (
+            not isinstance(rows, tuple)
+            or not rows
+            or any(
+                not isinstance(row, Mapping) or "horizon" not in row or "mean_ic" not in row
+                for row in rows
+            )
+        ):
+            return self._finding(
+                state=FindingState.UNKNOWN,
+                message="Per-horizon decay evidence with defined IC status was not supplied.",
+            )
+        horizon_rows = cast(tuple[Mapping[str, JsonValue], ...], rows)
+        undefined = tuple(
+            str(row["horizon"])
+            for row in horizon_rows
+            if isinstance(row["mean_ic"], bool) or not isinstance(row["mean_ic"], int | float)
+        )
+        count = len(horizon_rows) - len(undefined)
         if count >= 3:
             state = FindingState.PASS
-            message = "Signal decay is evaluated across at least three horizons."
+            message = "Signal decay is evaluated across at least three horizons with defined IC."
         elif count >= 2:
             state = FindingState.WARN
-            message = "Signal decay is visible, but only two horizons limit shape interpretation."
+            message = (
+                "Signal decay is visible, but only two horizons with defined IC limit shape "
+                "interpretation."
+            )
         else:
             state = FindingState.FAIL
-            message = "A single horizon cannot establish signal decay."
+            message = "Fewer than two horizons have defined IC, so decay cannot be established."
         return self._finding(
             state=state,
             message=message,
-            evidence={"n_horizons": count},
+            evidence={
+                "n_horizons": len(horizon_rows),
+                "n_defined_horizons": count,
+                "undefined_horizons": undefined,
+            },
         )
 
 
@@ -433,6 +458,7 @@ def default_rules() -> tuple[AuditRule, ...]:
             "robustness",
             Severity.MEDIUM,
             10.0,
+            rule_version=2,
         ),
         _LabelIntervalsRule(
             "LABEL_INTERVALS_PRESENT",

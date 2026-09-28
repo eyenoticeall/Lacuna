@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import numpy as np
+import polars as pl
 import pytest
 
 from lacuna.audit import (
@@ -11,16 +13,30 @@ from lacuna.audit import (
     default_rules,
     run_audit,
 )
+from lacuna.signal import decay
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata, Severity
 
 
-def _result(method: str, metrics: dict[str, object]) -> AnalysisResult:
+def _result(
+    method: str,
+    metrics: dict[str, object],
+    tables: dict[str, object] | None = None,
+) -> AnalysisResult:
     return AnalysisResult(
         metadata=ResultMetadata(
             method=method,
             parameters={"price_adjustment": "raw"} if method == "labels.forward_returns" else {},
         ),
         metrics=metrics,
+        tables=tables or {},
+    )
+
+
+def _decay(mean_ics: dict[str, float | None]) -> AnalysisResult:
+    return _result(
+        "signal.decay",
+        {"n_horizons": len(mean_ics)},
+        {"ic_decay": [{"horizon": name, "mean_ic": value} for name, value in mean_ics.items()]},
     )
 
 
@@ -33,7 +49,7 @@ def _complete_context() -> AuditContext:
                 "validation.bootstrap",
                 {"observed": 0.08, "confidence_lower": 0.01, "confidence_upper": 0.15},
             ),
-            "decay": _result("signal.decay", {"n_horizons": 3}),
+            "decay": _decay({"1D": 0.08, "5D": 0.05, "20D": 0.02}),
             "labels": _result("labels.forward_returns", {"n_labels": 1_000}),
             "split": _result("cv.purged_kfold", {"purged_observations": 24}),
             "turnover": _result("signal.turnover", {"mean_rank_turnover": 0.2}),
@@ -195,3 +211,67 @@ def test_non_purged_split_cannot_claim_temporal_validation_pass() -> None:
         finding for finding in result.findings if finding.code == "PURGED_VALIDATION_SUPPLIED"
     )
     assert finding.state == FindingState.UNKNOWN
+
+
+def _decay_finding(decay: AnalysisResult) -> Finding:
+    context = _complete_context()
+    results = {**context.results, "decay": decay}
+    result = run_audit(AuditContext(results=results, policies=context.policies))
+    return next(finding for finding in result.findings if finding.code == "HORIZON_DECAY_COVERAGE")
+
+
+def test_decay_coverage_counts_only_horizons_with_defined_ic() -> None:
+    # Regression: rule v1 counted requested horizons, so a horizon with no defined IC
+    # period still contributed to a three-horizon PASS.
+    finding = _decay_finding(_decay({"1D": None, "5D": 0.05, "20D": 0.02}))
+
+    assert finding.state == FindingState.WARN
+    assert finding.evidence["rule_version"] == 2
+    assert finding.evidence["n_horizons"] == 3
+    assert finding.evidence["n_defined_horizons"] == 2
+    assert finding.evidence["undefined_horizons"] == ("1D",)
+    assert _decay_finding(_decay({"1D": None, "5D": None, "20D": 0.02})).state == (
+        FindingState.FAIL
+    )
+
+
+@pytest.mark.parametrize("tables", [{}, {"ic_decay": []}, {"ic_decay": [{"horizon": "1D"}]}])
+def test_decay_coverage_without_per_horizon_evidence_is_unknown(
+    tables: dict[str, object],
+) -> None:
+    finding = _decay_finding(_result("signal.decay", {"n_horizons": 3}, tables))
+
+    assert finding.state == FindingState.UNKNOWN
+    assert "n_defined_horizons" not in finding.evidence
+
+
+def test_decay_coverage_reads_real_decay_evidence_with_an_undefined_horizon() -> None:
+    periods, instruments = 30, 6
+    times = np.repeat(np.arange(periods), instruments)
+    names = np.tile([f"asset-{index}" for index in range(instruments)], periods)
+    rng = np.random.default_rng(3)
+    signal = pl.DataFrame(
+        {"time": times, "instrument": names, "signal": rng.normal(size=times.size)}
+    )
+    labels = pl.concat(
+        [
+            pl.DataFrame(
+                {
+                    "observation_time": times,
+                    "instrument": names,
+                    "horizon": horizon,
+                    # A constant cross-section leaves every 1D period's rank IC undefined.
+                    "forward_return": (
+                        np.zeros(times.size) if horizon == "1D" else rng.normal(size=times.size)
+                    ),
+                }
+            )
+            for horizon in ("1D", "5D", "20D")
+        ]
+    )
+
+    finding = _decay_finding(decay(signal, labels, use_native=False))
+
+    assert finding.state == FindingState.WARN
+    assert finding.evidence["n_defined_horizons"] == 2
+    assert finding.evidence["undefined_horizons"] == ("1D",)

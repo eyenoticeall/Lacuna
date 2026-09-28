@@ -231,7 +231,7 @@ The implemented rule set is:
 | `IC_PERIOD_SUPPORT` | 12 | `ic` | pass at 60 periods, warn at 20 |
 | `QUANTILE_MONOTONICITY` | 10 | `quantiles` | pass at 0.7, warn at 0.4 |
 | `BOOTSTRAP_INTERVAL` | 12 | `bootstrap` | pass if interval is positive |
-| `HORIZON_DECAY_COVERAGE` | 10 | `decay` | pass at three horizons, warn at two |
+| `HORIZON_DECAY_COVERAGE` | 10 | `decay` | rule v2: pass at three horizons with defined IC, warn at two; unknown without the `ic_decay` table |
 | `LABEL_INTERVALS_PRESENT` | 10 | `labels` | explicit forward-label timing evidence |
 | `PURGED_VALIDATION_SUPPLIED` | 10 | `split` | evidence must come from `cv.purged_kfold` |
 | `PRICE_ADJUSTMENT_DECLARED` | 8 | `labels` | adjustment semantics are not unknown |

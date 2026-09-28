@@ -11,6 +11,11 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   default horizons) silently emitted all-zero labels and an entirely undefined 1D IC. `next_close`
   requires horizons of at least `2D`; `next_open` with `1D` remains a valid open-to-close label.
   Valid label calls are unchanged, so the `labels.forward_returns` method version stays 1.
+- `HORIZON_DECAY_COVERAGE` (rule version 2) counts only horizons whose `ic_decay` row has a
+  defined mean IC and reports `n_defined_horizons` and `undefined_horizons`. Version 1 counted
+  requested horizons, so a horizon with no defined IC period still earned a three-horizon `PASS`.
+  Decay evidence without the per-horizon table now yields `UNKNOWN` instead of trusting the
+  `n_horizons` count.
 
 ### Documentation
 
