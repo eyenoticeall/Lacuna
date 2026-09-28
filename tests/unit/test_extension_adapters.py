@@ -251,3 +251,137 @@ def test_sklearn_adapter_supports_purged_interval_splitters() -> None:
 def test_sklearn_adapter_rejects_unsupported_splitters() -> None:
     with pytest.raises(MethodContractError, match="splitter must be"):
         SklearnCV(object(), pl.DataFrame({"time": [1]}))  # type: ignore[arg-type]
+
+
+_DECLARED_VENDOR: dict[str, object] = {
+    "schema_id": "vendor.fundamentals.v1",
+    "columns": {
+        "time": "date",
+        "available_time": "published_at",
+        "revision_id": "revision",
+        "value": "metric",
+    },
+    "required": ("time", "available_time"),
+    "availability": "point_in_time",
+    "revisions": "versioned",
+    "timezone": "UTC",
+    "timezone_columns": ("available_time",),
+    "price_adjustment": "raw",
+    "identifier_policy": "vendor_native",
+}
+_MINIMAL_VENDOR: dict[str, object] = {
+    "schema_id": "vendor.minimal.v1",
+    "columns": {"value": "metric"},
+    "required": (),
+}
+
+
+@pytest.mark.parametrize(
+    ("baseline", "change", "message"),
+    [
+        (_DECLARED_VENDOR, {"schema_id": ""}, "schema_id must not be empty"),
+        (_DECLARED_VENDOR, {"schema_version": 0}, "positive integer"),
+        (_DECLARED_VENDOR, {"schema_version": True}, "positive integer"),
+        (_DECLARED_VENDOR, {"columns": [("time", "date")]}, "canonical-to-source mapping"),
+        (_DECLARED_VENDOR, {"required": ["time"]}, "tuple of canonical column names"),
+        (_DECLARED_VENDOR, {"availability": "eventually"}, "availability policy"),
+        (_DECLARED_VENDOR, {"revisions": "sometimes"}, "revision policy"),
+        (_DECLARED_VENDOR, {"timezone": ""}, "IANA name"),
+        (_DECLARED_VENDOR, {"identifier_policy": ""}, "identifier_policy"),
+        (_DECLARED_VENDOR, {"price_adjustment": ""}, "price_adjustment"),
+        (_DECLARED_VENDOR, {"timezone_columns": ["available_time"]}, "timezone_columns must be"),
+        (_DECLARED_VENDOR, {"required": ("",)}, "non-empty canonical names"),
+        (_DECLARED_VENDOR, {"timezone_columns": ("",)}, "timezone_columns must contain"),
+        (_DECLARED_VENDOR, {"required": ("time", "time")}, "must be unique"),
+        (
+            _DECLARED_VENDOR,
+            {"timezone_columns": ("available_time", "available_time")},
+            "timezone_columns must be unique",
+        ),
+        (_DECLARED_VENDOR, {"timezone_columns": ("revision_time",)}, "timezone columns"),
+        (_MINIMAL_VENDOR, {"columns": {}}, "at least one mapping"),
+        (_MINIMAL_VENDOR, {"columns": {"value": ""}}, "non-empty names"),
+        (_MINIMAL_VENDOR, {"columns": {"value": "x", "other": "x"}}, "map uniquely"),
+        (_MINIMAL_VENDOR, {"required": ("missing",)}, "not mapped"),
+    ],
+)
+def test_vendor_schema_rejects_each_ambiguous_declaration(
+    baseline: dict[str, object], change: dict[str, object], message: str
+) -> None:
+    with pytest.raises(MethodContractError, match=message):
+        VendorSchema(**{**baseline, **change})  # type: ignore[arg-type]
+
+
+def test_vendor_adapter_rejects_foreign_timezones_schemas_and_collect_flags() -> None:
+    schema = VendorSchema(**_DECLARED_VENDOR)  # type: ignore[arg-type]
+    source = pl.DataFrame(
+        {
+            "date": [1],
+            "published_at": [datetime(2026, 1, 1, tzinfo=UTC)],
+            "revision": [1],
+            "metric": [1.0],
+        }
+    )
+
+    with pytest.raises(DataContractError, match="expected 'UTC'"):
+        adapt_vendor(
+            source.with_columns(pl.col("published_at").dt.convert_time_zone("America/New_York")),
+            schema,
+        )
+    with pytest.raises(MethodContractError, match="must be a VendorSchema"):
+        adapt_vendor(source, object())  # type: ignore[arg-type]
+    with pytest.raises(MethodContractError, match="collect must be boolean"):
+        adapt_vendor(source, schema, collect="yes")  # type: ignore[arg-type]
+    assert adapt_vendor(source, schema, collect=True).columns == (
+        "time",
+        "available_time",
+        "revision_id",
+        "value",
+    )
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"returns": "levered"}, "returns must be"),
+        ({"compounding": "continuous"}, "compounding must be"),
+        ({"costs": "partial"}, "costs must be"),
+        ({"borrow": "sometimes"}, "borrow treatment"),
+    ],
+)
+def test_backtest_semantics_reject_undeclared_accounting(
+    change: dict[str, object], message: str
+) -> None:
+    fields = {name: getattr(_semantics(), name) for name in BacktestSemantics.__slots__}
+    with pytest.raises(MethodContractError, match=message):
+        BacktestSemantics(**{**fields, **change})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"schema_id": ""}, "schema_id must not be empty"),
+        ({"artifact": "orders"}, "returns, trades, or positions"),
+        ({"semantics": object()}, "semantics must be BacktestSemantics"),
+        ({"schema_version": 0}, "positive integer"),
+        ({"columns": [("time", "date")]}, "canonical-to-source mapping"),
+        ({"columns": {"time": "", "strategy": "m", "return": "r"}}, "non-empty names"),
+        ({"columns": {"time": "x", "strategy": "x", "return": "r"}}, "map uniquely"),
+    ],
+)
+def test_backtest_schema_rejects_each_ambiguous_declaration(
+    change: dict[str, object], message: str
+) -> None:
+    baseline: dict[str, object] = {
+        "schema_id": "engine.daily-returns.v1",
+        "artifact": "returns",
+        "columns": {"time": "date", "strategy": "model", "return": "pnl_return"},
+        "semantics": _semantics(),
+    }
+    with pytest.raises(MethodContractError, match=message):
+        BacktestSchema(**{**baseline, **change})  # type: ignore[arg-type]
+
+
+def test_backtest_adapter_rejects_undeclared_schema_objects() -> None:
+    with pytest.raises(MethodContractError, match="must be a BacktestSchema"):
+        adapt_backtest(pl.DataFrame({"date": [1]}), object())  # type: ignore[arg-type]
