@@ -45,9 +45,23 @@ weight change requires an appropriate rule or score version increment.
 
 ## Signal-study assembly
 
-`SignalStudy.audit` computes labels, Spearman IC, balanced quantiles, turnover, decay, and—when at
-least two IC values exist—a stationary bootstrap interval. An optional `PurgedKFold` result supplies
-purging evidence. Declared survivorship and trial-history policies remain caller assertions in v0.1;
+`SignalStudy.audit` computes labels, Spearman IC, balanced quantiles, turnover, decay, and an IC
+bootstrap interval. An optional `PurgedKFold` result supplies purging evidence.
+
+IC inference uses one pre-declared horizon: the first study horizon, or the
+`policies={"inference_horizon": ...}` value, which must name a study horizon. IC rows for different
+horizons estimate different quantities and are never pooled. Consecutive IC periods for an
+`h`-observation horizon share `h - 1` returns, so the bootstrap keeps only periods whose label
+intervals are disjoint (earliest first: a period is kept when its observation time is at or after
+every label end of the previously kept period) and resamples them IID. `IC_DEFINED` and
+`IC_PERIOD_SUPPORT` read the declared horizon's IC summary, and `BOOTSTRAP_INTERVAL` warns instead of
+passing when fewer than 30 disjoint periods remain. The audit records `inference_horizon` and
+`ic_inference_sampling="non_overlapping_label_intervals"` as policies and in rule evidence.
+
+Before rule version 2, the audit bootstrapped every `(date, horizon)` IC row as one stationary
+series. On a persistent but uninformative signal with 5D and 20D labels, that interval excluded zero
+in about a quarter of null simulations. The fixed-seed guard in
+`tests/statistical/test_signal_audit_calibration.py` holds the corrected path near nominal size. Declared survivorship and trial-history policies remain caller assertions in v0.1;
 they are not independently discovered from raw data.
 
 Transaction-cost evidence is `NOT_APPLICABLE` to a signal-only study because no portfolio or trade

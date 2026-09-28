@@ -3,22 +3,102 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Literal
+from typing import Literal, cast
+
+import polars as pl
 
 from lacuna import signal as signal_api
+from lacuna._frames import frame_records
 from lacuna.adapters.polars import PolarsFrame, to_polars
 from lacuna.audit import AuditContext, AuditRule, run_audit
 from lacuna.cv import SplitResult
 from lacuna.exceptions import MethodContractError
-from lacuna.labels import Horizon, LabelResult, PriceAdjustment, forward_returns
+from lacuna.labels import (
+    Horizon,
+    LabelResult,
+    PriceAdjustment,
+    _normalize_horizons,
+    forward_returns,
+)
 from lacuna.report import AuditReport
 from lacuna.types import AnalysisResult, JsonValue
 from lacuna.validation import bootstrap
+
+_IC_INFERENCE_SAMPLING = "non_overlapping_label_intervals"
 
 
 def _owned_frame(data: object, schema: Sequence[str] | None) -> PolarsFrame:
     normalized = to_polars(data, schema=schema)
     return normalized.clone()
+
+
+def _inference_horizon(
+    horizons: Sequence[Horizon],
+    policies: Mapping[str, JsonValue] | None,
+) -> str:
+    """Resolve the one pre-declared horizon that audit IC inference evaluates."""
+
+    declared = tuple(name for name, _ in _normalize_horizons(horizons, None))
+    requested = None if policies is None else policies.get("inference_horizon")
+    if requested is None:
+        return declared[0]
+    if isinstance(requested, bool) or not isinstance(requested, str | int):
+        raise MethodContractError("the inference_horizon policy must name one study horizon")
+    ((name, _),) = _normalize_horizons((requested,), None)
+    if name not in declared:
+        raise MethodContractError(
+            f"inference_horizon {name!r} is not a study horizon; declared: {', '.join(declared)}"
+        )
+    return name
+
+
+def _non_overlapping_ic(
+    ic_result: AnalysisResult,
+    labels: LabelResult,
+    horizon: str,
+) -> list[float]:
+    """Select defined IC periods with disjoint label intervals, earliest first.
+
+    Consecutive IC periods for an h-observation horizon share h - 1 return
+    observations, so their IC values are mechanically dependent. A period is
+    kept only when its observation time is at or after every label end of the
+    previously kept period, which makes the kept half-open label intervals
+    disjoint across all instruments.
+    """
+
+    defined: dict[JsonValue, float] = {}
+    for row in cast(Sequence[Mapping[str, JsonValue]], ic_result.table("ic_by_period")):
+        value = row.get("ic")
+        if (
+            row.get("horizon") == horizon
+            and isinstance(value, int | float)
+            and not isinstance(value, bool)
+        ):
+            defined[row.get("observation_time")] = float(value)
+    intervals = (
+        labels.frame.filter(pl.col("horizon") == horizon)
+        .group_by("observation_time")
+        .agg(pl.col("label_end").max())
+        .sort("observation_time")
+    )
+    keys = [
+        cast(Mapping[str, JsonValue], record)["observation_time"]
+        for record in frame_records(intervals.select("observation_time"))
+    ]
+    selected: list[float] = []
+    boundary: object = None
+    for key, start, end in zip(
+        keys,
+        intervals.get_column("observation_time"),
+        intervals.get_column("label_end"),
+        strict=True,
+    ):
+        if key not in defined:
+            continue
+        if boundary is None or start >= boundary:
+            selected.append(defined[key])
+            boundary = end
+    return selected
 
 
 class SignalStudy:
@@ -334,6 +414,11 @@ class SignalStudy:
             raise MethodContractError("bootstrap_resamples must be at least 100")
         if seed is not None and seed < 0:
             raise MethodContractError("seed must be non-negative")
+        if policies is not None and "ic_inference_sampling" in policies:
+            raise MethodContractError(
+                "the ic_inference_sampling policy is set by SignalStudy and cannot be overridden"
+            )
+        inference_horizon = _inference_horizon(self._horizons, policies)
 
         labels = self.labels()
         ic_result = self.ic(min_observations=min_observations, use_native=use_native)
@@ -350,23 +435,17 @@ class SignalStudy:
             "turnover": turnover_result,
             "decay": decay_result,
         }
-        ic_table = ic_result.table("ic_by_period")
-        if isinstance(ic_table, list):
-            ic_values = [
-                row["ic"]
-                for row in ic_table
-                if isinstance(row, Mapping) and isinstance(row.get("ic"), int | float)
-            ]
-            if len(ic_values) >= 2:
-                block_length = max(2, min(len(ic_values), round(len(ic_values) ** (1 / 3))))
-                results["bootstrap"] = bootstrap(
-                    ic_values,
-                    method="stationary",
-                    expected_block_length=block_length,
-                    resamples=bootstrap_resamples,
-                    seed=seed,
-                    use_native=use_native,
-                )
+        # Resample only the declared horizon's non-overlapping periods: pooling horizons
+        # mixes estimands, and overlapping labels make adjacent IC values dependent.
+        ic_values = _non_overlapping_ic(ic_result, labels, inference_horizon)
+        if len(ic_values) >= 2:
+            results["bootstrap"] = bootstrap(
+                ic_values,
+                method="iid",
+                resamples=bootstrap_resamples,
+                seed=seed,
+                use_native=use_native,
+            )
         if split is not None:
             results["split"] = split.evidence if isinstance(split, SplitResult) else split
         if additional_evidence is not None:
@@ -385,6 +464,8 @@ class SignalStudy:
         effective_policies: dict[str, JsonValue] = {"study_type": "signal"}
         if policies is not None:
             effective_policies.update(policies)
+        effective_policies["inference_horizon"] = inference_horizon
+        effective_policies["ic_inference_sampling"] = _IC_INFERENCE_SAMPLING
         result = run_audit(
             AuditContext(results=results, policies=effective_policies),
             rules=rules,

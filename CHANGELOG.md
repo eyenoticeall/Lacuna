@@ -6,6 +6,16 @@ All notable changes to Lacuna will be documented here. The project intends to fo
 
 ### Fixed
 
+- **Statistical correction:** `SignalStudy.audit` no longer bootstraps every `(date, horizon)` IC
+  row as one stationary series. Pooling mixed horizon estimands, and overlapping multi-period labels
+  made adjacent IC values dependent, so an uninformative persistent signal excluded zero in about a
+  quarter of null simulations and could earn `BOOTSTRAP_INTERVAL` `PASS`. The audit now infers on one
+  declared horizon (the first study horizon, or `policies={"inference_horizon": ...}`) and resamples
+  IID only periods whose label intervals are disjoint. `IC_DEFINED` and `IC_PERIOD_SUPPORT` (rule
+  version 2) read that horizon's IC summary, and return `UNKNOWN` for multi-horizon IC evidence
+  without a matching `inference_horizon` policy; `BOOTSTRAP_INTERVAL` (rule version 2) warns instead
+  of passing below 30 resampled periods and is `UNKNOWN` without a sample count. Audits produced by
+  0.14.0 and earlier remain identifiable by their recorded rule versions and should be regenerated.
 - `labels.forward_returns` now rejects a horizon that exits at the entry observation from the same
   price field. Previously `entry="next_close"` with a `1D` horizon (including `SignalStudy`'s
   default horizons) silently emitted all-zero labels and an entirely undefined 1D IC. `next_close`

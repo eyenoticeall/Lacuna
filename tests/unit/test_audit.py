@@ -47,7 +47,12 @@ def _complete_context() -> AuditContext:
             "quantiles": _result("signal.quantiles", {"spearman_monotonicity": 0.9}),
             "bootstrap": _result(
                 "validation.bootstrap",
-                {"observed": 0.08, "confidence_lower": 0.01, "confidence_upper": 0.15},
+                {
+                    "observed": 0.08,
+                    "confidence_lower": 0.01,
+                    "confidence_upper": 0.15,
+                    "n_raw": 80,
+                },
             ),
             "decay": _decay({"1D": 0.08, "5D": 0.05, "20D": 0.02}),
             "labels": _result("labels.forward_returns", {"n_labels": 1_000}),
@@ -275,3 +280,64 @@ def test_decay_coverage_reads_real_decay_evidence_with_an_undefined_horizon() ->
     assert finding.state == FindingState.WARN
     assert finding.evidence["n_defined_horizons"] == 2
     assert finding.evidence["undefined_horizons"] == ("1D",)
+
+
+def _finding(code: str, name: str, evidence: AnalysisResult, **policies: object) -> Finding:
+    context = _complete_context()
+    results = {**context.results, name: evidence}
+    merged = {**context.policies, **policies}
+    result = run_audit(AuditContext(results=results, policies=merged))  # type: ignore[arg-type]
+    return next(finding for finding in result.findings if finding.code == code)
+
+
+def _multi_horizon_ic() -> AnalysisResult:
+    # Pooled metrics blend both horizons; only the per-horizon rows are estimands.
+    return _result(
+        "signal.ic.spearman",
+        {"mean_ic": 0.03, "n_periods": 130},
+        {
+            "ic_by_horizon": [
+                {"horizon": "1D", "mean_ic": 0.05, "n_periods": 70},
+                {"horizon": "20D", "mean_ic": None, "n_periods": 0},
+            ]
+        },
+    )
+
+
+@pytest.mark.parametrize("code", ["IC_DEFINED", "IC_PERIOD_SUPPORT"])
+def test_multi_horizon_ic_without_a_declared_horizon_is_unknown(code: str) -> None:
+    # Regression: v1 read pooled metrics, mixing horizons into one mean and period count.
+    assert _finding(code, "ic", _multi_horizon_ic()).state == FindingState.UNKNOWN
+    assert (
+        _finding(code, "ic", _multi_horizon_ic(), inference_horizon="5D").state
+        == FindingState.UNKNOWN
+    )
+
+
+def test_ic_rules_evaluate_the_declared_inference_horizon() -> None:
+    defined = _finding("IC_DEFINED", "ic", _multi_horizon_ic(), inference_horizon="1D")
+    support = _finding("IC_PERIOD_SUPPORT", "ic", _multi_horizon_ic(), inference_horizon="1D")
+    undefined = _finding("IC_DEFINED", "ic", _multi_horizon_ic(), inference_horizon="20D")
+
+    assert defined.state == FindingState.PASS
+    assert defined.evidence["mean_ic"] == 0.05
+    assert defined.evidence["rule_version"] == 2
+    assert support.state == FindingState.PASS
+    assert support.evidence["n_periods"] == 70
+    assert undefined.state == FindingState.FAIL
+
+
+def test_bootstrap_interval_needs_an_adequate_resampled_sample() -> None:
+    def bootstrap(**metrics: object) -> AnalysisResult:
+        base = {"observed": 0.08, "confidence_lower": 0.01, "confidence_upper": 0.15}
+        return _result("validation.bootstrap", {**base, **metrics})
+
+    small = _finding("BOOTSTRAP_INTERVAL", "bootstrap", bootstrap(n_raw=29))
+    adequate = _finding("BOOTSTRAP_INTERVAL", "bootstrap", bootstrap(n_raw=30))
+    unsized = _finding("BOOTSTRAP_INTERVAL", "bootstrap", bootstrap())
+
+    assert small.state == FindingState.WARN
+    assert small.evidence["n_resampled"] == 29
+    assert adequate.state == FindingState.PASS
+    assert adequate.evidence["rule_version"] == 2
+    assert unsized.state == FindingState.UNKNOWN

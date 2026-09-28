@@ -124,20 +124,60 @@ class _ResultRule:
         )
 
 
+_UNRESOLVED_HORIZON_MESSAGE = (
+    "Multi-horizon IC evidence requires an inference_horizon policy that selects exactly one "
+    "horizon summary."
+)
+
+
+def _inference_ic_summary(
+    result: AnalysisResult,
+    context: AuditContext,
+) -> tuple[Mapping[str, JsonValue] | None, JsonValue]:
+    """Return the IC summary for the declared inference horizon.
+
+    Pooled IC metrics mix horizons whenever labels carry more than one, so a
+    per-horizon summary table takes precedence. Evidence without a horizon
+    table is a single IC series and keeps its top-level metrics.
+    """
+
+    declared = context.policies.get("inference_horizon")
+    table = result.tables.get("ic_overall_by_horizon", result.tables.get("ic_by_horizon"))
+    if not isinstance(table, tuple) or not table:
+        return result.metrics, declared
+    rows = tuple(row for row in table if isinstance(row, Mapping) and "horizon" in row)
+    if len(rows) != len(table):
+        return None, declared
+    horizons = {row["horizon"] for row in rows}
+    if declared is None and len(horizons) == 1:
+        return rows[0], rows[0]["horizon"]
+    matching = tuple(row for row in rows if row["horizon"] == declared)
+    if len(matching) != 1:
+        return None, declared
+    return matching[0], declared
+
+
 class _IcDefinedRule(_ResultRule):
     def evaluate(self, context: AuditContext) -> Finding:
         result = context.results[self.result_name]
-        value = result.metrics.get("mean_ic")
-        if value is None:
+        summary, horizon = _inference_ic_summary(result, context)
+        if summary is None:
+            return self._finding(
+                state=FindingState.UNKNOWN,
+                message=_UNRESOLVED_HORIZON_MESSAGE,
+                evidence={"inference_horizon": horizon},
+            )
+        value = summary.get("mean_ic")
+        if isinstance(value, bool) or not isinstance(value, int | float):
             return self._finding(
                 state=FindingState.FAIL,
                 message="No defined IC periods remain after sample and variance checks.",
-                evidence={"mean_ic": None},
+                evidence={"mean_ic": None, "inference_horizon": horizon},
             )
         return self._finding(
             state=FindingState.PASS,
             message="The IC time series contains a defined aggregate correlation.",
-            evidence={"mean_ic": value},
+            evidence={"mean_ic": value, "inference_horizon": horizon},
         )
 
 
@@ -147,8 +187,15 @@ class _IcSupportRule(_ResultRule):
 
     def evaluate(self, context: AuditContext) -> Finding:
         result = context.results[self.result_name]
-        raw = result.metrics.get("n_periods")
-        count = int(raw) if isinstance(raw, int | float) else 0
+        summary, horizon = _inference_ic_summary(result, context)
+        if summary is None:
+            return self._finding(
+                state=FindingState.UNKNOWN,
+                message=_UNRESOLVED_HORIZON_MESSAGE,
+                evidence={"inference_horizon": horizon},
+            )
+        raw = summary.get("n_periods")
+        count = int(raw) if isinstance(raw, int | float) and not isinstance(raw, bool) else 0
         if count >= self.pass_threshold:
             state = FindingState.PASS
             message = "IC is supported by at least 60 defined periods."
@@ -167,6 +214,7 @@ class _IcSupportRule(_ResultRule):
                 "n_periods": count,
                 "warn_threshold": self.warn_threshold,
                 "pass_threshold": self.pass_threshold,
+                "inference_horizon": horizon,
             },
         )
 
@@ -267,11 +315,14 @@ class _DecayCoverageRule(_ResultRule):
 
 
 class _BootstrapRule(_ResultRule):
+    minimum_sample = 30
+
     def evaluate(self, context: AuditContext) -> Finding:
         result = context.results[self.result_name]
         lower = result.metrics.get("confidence_lower")
         upper = result.metrics.get("confidence_upper")
         observed = result.metrics.get("observed")
+        sample = result.metrics.get("n_raw")
         if not (
             isinstance(lower, int | float)
             and isinstance(upper, int | float)
@@ -281,10 +332,21 @@ class _BootstrapRule(_ResultRule):
                 state=FindingState.UNKNOWN,
                 message="Bootstrap confidence bounds are unavailable.",
             )
+        if isinstance(sample, bool) or not isinstance(sample, int):
+            return self._finding(
+                state=FindingState.UNKNOWN,
+                message="The number of resampled periods behind the interval is unavailable.",
+            )
         lower_value = float(lower)
         upper_value = float(upper)
         observed_value = float(observed)
-        if lower_value > 0.0:
+        if sample < self.minimum_sample:
+            state = FindingState.WARN
+            message = (
+                f"Fewer than {self.minimum_sample} periods were resampled, so the interval is too "
+                "imprecise to support or reject the mean IC."
+            )
+        elif lower_value > 0.0:
             state = FindingState.PASS
             message = "The bootstrap confidence interval is strictly positive."
         elif upper_value < 0.0:
@@ -300,6 +362,10 @@ class _BootstrapRule(_ResultRule):
                 "observed": observed_value,
                 "confidence_lower": lower_value,
                 "confidence_upper": upper_value,
+                "n_resampled": sample,
+                "minimum_sample": self.minimum_sample,
+                "inference_horizon": context.policies.get("inference_horizon"),
+                "sampling": context.policies.get("ic_inference_sampling"),
             },
         )
 
@@ -426,6 +492,7 @@ def default_rules() -> tuple[AuditRule, ...]:
             "statistical_validity",
             Severity.HIGH,
             12.0,
+            rule_version=2,
         ),
         _IcSupportRule(
             "IC_PERIOD_SUPPORT",
@@ -434,6 +501,7 @@ def default_rules() -> tuple[AuditRule, ...]:
             "statistical_validity",
             Severity.HIGH,
             12.0,
+            rule_version=2,
         ),
         _MonotonicityRule(
             "QUANTILE_MONOTONICITY",
@@ -450,6 +518,7 @@ def default_rules() -> tuple[AuditRule, ...]:
             "statistical_validity",
             Severity.HIGH,
             12.0,
+            rule_version=2,
         ),
         _DecayCoverageRule(
             "HORIZON_DECAY_COVERAGE",

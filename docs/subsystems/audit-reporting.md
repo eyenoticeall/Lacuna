@@ -63,6 +63,13 @@ call `lacuna.audit(results=..., policies=...)`. This is useful when the analysis
 separate jobs. Result names are part of the v0.1 audit contract: `labels`, `ic`, `quantiles`,
 `turnover`, `decay`, `bootstrap`, and `split`.
 
+IC evidence with more than one horizon needs an `inference_horizon` policy that selects exactly one
+horizon summary; otherwise `IC_DEFINED` and `IC_PERIOD_SUPPORT` are `UNKNOWN`, because pooled
+metrics mix estimands. `BOOTSTRAP_INTERVAL` requires the bootstrap's resampled-period count
+(`n_raw`) and does not pass below 30 periods. `SignalStudy.audit` supplies both the policy and a
+bootstrap over disjoint label intervals; see
+[Audit scoring](../methodology/audit-scoring.md#signal-study-assembly).
+
 `SignalStudy.audit(additional_evidence=...)` retains those results in `report.evidence`. The mapping
 is immutable and sorted by source name. `report.table(name)` checks the audit result first and then
 named evidence; if multiple sources contain the same table, callers must use
@@ -227,10 +234,10 @@ The implemented rule set is:
 
 | Rule | Weight | Evidence or policy | Main v0.1 decision |
 | --- | ---: | --- | --- |
-| `IC_DEFINED` | 12 | `ic` | aggregate IC exists |
-| `IC_PERIOD_SUPPORT` | 12 | `ic` | pass at 60 periods, warn at 20 |
+| `IC_DEFINED` | 12 | `ic` | rule v2: IC exists for the declared inference horizon |
+| `IC_PERIOD_SUPPORT` | 12 | `ic` | rule v2: inference-horizon periods; pass at 60, warn at 20 |
 | `QUANTILE_MONOTONICITY` | 10 | `quantiles` | pass at 0.7, warn at 0.4 |
-| `BOOTSTRAP_INTERVAL` | 12 | `bootstrap` | pass if interval is positive |
+| `BOOTSTRAP_INTERVAL` | 12 | `bootstrap` | rule v2: pass if positive with at least 30 resampled periods |
 | `HORIZON_DECAY_COVERAGE` | 10 | `decay` | rule v2: pass at three horizons with defined IC, warn at two; unknown without the `ic_decay` table |
 | `LABEL_INTERVALS_PRESENT` | 10 | `labels` | explicit forward-label timing evidence |
 | `PURGED_VALIDATION_SUPPLIED` | 10 | `split` | evidence must come from `cv.purged_kfold` |
