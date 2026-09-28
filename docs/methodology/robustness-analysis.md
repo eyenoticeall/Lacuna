@@ -91,7 +91,8 @@ perturbed = lc.robustness.continuous_perturbation(
 ```
 
 Opaque constraints cannot enter a stable fingerprint, so a callable constraint requires an explicit
-versioned name. Bounds, false constraints, and constraint exceptions count as rejections. The result
+versioned name. Bounds, false constraints, and constraint exceptions count as rejections;
+`failure_policy="raise"` propagates constraint exceptions as it does evaluator exceptions. The result
 reports attempted, accepted, rejected, successful, and failed counts plus a rejection table.
 `max_attempts` bounds rejection sampling; exhaustion produces a failing shortfall finding rather
 than silently returning the requested count.

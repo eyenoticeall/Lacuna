@@ -282,3 +282,37 @@ def test_universe_contracts_require_stable_unique_membership() -> None:
             evaluator_name="strategy.universe_score",
             code_id="git:abc123",
         )
+
+
+def _raising_constraint_perturbation(failure_policy: str) -> AnalysisResult:
+    def constraint(parameters: Mapping[str, JsonValue]) -> bool:
+        raise ZeroDivisionError("broken constraint")
+
+    return continuous_perturbation(
+        lambda _: _result(score=1.0),
+        selected_parameters={"window": 10},
+        perturbations={"window": PerturbationSpec(scale=1.0)},
+        objective="score",
+        evaluator_name="strategy.score",
+        sample_id="sample:validation",
+        code_id="git:abc123",
+        draws=2,
+        max_attempts=4,
+        constraint=constraint,
+        constraint_name="broken:v1",
+        failure_policy=failure_policy,  # type: ignore[arg-type]
+    )
+
+
+def test_constraint_exceptions_honor_the_failure_policy() -> None:
+    # Regression: constraint exceptions were always swallowed as rejections, even when
+    # failure_policy="raise" promised to propagate exceptions for debugging.
+    with pytest.raises(ZeroDivisionError, match="broken constraint"):
+        _raising_constraint_perturbation("raise")
+
+    recorded = _raising_constraint_perturbation("record")
+    assert recorded.metrics["accepted_samples"] == 0
+    rejections = recorded.table("rejections")
+    assert rejections == [  # every bounded attempt reached the broken constraint
+        {"reason": "constraint_error", "count": 4, "fraction_of_attempts": 1.0}
+    ]

@@ -26,6 +26,10 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   requested horizons, so a horizon with no defined IC period still earned a three-horizon `PASS`.
   Decay evidence without the per-horizon table now yields `UNKNOWN` instead of trusting the
   `n_horizons` count.
+- `robustness.continuous_perturbation` now propagates constraint-callback exceptions under
+  `failure_policy="raise"`, matching evaluator exceptions. They were previously always swallowed as
+  `constraint_error` rejections, which hid a broken constraint behind an acceptance shortfall. The
+  default `"record"` policy is unchanged.
 
 ### Documentation
 

@@ -213,6 +213,8 @@ def continuous_perturbation(
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception:
+                if failure_policy == "raise":
+                    raise
                 rejections["constraint_error"] += 1
                 continue
             if not isinstance(constraint_passed, bool):
