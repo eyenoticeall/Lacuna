@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import stat
 import zipfile
@@ -259,3 +260,164 @@ def test_creator_enforces_verifier_member_limits(
     monkeypatch.setattr(bundle_module, "_MAX_MEMBER_SIZE", 128)
     with pytest.raises(ReportError, match=r"member.*safety limit"):
         _report().bundle(tmp_path / "oversized.lacuna")
+
+
+def _hostile_archive(
+    source: Path,
+    destination: Path,
+    *,
+    member: str = "report/audit.md",
+    comment: bytes = b"",
+    duplicate: bool = False,
+    **attributes: int,
+) -> None:
+    """Rewrite a valid bundle with one deliberately unsafe ZIP property."""
+
+    with zipfile.ZipFile(source) as archive:
+        members = {name: archive.read(name) for name in archive.namelist()}
+    with zipfile.ZipFile(destination, "w") as archive:
+        archive.comment = comment
+        for name, content in sorted(members.items()):
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_STORED
+            info.create_system = 3
+            info.external_attr = (stat.S_IFREG | 0o600) << 16
+            if name == member:
+                for attribute, value in attributes.items():
+                    setattr(info, attribute, value)
+            archive.writestr(info, content)
+            if duplicate and name == member:
+                archive.writestr(info, content)
+
+
+@pytest.mark.parametrize(
+    ("options", "message"),
+    [
+        ({"external_attr": (stat.S_IFLNK | 0o777) << 16}, "unsafe file type"),
+        ({"external_attr": (stat.S_IFREG | 0o755) << 16}, "executable permissions"),
+        ({"create_system": 0}, "unsafe file type"),
+        ({"compress_type": zipfile.ZIP_DEFLATED}, "not a stored regular file"),
+        ({"comment": b"hidden instructions"}, "comments are not permitted"),
+        ({"duplicate": True}, "duplicate member names"),
+    ],
+)
+def test_verifier_rejects_unsafe_zip_member_shapes(
+    tmp_path: Path, options: dict[str, object], message: str
+) -> None:
+    source = tmp_path / "source.lacuna"
+    hostile = tmp_path / "hostile.lacuna"
+    _report().bundle(source)
+    with pytest.warns(UserWarning) if options.get("duplicate") else contextlib.nullcontext():
+        _hostile_archive(source, hostile, **options)  # type: ignore[arg-type]
+
+    with pytest.raises(ReportError, match=message):
+        verify_bundle(hostile)
+
+
+def _manifest_variant(source: Path, destination: Path, change: object) -> None:
+    with zipfile.ZipFile(source) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+    if callable(change):
+        change(manifest)
+        content = bundle_module._canonical_bytes(manifest)
+    else:
+        content = change  # type: ignore[assignment]
+    _rewrite_archive(source, destination, replace={"manifest.json": content})  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda value: value["producer"].update(name="lacuna-fork"), "producer.name"),
+        (lambda value: value["security"].update(executable_code=True), "trust contract"),
+        (lambda value: value["reproducibility"].update(level="bitwise"), "unsupported claim"),
+        (lambda value: value["report"].update(path="report/other.json"), "report.path"),
+        (b"\xff\xfe not utf-8", "not valid UTF-8 JSON"),
+        (b'{"format": "a", "format": "b"}\n', "duplicate JSON key"),
+    ],
+)
+def test_verifier_rejects_manifests_that_break_the_trust_contract(
+    tmp_path: Path, change: object, message: str
+) -> None:
+    # Manifest variants are canonically encoded so each reaches its semantic check.
+    source = tmp_path / "source.lacuna"
+    hostile = tmp_path / "hostile.lacuna"
+    _report().bundle(source)
+    _manifest_variant(source, hostile, change)
+
+    with pytest.raises(ReportError, match=message):
+        verify_bundle(hostile)
+
+
+def test_verifier_rejects_members_flagged_as_encrypted(tmp_path: Path) -> None:
+    # zipfile clears flag_bits on write, so set the encryption bit directly in the
+    # central-directory record that the verifier inspects.
+    hostile = tmp_path / "encrypted.lacuna"
+    _report().bundle(hostile)
+    content = bytearray(hostile.read_bytes())
+    target = b"report/audit.md"
+    position = content.find(b"PK\x01\x02")
+    while position != -1:
+        name_length = int.from_bytes(content[position + 28 : position + 30], "little")
+        if bytes(content[position + 46 : position + 46 + name_length]) == target:
+            content[position + 8] |= 0x1
+            break
+        position = content.find(b"PK\x01\x02", position + 4)
+    assert position != -1
+    hostile.write_bytes(bytes(content))
+
+    with pytest.raises(ReportError, match="is encrypted"):
+        verify_bundle(hostile)
+
+
+def _resealed(change: object) -> object:
+    """Apply a manifest change, then recompute the artifact-set digest over it."""
+
+    def apply(manifest: dict[str, object]) -> None:
+        change(manifest)  # type: ignore[operator]
+        manifest["artifact_set_sha256"] = bundle_module._digest(
+            bundle_module._canonical_bytes(manifest["artifacts"])
+        )
+
+    return apply
+
+
+def _first_artifact(manifest: dict[str, object]) -> dict[str, object]:
+    return manifest["artifacts"][0]  # type: ignore[index, no-any-return]
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        (lambda value: _first_artifact(value).update(sha256="0" * 64), "artifact-set digest"),
+        (
+            _resealed(lambda value: _first_artifact(value).update(size=1)),
+            "artifact size mismatch",
+        ),
+        (
+            _resealed(lambda value: _first_artifact(value).update(sha256="0" * 64)),
+            "artifact SHA-256 mismatch",
+        ),
+        (lambda value: value["report"].update(method="audit.other"), "report identity"),
+    ],
+)
+def test_verifier_rejects_manifest_digests_and_identity_that_disagree_with_content(
+    tmp_path: Path, change: object, message: str
+) -> None:
+    source = tmp_path / "source.lacuna"
+    hostile = tmp_path / "hostile.lacuna"
+    _report().bundle(source)
+    _manifest_variant(source, hostile, change)
+
+    with pytest.raises(ReportError, match=message):
+        verify_bundle(hostile)
+
+
+def test_verifier_rejects_valid_members_in_a_noncanonical_zip_encoding(tmp_path: Path) -> None:
+    source = tmp_path / "source.lacuna"
+    reencoded = tmp_path / "reencoded.lacuna"
+    _report().bundle(source)
+    _hostile_archive(source, reencoded, date_time=(1999, 1, 1, 0, 0, 0))  # type: ignore[arg-type]
+
+    with pytest.raises(ReportError, match="not in canonical version-1 form"):
+        verify_bundle(reencoded)
