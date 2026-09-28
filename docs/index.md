@@ -18,7 +18,7 @@ Lacuna is an open-source quantitative research validation library for discoverin
 ## Install Lacuna
 
 The current verified releases are
-[`lacuna-quant` 0.14.0](https://pypi.org/project/lacuna-quant/0.14.0/) and the optional
+[`lacuna-quant` 0.14.1](https://pypi.org/project/lacuna-quant/0.14.1/) and the optional
 [`lacuna-options` 0.2.1](https://pypi.org/project/lacuna-options/0.2.1/). Install the core
 distribution, then verify the runtime:
 

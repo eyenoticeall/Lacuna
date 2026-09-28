@@ -14,7 +14,7 @@ ACTIONLINT_SHA256 = "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b34
 
 def test_release_source_contract_accepts_the_declared_release() -> None:
     subprocess.run(
-        [sys.executable, str(VERIFIER), "source", "--tag", "v0.14.0"],
+        [sys.executable, str(VERIFIER), "source", "--tag", "v0.14.1"],
         cwd=ROOT,
         check=True,
     )
@@ -22,7 +22,7 @@ def test_release_source_contract_accepts_the_declared_release() -> None:
 
 def test_release_source_contract_rejects_a_mismatched_tag() -> None:
     result = subprocess.run(
-        [sys.executable, str(VERIFIER), "source", "--tag", "v0.14.1"],
+        [sys.executable, str(VERIFIER), "source", "--tag", "v0.14.2"],
         cwd=ROOT,
         check=False,
         capture_output=True,

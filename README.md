@@ -22,7 +22,7 @@
     <a href="#quick-start">Quick start</a> ·
     <a href="#what-lacuna-validates">Capabilities</a> ·
     <a href="https://github.com/eyenoticeall/Lacuna/tree/main/docs">Documentation</a> ·
-    <a href="https://github.com/eyenoticeall/Lacuna/releases/tag/v0.14.0">v0.14.0</a>
+    <a href="https://github.com/eyenoticeall/Lacuna/releases/tag/v0.14.1">v0.14.1</a>
   </p>
 </div>
 
@@ -36,8 +36,9 @@ It complements your research stack instead of replacing it. Results are returned
 versioned evidence that can be inspected, audited, rendered, and archived.
 
 > [!IMPORTANT]
-> **v0.14.0 is current.** Lacuna is alpha, pre-1.0 software. This release preserves the v0.13
-> public API while hardening performance, memory use, native boundaries, and release verification.
+> **v0.14.1 is current.** Lacuna is alpha, pre-1.0 software. This patch corrects signal-audit IC
+> inference, which could pass an uninformative signal; regenerate audits produced by v0.14.0 or
+> earlier. It preserves the v0.13/v0.14 public signatures.
 
 ## Quick start
 

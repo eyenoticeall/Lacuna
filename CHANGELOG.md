@@ -2,7 +2,7 @@
 
 All notable changes to Lacuna will be documented here. The project intends to follow [Semantic Versioning](https://semver.org/) once its public release process begins.
 
-## Unreleased
+## [0.14.1] - 2026-09-28
 
 ### Fixed
 
@@ -30,6 +30,14 @@ All notable changes to Lacuna will be documented here. The project intends to fo
   `failure_policy="raise"`, matching evaluator exceptions. They were previously always swallowed as
   `constraint_error` rejections, which hid a broken constraint behind an acceptance shortfall. The
   default `"record"` policy is unchanged.
+
+### Tests and release QA
+
+- Add fixed-seed null-calibration guards that run through `SignalStudy.audit`, and for block and
+  within-date permutation, DSR selection deflation, and IID, circular, and stationary bootstrap
+  coverage. Each guard pairs the method with the naive alternative it must beat.
+- Cover every bundle-verifier hostile-archive, manifest trust-contract, digest, report-identity, and
+  canonical-encoding rejection, and every vendor and backtest adapter declaration rejection.
 
 ### Documentation
 
