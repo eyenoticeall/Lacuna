@@ -24,7 +24,7 @@ such as `0.2.0rc1`.
 | `0.11.x` | Validated decay inference, diagnostic portfolio projection, robust event studies | Released |
 | `0.12.x` | Generic factor-panel interoperability and migration guidance | Released |
 | `0.13.x` | PyPI-safe distribution identity, Trusted Publishing, and registry-install verification | Released |
-| `0.14.x` | Admission-gated Rust migration and performance/memory hardening | Release-gated |
+| `0.14.x` | Admission-gated Rust migration and performance/memory hardening | Released |
 | `1.0.0` | Stable product contract in the technical specification | Every v1 definition item is evidenced, including independent use |
 
 This enumeration is a compatibility plan, not a schedule. A phase may receive multiple release
@@ -272,6 +272,12 @@ Native work stays single-threaded. Python retains timing semantics, methodology,
 findings, provenance, RNG, and public result construction. Arrow C Data, native RNG/scheduling,
 Rayon, public compact carriers, c14n-v2, approximate quantiles, and semantic method changes remain
 outside this milestone.
+
+`0.14.1` is a correctness patch within the line. It corrects `SignalStudy.audit` IC inference, which
+pooled horizons and resampled overlapping labels as independent, rejects zero-length `next_close`
+labels, counts only defined horizons for decay coverage, and honors the robustness failure policy
+for constraint errors. The four affected audit rules are at rule version 2; see
+[Audit scoring](../methodology/audit-scoring.md#signal-study-assembly).
 
 ## Historical v0.1 boundary
 

@@ -80,12 +80,15 @@ IID output carries a structured independence warning. Block methods warn that se
 must be checked. v0.1 leaves `n_effective` unknown rather than equating it to raw sample size.
 
 Bootstrap intervals describe the chosen estimator under the empirical dependence scheme. They do not
-correct selection bias, nonstationarity, universe bias, or a poorly chosen block length. In
-`SignalStudy.audit`, stationary bootstrap is applied to the defined IC series with at least two values;
-the report does not pretend this validates all research choices.
+correct selection bias, nonstationarity, universe bias, or a poorly chosen block length. Since
+0.14.1, `SignalStudy.audit` resamples IID only the declared inference horizon's IC periods whose label
+intervals are disjoint, because overlapping labels make adjacent IC values dependent; see
+[Audit scoring](audit-scoring.md#signal-study-assembly). The report does not pretend this validates
+all research choices.
 
 Validation includes deterministic index fixtures, batch-size invariance, native/reference
-differentials, restart-frequency simulation, and a fixed-seed AR(1) coverage guard.
+differentials, restart-frequency simulation, and fixed-seed coverage guards for IID, moving,
+circular, and stationary intervals.
 
 ## Joint stationary bootstrap in v0.5
 

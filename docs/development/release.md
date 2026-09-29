@@ -150,7 +150,7 @@ universal `lacuna-options` wheel and source distribution, installs that wheel wi
 target-smoke-tested Linux core wheel, and runs the extension smoke contract.
 
 A separate job downloads the complete matrix, rejects missing or unexpected filenames/tags/names/
-versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.14.0`
+versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.14.1`
 tag with extension `0.2.1`, the release set is exactly four `lacuna-quant` wheels, one
 `lacuna-options` wheel, two source distributions, and the checksum manifest.
 
@@ -165,7 +165,7 @@ Core publishes to PyPI as `lacuna-quant`; the Python import package and CLI rema
 PyPI name `lacuna` belongs to an unrelated project and is a prohibited release target. The optional
 extension publishes independently as `lacuna-options` and depends on
 `lacuna-quant>=0.13,<0.15` from its `0.2.1` release onward. Release QA installs that exact extension
-wheel beside both core 0.13.0 and the candidate 0.14.0 wheel.
+wheel beside both core 0.13.0 and the candidate 0.14.x core wheel.
 
 Registry publication uses PyPI Trusted Publishing only—no long-lived API token is stored. Both
 PyPI projects authorize repository `eyenoticeall/Lacuna` and workflow `release.yml`. The core

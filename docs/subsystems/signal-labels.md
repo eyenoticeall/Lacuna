@@ -68,7 +68,7 @@ The label result contains:
 - `horizon` — normalized requested horizon;
 - `forward_return`.
 
-A close-observed signal cannot use the same close as entry unless the caller explicitly defines a pre-close availability model. `next_open` resolves per instrument ordering and missing-bar policy. Starting the label interval at the signal observation is conservative for purging and keeps same-session entry/exit labels from collapsing to an empty interval when the source only has session timestamps.
+A close-observed signal cannot use the same close as entry unless the caller explicitly defines a pre-close availability model. `next_open` resolves per instrument ordering and missing-bar policy. `next_close` enters at the next observation's close, so its horizons must be at least `2D`: a horizon that exits at the entry observation from the same price field is a zero-length holding period and is rejected rather than emitted as an all-zero label. Starting the label interval at the signal observation is conservative for purging and keeps same-session entry/exit labels from collapsing to an empty interval when the source only has session timestamps.
 
 ### Horizon semantics
 
@@ -343,6 +343,7 @@ Polars should own alignment, projection, and ordinary grouping unless benchmarks
 - Exact portfolio gross/net/leg and contribution identities, the gross-one regression case,
   one-sided group policy, concentration, turnover, and permutation invariance.
 - No same-close entry under `signal_time="close"`, `entry="next_open"`.
+- Zero-length horizons, such as `entry="next_close"` with `1D`, are rejected.
 - Calendar, missing-bar, delisting, and last-horizon censoring.
 - Eager/lazy and adapter equivalence.
 - Native/reference differential tests.

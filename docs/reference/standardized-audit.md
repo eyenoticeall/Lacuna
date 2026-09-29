@@ -5,8 +5,10 @@ adapter, plugin, and extension boundaries. It does not rerun those methods, rein
 thresholds, or reduce unlike research questions to one quality number.
 
 The public entry point is `lacuna.standard_audit(...)`. The original `lacuna.audit(...)` and
-`SignalStudy.audit(...)` retain the frozen signal-audit contract from `0.1.x`; the standardized
-profile is additive in `0.8.x`.
+`SignalStudy.audit(...)` retain the signal-audit API and finding codes from `0.1.x`; since `0.14.1`,
+four of its rules are at rule version 2 (see
+[Audit engine and reporting](../subsystems/audit-reporting.md)). The standardized profile is
+additive in `0.8.x`.
 
 ## Why a profile exists
 
