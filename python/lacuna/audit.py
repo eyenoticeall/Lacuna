@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -419,20 +420,74 @@ class _DelistingRule(_ResultRule):
         )
 
 
+_PURGED_SPLIT_METHODS = frozenset({"cv.purged_kfold", "cv.combinatorial_purged_kfold"})
+_OBSERVATION_HORIZON = re.compile(r"(?P<count>[1-9][0-9]*)D")
+
+
+def _split_count(result: AnalysisResult, name: str) -> int | None:
+    value = result.metrics.get(name)
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 class _PurgedValidationRule(_ResultRule):
+    """Check that supplied split evidence purged against overlapping label intervals.
+
+    Split evidence carries no input fingerprint, so the rule cannot prove the split was
+    built from the audited study's labels. It can flag an inconsistency: consecutive labels
+    spanning two or more observations overlap the first test observation after their start,
+    so a purged split of them removes at least one observation. Zero purged observations
+    is still legitimate for a split built on non-overlapping sampled labels (for example
+    every fifth observation of a five-observation horizon), which the rule cannot tell
+    apart, so the outcome is a warning rather than a failure.
+    """
+
     def evaluate(self, context: AuditContext) -> Finding:
         result = context.results[self.result_name]
-        if result.metadata.method != "cv.purged_kfold":
+        method = result.metadata.method
+        if method not in _PURGED_SPLIT_METHODS:
             return self._finding(
                 state=FindingState.UNKNOWN,
                 message="The supplied split evidence does not establish purged validation.",
-                evidence={"method": result.metadata.method},
+                evidence={"method": method},
             )
-        purged = result.metrics.get("purged_observations")
+        purged = _split_count(result, "purged_observations")
+        embargoed = _split_count(result, "embargoed_observations")
+        evidence: dict[str, JsonValue] = {
+            "method": method,
+            "purged_observations": purged,
+            "embargoed_observations": embargoed,
+            "data_identity_verified": False,
+        }
+        if purged is None:
+            return self._finding(
+                state=FindingState.UNKNOWN,
+                message="The supplied split evidence does not report its purged observations.",
+                evidence=evidence,
+            )
+        horizon = context.policies.get("inference_horizon")
+        match = _OBSERVATION_HORIZON.fullmatch(horizon) if isinstance(horizon, str) else None
+        if match is not None and int(match.group("count")) >= 2 and purged == 0:
+            return self._finding(
+                state=FindingState.WARN,
+                message=(
+                    "The supplied split purged no observations although the inference "
+                    "horizon's labels span several observations. Consecutive labels of that "
+                    "horizon overlap a test boundary, so unless the split was built on "
+                    "non-overlapping sampled labels it was not purged against the audited "
+                    "labels."
+                ),
+                evidence={**evidence, "inference_horizon": horizon},
+            )
         return self._finding(
             state=FindingState.PASS,
-            message="A supplied validation split applied interval-aware purging.",
-            evidence={"purged_observations": purged},
+            message=(
+                "A supplied validation split applied interval-aware purging. The split "
+                "evidence does not identify its input, so this does not verify that it was "
+                "built from the audited labels."
+            ),
+            evidence=evidence,
         )
 
 
@@ -544,6 +599,7 @@ def default_rules() -> tuple[AuditRule, ...]:
             "temporal_integrity",
             Severity.HIGH,
             10.0,
+            rule_version=2,
         ),
         _PriceAdjustmentRule(
             "PRICE_ADJUSTMENT_DECLARED",

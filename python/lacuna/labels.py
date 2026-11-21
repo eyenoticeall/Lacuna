@@ -258,9 +258,15 @@ def forward_returns(
         )
         censored = int(candidate.select(invalid.sum()).item())
         total_censored += censored
-        if censored and missing == "raise":
+        # ``missing="raise"`` covers observations whose entry and exit bars exist but do not
+        # yield a return. Rows with no entry or exit bar inside the sample are end-of-sample
+        # censoring: every finite panel has them, so they are always dropped and counted.
+        boundary = pl.col("entry_time").is_null() | pl.col("label_end").is_null()
+        interior = int(candidate.select((invalid & ~boundary).sum()).item())
+        if interior and missing == "raise":
             raise DataContractError(
-                f"horizon {name} has {censored} rows without an entry or exit observation"
+                f"horizon {name} has {interior} rows with entry and exit observations but "
+                "no defined forward return"
             )
         candidate = candidate.filter(~invalid).select(
             "observation_time",
@@ -286,7 +292,9 @@ def forward_returns(
                     "missing_entry_exit_or_label_boundary",
                     input_rows=diagnostics.rows,
                     retained_rows=candidate.height,
-                    policy=missing,
+                    # Rows excluded here were dropped under either policy: ``"raise"`` has
+                    # already rejected interior gaps, leaving only end-of-sample censoring.
+                    policy="drop",
                 ),
                 "horizon": name,
             }

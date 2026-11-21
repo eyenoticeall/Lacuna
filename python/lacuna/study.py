@@ -11,7 +11,7 @@ from lacuna import signal as signal_api
 from lacuna._frames import frame_records
 from lacuna.adapters.polars import PolarsFrame, to_polars
 from lacuna.audit import AuditContext, AuditRule, run_audit
-from lacuna.cv import SplitResult
+from lacuna.cv import CombinatorialSplitResult, SplitResult
 from lacuna.exceptions import MethodContractError
 from lacuna.labels import (
     Horizon,
@@ -402,7 +402,7 @@ class SignalStudy:
         bootstrap_resamples: int = 1_000,
         seed: int | None = None,
         min_observations: int = 3,
-        split: SplitResult | AnalysisResult | None = None,
+        split: SplitResult | CombinatorialSplitResult | AnalysisResult | None = None,
         policies: Mapping[str, JsonValue] | None = None,
         additional_evidence: Mapping[str, AnalysisResult] | None = None,
         rules: Sequence[AuditRule] | None = None,
@@ -447,7 +447,11 @@ class SignalStudy:
                 use_native=use_native,
             )
         if split is not None:
-            results["split"] = split.evidence if isinstance(split, SplitResult) else split
+            results["split"] = (
+                split.evidence
+                if isinstance(split, SplitResult | CombinatorialSplitResult)
+                else split
+            )
         if additional_evidence is not None:
             collisions = set(results).intersection(additional_evidence)
             if collisions:

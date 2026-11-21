@@ -140,6 +140,7 @@ def _aligned_panel(
     label_value: str,
     null_policy: Literal["drop", "raise"],
     extra_signal_columns: Sequence[str] = (),
+    signal_instrument: str | None = None,
 ) -> tuple[pl.DataFrame, FrameDiagnostics, FrameDiagnostics, int, int, int]:
     if isinstance(signal_data, np.ndarray) and isinstance(labels, np.ndarray):
         if extra_signal_columns:
@@ -157,6 +158,11 @@ def _aligned_panel(
             panel.height,
         )
 
+    # ``forward_returns`` and ``bucketize`` always write the canonical ``instrument`` column,
+    # whatever the source identifier was called; ``instrument`` names the column only in
+    # caller-built frames.
+    label_instrument = "instrument" if isinstance(labels, LabelResult) else instrument
+    instrument = instrument if signal_instrument is None else signal_instrument
     signal_frame, signal_diagnostics = eager_frame(
         signal_data,
         required=[signal_time, instrument, signal_value, *extra_signal_columns],
@@ -164,7 +170,7 @@ def _aligned_panel(
     label_source = labels.frame if isinstance(labels, LabelResult) else labels
     label_frame, label_diagnostics = eager_frame(
         label_source,
-        required=[label_time, instrument, label_value],
+        required=[label_time, label_instrument, label_value],
     )
     validate_panel_schema(
         signal_frame,
@@ -174,13 +180,13 @@ def _aligned_panel(
         name="signal",
     )
     require_no_nulls(signal_frame, extra_signal_columns, name="signal grouping columns")
-    label_key = [label_time, instrument]
+    label_key = [label_time, label_instrument]
     if "horizon" in label_frame.columns:
         label_key.append("horizon")
     validate_panel_schema(
         label_frame,
         time=label_time,
-        instrument=instrument,
+        instrument=label_instrument,
         numeric=[label_value],
         name="labels",
         unique=False,
@@ -190,7 +196,7 @@ def _aligned_panel(
     require_compatible_keys(
         signal_frame,
         label_frame,
-        pairs=((signal_time, label_time), (instrument, instrument)),
+        pairs=((signal_time, label_time), (instrument, label_instrument)),
     )
     signal_diagnostics = signal_diagnostics.with_execution(
         "validate_signal_frame",
@@ -203,6 +209,18 @@ def _aligned_panel(
         "inner_join_signal_labels",
     )
 
+    # Infinity is rejected on the declared inputs, not on the joined panel: an infinite
+    # value on a row without a matching label or signal is still an invalid input.
+    for source, column, role in (
+        (signal_frame, signal_value, "signal"),
+        (label_frame, label_value, "label"),
+    ):
+        infinite_count = int(source.select(pl.col(column).is_infinite().sum()).item())
+        if infinite_count:
+            raise DataContractError(
+                f"{role} input contains {infinite_count} rows with positive or negative infinity"
+            )
+
     signal_expressions = [
         pl.col(signal_time).alias("observation_time"),
         pl.col(instrument).alias("instrument"),
@@ -214,7 +232,7 @@ def _aligned_panel(
     signal_projection = signal_frame.select(signal_expressions)
     label_expressions = [
         pl.col(label_time).alias("observation_time"),
-        pl.col(instrument).alias("instrument"),
+        pl.col(label_instrument).alias("instrument"),
         pl.col(label_value).cast(pl.Float64).alias("forward_return"),
     ]
     for optional in ("horizon", "label_start", "entry_time", "label_end"):
@@ -730,6 +748,7 @@ def bucket_returns(
         label_value=label_value,
         null_policy=null_policy,
         extra_signal_columns=tuple(dict.fromkeys(extra_columns)),
+        signal_instrument="instrument",
     )
     if not panel.schema["bucket"].is_integer():
         raise DataContractError("bucket assignments must use an integer dtype")
@@ -1301,7 +1320,7 @@ def decay(
     spread_by_horizon = spread_by_period.group_by("horizon", maintain_order=True).agg(
         pl.col("spread").mean().alias("mean_top_bottom_spread"),
         pl.col("spread").std(ddof=1).alias("std_top_bottom_spread"),
-        pl.len().alias("n_periods"),
+        pl.len().alias("n_spread_periods"),
     )
     decay_table = ic_by_horizon.join(
         spread_by_horizon, on="horizon", how="full", coalesce=True
