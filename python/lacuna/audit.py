@@ -220,17 +220,64 @@ class _IcSupportRule(_ResultRule):
         )
 
 
+_UNRESOLVED_MONOTONICITY_MESSAGE = (
+    "Multi-horizon quantile evidence requires an inference_horizon policy that selects exactly "
+    "one horizon's monotonicity."
+)
+
+
+def _inference_monotonicity(
+    result: AnalysisResult,
+    context: AuditContext,
+) -> tuple[bool, JsonValue, JsonValue]:
+    """Return the quantile monotonicity for the declared inference horizon.
+
+    The top-level metric describes one headline horizon, which need not be the horizon the
+    audit infers on, so the per-horizon table decides whenever it can. Evidence without a
+    horizon is a single series and keeps its top-level metric.
+    """
+
+    declared = context.policies.get("inference_horizon")
+    headline = result.metrics.get("spearman_monotonicity")
+    table = result.tables.get("monotonicity")
+    rows = (
+        tuple(row for row in table if isinstance(row, Mapping) and "horizon" in row)
+        if isinstance(table, tuple)
+        else ()
+    )
+    if not rows:
+        return True, headline, declared
+    horizons = {row["horizon"] for row in rows}
+    if declared is None:
+        if len(horizons) == 1:
+            return True, headline, next(iter(horizons))
+        return False, None, declared
+    if result.metadata.parameters.get("headline_horizon") == declared:
+        return True, headline, declared
+    matching = tuple(row for row in rows if row["horizon"] == declared)
+    if len(matching) != 1:
+        return False, None, declared
+    return True, matching[0].get("spearman_monotonicity"), declared
+
+
 class _MonotonicityRule(_ResultRule):
     pass_threshold = 0.7
     warn_threshold = 0.4
 
     def evaluate(self, context: AuditContext) -> Finding:
         result = context.results[self.result_name]
-        raw = result.metrics.get("spearman_monotonicity")
-        if not isinstance(raw, int | float):
+        resolved, raw, horizon = _inference_monotonicity(result, context)
+        if not resolved:
+            return self._finding(
+                state=FindingState.UNKNOWN,
+                message=_UNRESOLVED_MONOTONICITY_MESSAGE,
+                evidence={"inference_horizon": horizon},
+            )
+        if isinstance(raw, bool) or not isinstance(raw, int | float):
             return self._finding(
                 state=FindingState.UNKNOWN,
                 message="Quantile monotonicity could not be computed from the supplied groups.",
+                evidence={"inference_horizon": horizon},
             )
         value = float(raw)
         if value >= self.pass_threshold:
@@ -249,6 +296,7 @@ class _MonotonicityRule(_ResultRule):
                 "spearman_monotonicity": value,
                 "warn_threshold": self.warn_threshold,
                 "pass_threshold": self.pass_threshold,
+                "inference_horizon": horizon,
             },
         )
 
@@ -565,6 +613,7 @@ def default_rules() -> tuple[AuditRule, ...]:
             "statistical_validity",
             Severity.MEDIUM,
             10.0,
+            rule_version=2,
         ),
         _BootstrapRule(
             "BOOTSTRAP_INTERVAL",

@@ -269,6 +269,82 @@ def signal_values_count(values: np.ndarray[Any, Any]) -> int:
     return int(values.shape[0])
 
 
+_HORIZON_ORDER = "__lacuna_horizon_order"
+_OBSERVATION_HORIZON = r"^([1-9][0-9]*)D$"
+
+
+def _sort_by_keys(frame: pl.DataFrame, keys: Sequence[str]) -> pl.DataFrame:
+    """Sort by ``keys``, ordering observation horizons by length instead of as text.
+
+    ``"10D"`` sorts before ``"5D"`` as a string. Horizon names of the form ``ND`` are ordered
+    by ``N``; any other horizon name follows them in text order.
+    """
+
+    if not keys:
+        return frame
+    if "horizon" not in keys or frame.schema["horizon"] != pl.String:
+        return frame.sort(list(keys))
+    expanded = [
+        part for key in keys for part in ((_HORIZON_ORDER, key) if key == "horizon" else (key,))
+    ]
+    return (
+        frame.with_columns(
+            pl.col("horizon")
+            .str.extract(_OBSERVATION_HORIZON, 1)
+            .cast(pl.Int64, strict=False)
+            .fill_null(np.iinfo(np.int64).max)
+            .alias(_HORIZON_ORDER)
+        )
+        .sort(expanded)
+        .drop(_HORIZON_ORDER)
+    )
+
+
+def _headline_horizon(panel: pl.DataFrame, labels: object) -> tuple[JsonValue, bool]:
+    """Resolve the one horizon that headline metrics describe.
+
+    Different horizons are different estimands, so a headline never pools them. Returns the
+    horizon and whether it is undeclared. A ``LabelResult`` always headlines the first
+    horizon in its declared order, the same default the study audit uses for inference, even
+    when that horizon has no aligned rows: the headline is then empty rather than moved to a
+    later horizon. A bare label frame declares no order, so a single horizon is its own
+    headline and several horizons leave the headline undefined instead of chosen by text
+    order.
+    """
+
+    if "horizon" not in panel.columns:
+        return None, False
+    if isinstance(labels, LabelResult):
+        declared = labels.evidence.metadata.parameters.get("horizons")
+        if isinstance(declared, Sequence) and not isinstance(declared, str) and declared:
+            return declared[0], False
+    present = panel.get_column("horizon").unique().to_list()
+    if len(present) == 1:
+        return cast(JsonValue, present[0]), False
+    return None, True
+
+
+def _headline_rows(frame: pl.DataFrame, horizon: JsonValue) -> pl.DataFrame:
+    if horizon is None or "horizon" not in frame.columns:
+        return frame
+    return frame.filter(pl.col("horizon") == horizon)
+
+
+def _undeclared_headline_finding(code: str, subject: str) -> Finding:
+    return Finding(
+        code=code,
+        title="Headline horizon is undeclared",
+        message=(
+            f"The labels carry several horizons without a declared order, so headline {subject} "
+            "metrics are undefined instead of pooled across horizons. Read the per-horizon "
+            "tables, or pass a LabelResult, whose first declared horizon is the headline."
+        ),
+        state=FindingState.UNKNOWN,
+        severity=Severity.MEDIUM,
+        category="statistical_validity",
+    )
+
+
 def _group_keys(panel: pl.DataFrame, by: str | Sequence[str] | None) -> list[str]:
     if by is None:
         keys: list[str] = []
@@ -453,7 +529,7 @@ def _horizon_summary(period_ic: pl.DataFrame) -> pl.DataFrame:
             pl.col("n_observations").sum(),
         )
         .with_columns((pl.col("mean_ic") / pl.col("std_ic")).alias("ic_information_ratio"))
-        .sort(summary_keys)
+        .pipe(_sort_by_keys, summary_keys)
     )
 
 
@@ -531,17 +607,25 @@ def ic(
     else:
         period_ic = _reference_grouped_ic(panel, keys, method)
 
-    period_ic = period_ic.sort(keys) if keys else period_ic
+    period_ic = _sort_by_keys(period_ic, keys)
     overall_keys = [key for key in keys if key in {"observation_time", "horizon"}]
     overall_period_ic = compute(panel, overall_keys) if overall_keys != keys else period_ic
-    overall_period_ic = overall_period_ic.sort(overall_keys) if overall_keys else overall_period_ic
+    overall_period_ic = _sort_by_keys(overall_period_ic, overall_keys)
     defined = period_ic.filter(pl.col("ic").is_not_null())
-    overall_defined = overall_period_ic.filter(pl.col("ic").is_not_null())
-    values = overall_defined.get_column("ic").to_list()
-    metrics = _ic_metrics(values, int(overall_period_ic.get_column("n_observations").sum()))
+    headline_horizon, headline_undeclared = _headline_horizon(panel, labels)
+    headline_period_ic = _headline_rows(overall_period_ic, headline_horizon)
+    overall_defined = headline_period_ic.filter(pl.col("ic").is_not_null())
+    if headline_undeclared:
+        metrics = _ic_metrics([], 0)
+        metrics.update(n_periods=None, n_observations=None)
+    else:
+        values = overall_defined.get_column("ic").to_list()
+        metrics = _ic_metrics(values, int(headline_period_ic.get_column("n_observations").sum()))
     undefined_count = period_ic.height - defined.height
     undersized_count = group_sizes.height - eligible_sizes.height
     findings: list[Finding] = list(availability_findings)
+    if headline_undeclared:
+        findings.append(_undeclared_headline_finding("IC_HEADLINE_HORIZON_UNDECLARED", "IC"))
     if undefined_count:
         findings.append(
             Finding(
@@ -566,7 +650,7 @@ def ic(
                 evidence={"excluded_groups": undersized_count, "minimum": min_observations},
             )
         )
-    if overall_defined.height < 20:
+    if not headline_undeclared and overall_defined.height < 20:
         findings.append(
             Finding(
                 code="IC_PERIOD_SUPPORT_LOW",
@@ -612,10 +696,11 @@ def ic(
     return AnalysisResult(
         metadata=ResultMetadata(
             method=f"signal.ic.{method}",
-            method_version=1,
+            method_version=2,
             parameters={
                 "method": method,
                 "by": tuple(keys),
+                "headline_horizon": headline_horizon,
                 "group_available_time": group_available_time,
                 "tie_policy": "average" if method == "spearman" else None,
                 "minimum_observations": min_observations,
@@ -656,7 +741,7 @@ def _bucket_tables(
             pl.col("forward_return").median().alias("median_return"),
             pl.len().alias("n_observations"),
         )
-        .sort([*effective_keys, "bucket"])
+        .pipe(_sort_by_keys, [*effective_keys, "bucket"])
     )
     spread = (
         period_bucket.group_by(effective_keys, maintain_order=True)
@@ -681,7 +766,7 @@ def _bucket_tables(
             pl.col("n_observations").sum().alias("n_observations"),
             pl.len().alias("n_periods"),
         )
-        .sort(summary_group_keys)
+        .pipe(_sort_by_keys, summary_group_keys)
     )
     monotonicity_group_keys = summary_keys or ["_summary_group"]
     monotonicity_input = (
@@ -767,9 +852,43 @@ def bucket_returns(
     else:
         overall_period, overall_spread = period, spread
         overall_summary, overall_monotonicity = summary, monotonicity
-    mean_spread = _float_or_none(overall_spread.get_column("spread").drop_nulls().mean())
-    overall_record = overall_monotonicity.row(0, named=True)
+    headline_horizon, headline_undeclared = _headline_horizon(panel, labels)
     findings = list(bucketed.evidence.findings)
+    overall_record: Mapping[str, object]
+    if headline_undeclared:
+        mean_spread = None
+        overall_record = {}
+        findings.append(
+            _undeclared_headline_finding("BUCKET_HEADLINE_HORIZON_UNDECLARED", "bucket return")
+        )
+    else:
+        mean_spread = _float_or_none(
+            _headline_rows(overall_spread, headline_horizon)
+            .get_column("spread")
+            .drop_nulls()
+            .mean()
+        )
+        headline_monotonicity = _headline_rows(overall_monotonicity, headline_horizon)
+        if headline_monotonicity.is_empty():
+            # The declared headline horizon has no aligned observations. Its metrics are
+            # undefined; a later horizon must not take its place.
+            overall_record = {}
+            findings.append(
+                Finding(
+                    code="BUCKET_HEADLINE_HORIZON_EMPTY",
+                    title="Headline horizon has no aligned observations",
+                    message=(
+                        "No signal row aligns with a label of the declared headline horizon, "
+                        "so headline bucket return metrics are undefined."
+                    ),
+                    state=FindingState.UNKNOWN,
+                    severity=Severity.MEDIUM,
+                    category="statistical_validity",
+                    evidence={"headline_horizon": headline_horizon},
+                )
+            )
+        else:
+            overall_record = headline_monotonicity.row(0, named=True)
     monotonicity_value = _float_or_none(overall_record.get("spearman_monotonicity"))
     if monotonicity_value is not None and monotonicity_value < 0.5:
         findings.append(
@@ -811,9 +930,10 @@ def bucket_returns(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.bucket_returns",
-            method_version=1,
+            method_version=2,
             parameters={
                 "by": tuple(keys),
+                "headline_horizon": headline_horizon,
                 "bucket_method": bucketed.metadata.method,
                 "bucket_method_version": bucketed.metadata.method_version,
                 "bucket_spec": bucketed.metadata.parameters.get("spec"),
@@ -825,7 +945,9 @@ def bucket_returns(
         metrics={
             "mean_top_bottom_spread": mean_spread,
             "spearman_monotonicity": monotonicity_value,
-            "adjacent_order_fraction": overall_record.get("adjacent_order_fraction"),
+            "adjacent_order_fraction": cast(
+                JsonValue, overall_record.get("adjacent_order_fraction")
+            ),
             "n_buckets": requested,
             "n_observations": panel.height,
             "signal_rows": signal_rows,
@@ -917,6 +1039,10 @@ def quantiles(
                     evidence={**finding.evidence, "quantiles": quantiles},
                 )
             )
+        elif finding.code == "BUCKET_HEADLINE_HORIZON_UNDECLARED":
+            findings.append(
+                _undeclared_headline_finding("QUANTILE_HEADLINE_HORIZON_UNDECLARED", "quantile")
+            )
         elif finding.code == "BUCKET_MONOTONICITY_WEAK":
             findings.append(
                 Finding(
@@ -940,10 +1066,11 @@ def quantiles(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.quantiles",
-            method_version=1,
+            method_version=2,
             parameters={
                 "quantiles": quantiles,
                 "by": normalized_by,
+                "headline_horizon": result.metadata.parameters.get("headline_horizon"),
                 "ascending": ascending,
                 "tie_policy": tie_policy,
                 "small_group_policy": "drop",
@@ -1322,13 +1449,16 @@ def decay(
         pl.col("spread").std(ddof=1).alias("std_top_bottom_spread"),
         pl.len().alias("n_spread_periods"),
     )
-    decay_table = ic_by_horizon.join(
-        spread_by_horizon, on="horizon", how="full", coalesce=True
-    ).sort("horizon")
+    decay_table = _sort_by_keys(
+        ic_by_horizon.join(spread_by_horizon, on="horizon", how="full", coalesce=True),
+        ["horizon"],
+    )
+    # Decay is a per-horizon method: the headline-horizon notices of its inputs do not apply.
+    headline_codes = {"IC_HEADLINE_HORIZON_UNDECLARED", "QUANTILE_HEADLINE_HORIZON_UNDECLARED"}
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.decay",
-            method_version=1,
+            method_version=2,
             parameters={
                 "ic_method": "spearman",
                 "quantiles": quantile_count,
@@ -1338,9 +1468,13 @@ def decay(
         ),
         metrics={
             "n_horizons": decay_table.height,
-            "n_observations": ic_result.metrics["n_observations"],
+            "n_observations": int(ic_by_horizon.get_column("n_observations").sum()),
         },
-        findings=tuple((*ic_result.findings, *quantile_result.findings)),
+        findings=tuple(
+            finding
+            for finding in (*ic_result.findings, *quantile_result.findings)
+            if finding.code not in headline_codes
+        ),
         tables={
             "ic_decay": frame_records(decay_table),
             "ic_by_period_horizon": ic_result.tables["ic_by_period"],

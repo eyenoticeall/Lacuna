@@ -105,6 +105,34 @@ def test_missing_raise_accepts_end_of_sample_censoring() -> None:
     assert [(row["excluded_rows"], row["policy"]) for row in horizon_rows] == [(1, "drop")]
 
 
+def test_missing_raise_censors_an_instrument_that_ends_before_the_panel() -> None:
+    """An instrument whose series stops early is censored at its own end, and counted.
+
+    Its last observations have no exit bar in its own series. That is end-of-sample
+    censoring per instrument, not a data defect, so ``"raise"`` drops and counts it exactly
+    like ``"drop"`` and never borrows another instrument's later bars.
+    """
+
+    prices = pl.DataFrame(
+        {
+            "time": [0, 1, 2, 3, 4, 5, 0, 1, 2],
+            "instrument": ["A"] * 6 + ["B"] * 3,
+            "close": [10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 20.0, 21.0, 22.0],
+        }
+    )
+    raised = forward_returns(prices, horizon="2D", price_adjustment="raw", missing="raise")
+    dropped = forward_returns(prices, horizon="2D", price_adjustment="raw", missing="drop")
+
+    assert raised.frame.equals(dropped.frame)
+    by_instrument = {
+        name: group.get_column("observation_time").to_list()
+        for (name,), group in raised.frame.group_by("instrument")
+    }
+    assert by_instrument == {"A": [0, 1, 2, 3], "B": [0]}
+    (coverage,) = raised.evidence.table("coverage_by_horizon")  # type: ignore[misc]
+    assert coverage["censored_rows"] == 4  # two tail rows per instrument
+
+
 def test_missing_raise_still_rejects_null_source_prices() -> None:
     prices = pl.DataFrame(
         {
@@ -223,3 +251,166 @@ def test_split_evidence_without_a_purge_count_is_unknown() -> None:
     bare = AnalysisResult(metadata=ResultMetadata(method="cv.purged_kfold"), metrics={})
     report = study.audit(bootstrap_resamples=100, seed=3, split=bare)
     assert _audit_states(report)["PURGED_VALIDATION_SUPPLIED"].state == FindingState.UNKNOWN
+
+
+# --- Headline metrics never pool horizons ---------------------------------------------------
+
+
+def _horizon_row(table: object, horizon: str) -> dict[str, object]:
+    (row,) = [row for row in table if row["horizon"] == horizon]  # type: ignore[attr-defined]
+    return row
+
+
+def test_multi_horizon_ic_headline_is_the_first_declared_horizon_not_a_pool() -> None:
+    """Different horizons are different estimands; the headline must describe exactly one.
+
+    The headline used to average every (period, horizon) IC row. It is the first horizon in
+    the label result's declared order, whatever that order sorts to as text.
+    """
+
+    signal, prices = _panel(n_times=60)
+    for declared in (("5D", "10D", "1D"), ("10D", "1D", "5D")):
+        labels = forward_returns(prices, horizons=declared, price_adjustment="raw")
+        result = ic(signal, labels, use_native=False)
+        headline = _horizon_row(result.table("ic_by_horizon"), declared[0])
+
+        assert result.metadata.parameters["headline_horizon"] == declared[0]
+        assert result.metadata.method_version == 2
+        for name in ("mean_ic", "median_ic", "std_ic", "n_periods", "n_observations"):
+            assert result.metrics[name] == pytest.approx(headline[name]), name
+        single = ic(
+            signal,
+            forward_returns(prices, horizon=declared[0], price_adjustment="raw"),
+            use_native=False,
+        )
+        for name in ("mean_ic", "t_statistic", "positive_fraction", "n_periods"):
+            assert result.metrics[name] == pytest.approx(single.metrics[name]), name
+
+
+def test_multi_horizon_quantile_headline_is_the_first_declared_horizon() -> None:
+    signal, prices = _panel(n_times=60)
+    labels = forward_returns(prices, horizons=("5D", "10D", "1D"), price_adjustment="raw")
+    result = quantiles(signal, labels, quantiles=3)
+    single = quantiles(
+        signal, forward_returns(prices, horizon="5D", price_adjustment="raw"), quantiles=3
+    )
+
+    assert result.metadata.parameters["headline_horizon"] == "5D"
+    for name in ("mean_top_bottom_spread", "spearman_monotonicity", "adjacent_order_fraction"):
+        assert result.metrics[name] == pytest.approx(single.metrics[name]), name
+    monotonicity = _horizon_row(result.table("monotonicity"), "5D")
+    assert result.metrics["spearman_monotonicity"] == pytest.approx(
+        monotonicity["spearman_monotonicity"]
+    )
+
+
+def test_bare_multi_horizon_label_frame_has_no_headline_instead_of_a_text_order_one() -> None:
+    """A label frame declares no horizon order, so no horizon may be silently preferred."""
+
+    signal, prices = _panel(n_times=60)
+    labels = forward_returns(prices, horizons=("5D", "10D"), price_adjustment="raw")
+    ic_result = ic(signal, labels.frame, use_native=False)
+    quantile_result = quantiles(signal, labels.frame, quantiles=3)
+
+    assert ic_result.metadata.parameters["headline_horizon"] is None
+    for name in ("mean_ic", "ic_information_ratio", "t_statistic", "n_periods"):
+        assert ic_result.metrics[name] is None, name
+    ic_finding = next(f for f in ic_result.findings if f.code == "IC_HEADLINE_HORIZON_UNDECLARED")
+    assert ic_finding.state == FindingState.UNKNOWN
+    assert quantile_result.metrics["mean_top_bottom_spread"] is None
+    assert quantile_result.metrics["spearman_monotonicity"] is None
+    assert "QUANTILE_HEADLINE_HORIZON_UNDECLARED" in {f.code for f in quantile_result.findings}
+    # The per-horizon evidence is still complete.
+    assert ic_result.table("ic_by_horizon") == ic(signal, labels, use_native=False).table(
+        "ic_by_horizon"
+    )
+
+
+def test_headline_stays_on_the_first_declared_horizon_when_it_has_no_aligned_rows() -> None:
+    """The headline horizon is the declared one, never the first horizon that has data.
+
+    The signal covers only the final dates, where no 20D label exists. The headline must be
+    an empty 20D result, matching the audit's default inference horizon, not the 1D numbers.
+    """
+
+    signal, prices = _panel(n_times=60)
+    late = signal.filter(pl.col("time") >= 50)
+    labels = forward_returns(prices, horizons=("20D", "1D"), price_adjustment="raw")
+    ic_result = ic(late, labels, use_native=False)
+    quantile_result = quantiles(late, labels, quantiles=3)
+
+    assert [row["horizon"] for row in ic_result.table("ic_by_horizon")] == ["1D"]  # type: ignore[union-attr]
+    assert ic_result.metadata.parameters["headline_horizon"] == "20D"
+    assert ic_result.metrics["mean_ic"] is None
+    assert ic_result.metrics["n_periods"] == 0
+    assert "IC_PERIOD_SUPPORT_LOW" in {f.code for f in ic_result.findings}
+    assert quantile_result.metadata.parameters["headline_horizon"] == "20D"
+    assert quantile_result.metrics["mean_top_bottom_spread"] is None
+    assert quantile_result.metrics["spearman_monotonicity"] is None
+    empty = next(f for f in quantile_result.findings if f.code == "BUCKET_HEADLINE_HORIZON_EMPTY")
+    assert empty.state == FindingState.UNKNOWN
+
+
+def test_single_horizon_label_frame_keeps_its_headline() -> None:
+    signal, prices = _panel(n_times=60)
+    labels = forward_returns(prices, horizon="5D", price_adjustment="raw")
+    from_frame = ic(signal, labels.frame, use_native=False)
+
+    assert from_frame.metrics["mean_ic"] == ic(signal, labels, use_native=False).metrics["mean_ic"]
+    assert from_frame.metadata.parameters["headline_horizon"] == "5D"
+    assert "IC_HEADLINE_HORIZON_UNDECLARED" not in {f.code for f in from_frame.findings}
+
+
+def test_horizon_tables_are_ordered_by_length_not_as_text() -> None:
+    """``"10D"`` sorted before ``"1D"`` and ``"5D"`` when horizons were ordered as strings."""
+
+    signal, prices = _panel(n_times=60)
+    study = lc.SignalStudy(
+        signal=signal,
+        prices=prices,
+        horizons=("10D", "1D", "5D"),
+        signal_observed_at="open",
+        entry="current_close",
+        price_adjustment="total_return_adjusted",
+        quantiles=3,
+    )
+    expected = ["1D", "5D", "10D"]
+
+    assert [row["horizon"] for row in study.ic().table("ic_by_horizon")] == expected  # type: ignore[union-attr]
+    assert [row["horizon"] for row in study.quantiles().table("monotonicity")] == expected  # type: ignore[union-attr]
+    decay_result = study.decay()
+    assert [row["horizon"] for row in decay_result.table("ic_decay")] == expected  # type: ignore[union-attr]
+    assert decay_result.metadata.method_version == 2
+    assert not {f.code for f in decay_result.findings} & {
+        "IC_HEADLINE_HORIZON_UNDECLARED",
+        "QUANTILE_HEADLINE_HORIZON_UNDECLARED",
+    }
+
+
+def test_audit_scores_quantile_monotonicity_on_the_inference_horizon() -> None:
+    """``QUANTILE_MONOTONICITY`` read the headline, which could be a different horizon.
+
+    The rule (version 2) reads the declared inference horizon's row, and is ``UNKNOWN`` for
+    multi-horizon evidence without an ``inference_horizon`` policy.
+    """
+
+    signal, prices = _panel(n_times=80)
+    study = _study(signal, prices)  # horizons 1D, 5D
+    quantile_table = study.quantiles().table("monotonicity")
+
+    for horizon in ("1D", "5D"):
+        report = study.audit(
+            bootstrap_resamples=100, seed=3, policies={"inference_horizon": horizon}
+        )
+        finding = _audit_states(report)["QUANTILE_MONOTONICITY"]
+        assert finding.evidence["rule_version"] == 2
+        assert finding.evidence["inference_horizon"] == horizon
+        assert finding.evidence["spearman_monotonicity"] == pytest.approx(
+            _horizon_row(quantile_table, horizon)["spearman_monotonicity"]
+        )
+
+    undeclared = lc.run_audit(
+        lc.AuditContext(results={"quantiles": study.quantiles()}, policies={})
+    )
+    unresolved = next(f for f in undeclared.findings if f.code == "QUANTILE_MONOTONICITY")
+    assert unresolved.state == FindingState.UNKNOWN

@@ -85,11 +85,14 @@ def test_eager_and_lazy_polars_paths_are_semantically_equivalent() -> None:
     assert (
         lazy_labels.metadata.parameters["input"]["materialized"] is True  # type: ignore[index]
     )
-    eager_ic = ic(signal, eager_labels)
+    # Compare like with like: a bare multi-horizon label frame declares no horizon order, so
+    # its headline is undefined, while a LabelResult headlines its first declared horizon.
+    eager_ic = ic(signal, eager_labels.frame)
     lazy_ic = ic(signal.lazy(), lazy_labels.frame.lazy())
     assert eager_ic.metrics == lazy_ic.metrics
     assert eager_ic.tables == lazy_ic.tables
-    eager_quantiles = quantiles(signal, eager_labels, quantiles=3)
+    assert ic(signal, eager_labels).tables == lazy_ic.tables
+    eager_quantiles = quantiles(signal, eager_labels.frame, quantiles=3)
     lazy_quantiles = quantiles(signal.lazy(), lazy_labels.frame.lazy(), quantiles=3)
     assert eager_quantiles.metrics == lazy_quantiles.metrics
     assert eager_quantiles.tables == lazy_quantiles.tables
