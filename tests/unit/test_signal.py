@@ -217,8 +217,13 @@ def test_turnover_membership_self_join_matches_literal_sets_with_universe_churn(
             key=lambda row: (row["signal"], row["instrument"]),
         )
         memberships[period] = {bucket: set() for bucket in range(1, quantile_count + 1)}
+        # Balanced midpoint rule shared with ``bucketize``: an ordinal rank's midpoint position
+        # is compared with equally spaced boundaries. (Method version 1 floored the rank,
+        # which made the bottom bucket larger than the top whenever sizes were uneven.)
+        boundaries = np.linspace(0.0, 1.0, quantile_count + 1)[1:-1]
         for ordinal, row in enumerate(ordered):
-            bucket = int(ordinal * quantile_count / len(ordered)) + 1
+            position = (ordinal + 0.5) / len(ordered)
+            bucket = 1 + int(sum(position >= boundary for boundary in boundaries))
             memberships[period][bucket].add(int(row["instrument"]))
 
     expected: list[dict[str, object]] = []

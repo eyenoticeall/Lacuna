@@ -29,6 +29,7 @@ from lacuna._portfolio import PortfolioProjectionResult, portfolio_projection
 from lacuna._signal_transform import (
     BucketSpec,
     SignalTransformResult,
+    _position_bucket,
     bucketize,
     neutralize,
 )
@@ -1176,11 +1177,14 @@ def turnover(
             pl.len().over("observation_time").alias("_period_count"),
         )
         .with_columns(
-            (
-                ((pl.col("_ordinal") - 1) * quantiles / pl.col("_period_count"))
-                .floor()
-                .cast(pl.Int32)
-                + 1
+            # The balanced rule of ``bucketize``: the midpoint position of each ordinal rank
+            # against equally spaced boundaries. Membership turnover is therefore measured on
+            # exactly the quantile sets whose returns ``quantiles`` reports. The midpoint rule
+            # keeps the top and bottom legs the same size when the period size is not a
+            # multiple of the quantile count; flooring the rank always made the bottom larger.
+            _position_bucket(
+                (pl.col("_ordinal").cast(pl.Float64) - 0.5) / pl.col("_period_count"),
+                tuple(np.linspace(0.0, 1.0, quantiles + 1)),
             ).alias("quantile")
         )
     )
@@ -1352,10 +1356,11 @@ def turnover(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.turnover",
-            method_version=1,
+            method_version=2,
             parameters={
                 "rank_turnover_definition": "mean absolute percentile-rank change",
                 "membership_turnover_definition": "symmetric difference / total membership",
+                "membership_bucket_rule": "balanced_midpoint_position",
                 "quantiles": quantiles,
                 "lags": normalized_lags,
                 "lag_clock": "global_observation_index",

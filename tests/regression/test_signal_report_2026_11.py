@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import numpy as np
 import polars as pl
 import pytest
 
 import lacuna as lc
 from lacuna.cv import CombinatorialPurgedKFold, PurgedKFold
 from lacuna.labels import forward_returns
-from lacuna.signal import BucketSpec, ic, quantiles
+from lacuna.signal import BucketSpec, bucketize, ic, quantiles, turnover
 from lacuna.types import AnalysisResult, Finding, FindingState, ResultMetadata
 
 
@@ -414,3 +415,57 @@ def test_audit_scores_quantile_monotonicity_on_the_inference_horizon() -> None:
     )
     unresolved = next(f for f in undeclared.findings if f.code == "QUANTILE_MONOTONICITY")
     assert unresolved.state == FindingState.UNKNOWN
+
+
+# --- Turnover measures membership on the quantile sets that quantiles() reports -------------
+
+
+@pytest.mark.parametrize(("instruments", "quantile_count"), [(7, 5), (11, 10), (13, 3), (8, 5)])
+def test_turnover_membership_buckets_match_bucketize_for_uneven_periods(
+    instruments: int, quantile_count: int
+) -> None:
+    """Membership turnover must use the same balanced buckets as ``bucketize``.
+
+    Turnover floored the rank while ``quantiles`` used midpoint positions, so with a period
+    size that is not a multiple of the quantile count a boundary instrument sat in different
+    buckets for returns and for turnover.
+    """
+
+    rng = np.random.default_rng(instruments * 100 + quantile_count)
+    periods = 6
+    signal = pl.DataFrame(
+        {
+            "time": [t for t in range(periods) for _ in range(instruments)],
+            "instrument": [f"I{i:02d}" for _ in range(periods) for i in range(instruments)],
+            "signal": rng.normal(size=periods * instruments),
+        }
+    )
+    buckets = bucketize(signal, spec=BucketSpec.quantiles(quantile_count), by="time").frame
+    members = {
+        (int(time), int(bucket)): set(group.get_column("instrument").to_list())
+        for (time, bucket), group in buckets.group_by(["observation_time", "bucket"])
+    }
+    expected = {}
+    for time in range(1, periods):
+        for bucket in range(1, quantile_count + 1):
+            previous = members.get((time - 1, bucket), set())
+            current = members.get((time, bucket), set())
+            total = len(previous) + len(current)
+            expected[(time, bucket)] = len(previous ^ current) / total if total else None
+
+    result = turnover(signal, quantiles=quantile_count)
+    observed = {
+        (int(row["observation_time"]), int(row["bucket"])): row["membership_turnover"]
+        for row in result.table("membership_turnover_by_period_lag")  # type: ignore[union-attr]
+        if row["lag"] == 1
+    }
+
+    assert result.metadata.method_version == 2
+    assert result.metadata.parameters["membership_bucket_rule"] == "balanced_midpoint_position"
+    assert observed.keys() == expected.keys()
+    for key, value in expected.items():
+        assert observed[key] == pytest.approx(value), key
+    # The legs of a top-minus-bottom spread are the same size under the midpoint rule.
+    sizes = buckets.filter(pl.col("observation_time") == 0).group_by("bucket").len()
+    by_bucket = dict(zip(sizes.get_column("bucket"), sizes.get_column("len"), strict=True))
+    assert by_bucket[1] == by_bucket[quantile_count]
