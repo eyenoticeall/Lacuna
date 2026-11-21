@@ -279,6 +279,71 @@ labels, counts only defined horizons for decay coverage, and honors the robustne
 for constraint errors. The four affected audit rules are at rule version 2; see
 [Audit scoring](../methodology/audit-scoring.md#signal-study-assembly).
 
+## Open follow-ups from the 0.14.1 review
+
+A documentation-driven review of 0.14.1 in November 2026 produced the corrections listed under
+**Unreleased** in the changelog. The items below were found in the same review and deliberately
+left open. Each is its own change: none is a quick patch, and several alter scoring, persisted
+identities, or methodology. They are recorded here so they are not rediscovered from scratch.
+
+Two methodology questions from that review are settled and are not open: headline metrics describe
+one horizon and never pool horizons, and every balanced quantile assignment uses the midpoint rule.
+
+### Audit and evidence
+
+| Status | Item | Why it was deferred | Starting point |
+| --- | --- | --- | --- |
+| Open | The standard audit profile recognises no `events.*` method, so `event_windows` and `event_response` results come back as `UNRECOGNIZED_EVIDENCE` (`WARN`). | Method-family membership is versioned. It needs a new capability, not a pattern added to `signal_diagnostics`, plus profile version 2, its fixture, and the schema. | `_BASE_REQUIREMENTS` in `python/lacuna/audit_profiles.py`; `tests/fixtures/standard-audit-profile-v1.json`. |
+| Open | `PRICE_ADJUSTMENT_DECLARED` passes for `"raw"`, and `DELISTING_HANDLING_DECLARED` passes once a column is named even if it is entirely null. About 20 of the 100 signal-audit points come from declarations, not measurements. | These are documented as declaration rules. Changing what earns credit is a scoring redesign and needs a new score version. | `_PriceAdjustmentRule` and `_DelistingRule` in `python/lacuna/audit.py`; `docs/methodology/audit-scoring.md`. |
+| Open | `PURGED_VALIDATION_SUPPLIED` cannot verify that a split was built from the audited labels. It passes with `data_identity_verified: false`, and its zero-purge warning also fires for legitimately sampled, non-overlapping labels. | Split evidence carries no input fingerprint. Adding one changes `cv.*` evidence and needs a matching fingerprint on label evidence to compare against. | `_split_evidence` in `python/lacuna/cv.py`; `_PurgedValidationRule` in `python/lacuna/audit.py`. |
+| Open | `lc.audit()` and `standard_audit()` keep no evidence, so the Plotly view and bundles need `evidence=` passed explicitly, unlike `SignalStudy.audit`. | An API behavior change on a frozen public surface; needs a decision on retention and memory cost. | `python/lacuna/audit.py`, `python/lacuna/report.py`. |
+| Open | A bare multi-horizon label frame has a null headline because it declares no horizon order, and there is no way to declare one. | A `headline_horizon=` parameter changes frozen public signatures, so it belongs to the next API revision. | `_headline_horizon` in `python/lacuna/signal.py`. |
+
+### Point-in-time and bias
+
+| Status | Item | Why it was deferred | Starting point |
+| --- | --- | --- | --- |
+| Open | `asof_join(effective_time=...)` is validated and recorded but does not affect matching, so a late restatement of an older period outranks a newer period's first print. | The specification defines no matching role for it. Ordering by effective time is a methodology decision, not a fix. | `docs/subsystems/bias-point-in-time.md` ("Implemented parameter semantics"). |
+| Open | `revision_diagnostics` still accepts string and categorical revisions, which sort lexicographically (`"10"` below `"9"`). `asof_join` now rejects them. | Out of scope of the as-of fix; rejecting them changes an explicitly allowed input. | `revision_diagnostics` in `python/lacuna/bias.py`; reuse `_require_orderable_revision`. |
+| Open | `asof_join` on a `Duration` time column fails inside `_portable_records` with a Polars cast error. | Separate from the tolerance validation that surfaced it. | `_portable_records` in `python/lacuna/bias.py`. |
+
+### Validation, events, and regimes
+
+| Status | Item | Why it was deferred | Starting point |
+| --- | --- | --- | --- |
+| Open | `event_response` resamples ordered anchor-time clusters only. Same-instrument `overlap_cluster` groups are reported but are not a resampling unit, and the result still passes when overlap exists (the overlap warning travels with it). | Resampling overlap clusters as units is a methodology change and needs a null-calibration study first. | `docs/subsystems/event-studies.md`; `event_response` in `python/lacuna/events.py`. |
+| Open | `regime_analysis` cannot cross-check `classification_mode` against how labels were built, because it accepts only a table. | Needs a new input path that accepts a `quantile_regimes` result and its provenance. | `python/lacuna/regime.py`. |
+| Open | `WalkForward` in calendar mode over midnight-stamped daily `Datetime` bars still drops the final window; only `Date` columns get whole-day coverage. | A `Datetime` has no declared bar length, and inferring cadence would be a silent methodology choice. A declared bar-length parameter would resolve it. | `WalkForward.split` in `python/lacuna/cv.py`. |
+| Open | `SklearnCV` checks only that `X` and `y` have the split's row count, not that they are in the same row order. | No identity travels with `X`; documented in the docstring instead. | `python/lacuna/adapters/sklearn.py`. |
+
+### Costs
+
+| Status | Item | Why it was deferred | Starting point |
+| --- | --- | --- | --- |
+| Open | Net Sharpe and CAGR in `stress`, `break_even_cost`, and `capacity_curve` use only periods that contain a trade; results warn about it. | Counting trade-free periods needs a declared period calendar, which is a new parameter and a method version. | `_period_aggregate_matrix` in `python/lacuna/costs.py`. |
+| Open | `BorrowCostModel` is stateless and charges every negative-quantity row over its declared `holding_days`. | Position-aware borrow accrual needs ordering, opening positions, and its own contract. | `BorrowCostModel` in `python/lacuna/costs.py`. |
+
+### Reproducibility and persistence
+
+| Status | Item | Why it was deferred | Starting point |
+| --- | --- | --- | --- |
+| Open | `ExperimentRegistry` is append-only through the API only. The SQLite schema has no triggers, so `UPDATE` and `DELETE` through `sqlite3` succeed silently. | Triggers change the stored schema; existing databases need a migration path and the superseding-record flow must keep working. | `_initialize` in `python/lacuna/experiment.py`. |
+| Open | `schemas/persisted-artifact-compatibility-v1.json` still declares consumer package series `0.9`, and its producer lists stop at `0.9`. A regression test pins that value. | It is a release-time artifact; refresh it with the next release rather than mid-line. | `tests/regression/test_persisted_artifact_compatibility.py`. |
+| Open | Packaged schema `$id` values use `lacuna.dev`, while the project site is `lacuna.run`. | A `$id` is a persisted identity. Changing it needs a decision on whether old identifiers stay resolvable. | `schemas/*.schema.json`. |
+| Open | Bundle digests differ across CLI runs because `created_at` is stamped per run, and nothing pins it. | Needs a decision between a `SOURCE_DATE_EPOCH`-style input and excluding the timestamp from the digest. | `python/lacuna/bundle.py`, `python/lacuna/cli.py`. |
+| Open | `lacuna-options` evidence carries no `input_fingerprint`. | The core fingerprint helpers that handle timezones portably are private; the extension needs a public one, and a decision on what the fingerprint covers. | `extensions/lacuna-options/CHANGELOG.md` ("Deferred"); `_frames.frame_records`. |
+| Open | `NativeExtensionError` is exported but never raised. | Removing an export breaks the frozen API; raising it needs a capability that has no fallback. | `python/lacuna/exceptions.py`. |
+
+### Before the release that ships the Unreleased corrections
+
+- Run the gates that were not run on the development machine: `cargo clippy`, `cargo test`,
+  `uv build`, and the pandas, pyarrow, DuckDB, and scikit-learn paths.
+- Expect the same-runner benchmark guard to fail once on the ten changed checksums recorded in the
+  [performance guide](performance.md). The recorded timings were taken on a loaded machine; replace
+  them with the CI job's same-runner numbers.
+- The website documentation describes released behavior. It needs an update pass when the release
+  ships, including the turnover bucket rule and the multi-horizon headline definition.
+
 ## Historical v0.1 boundary
 
 v0.1 turns a cross-sectional signal into a rigorous diagnostics report. It excludes live trading, full backtesting, distributed execution, GPU kernels, advanced impact simulation, and a plugin marketplace.
