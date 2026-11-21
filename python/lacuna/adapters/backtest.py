@@ -9,7 +9,8 @@ from typing import Literal, cast
 
 import polars as pl
 
-from lacuna.adapters.types import AdaptedFrame, normalize_mapped_frame
+from lacuna.adapters.polars import source_type_name
+from lacuna.adapters.types import AdaptedFrame, absent_mapped_columns, normalize_mapped_frame
 from lacuna.exceptions import MethodContractError
 from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
 
@@ -125,13 +126,14 @@ def adapt_backtest(
     if not isinstance(schema, BacktestSchema):
         raise MethodContractError("schema must be a BacktestSchema")
     required = _REQUIRED_COLUMNS[schema.artifact]
-    source_type = f"{type(data).__module__}.{type(data).__name__}"
+    source_type = source_type_name(data)
     frame, original_columns = normalize_mapped_frame(
         data,
         columns=schema.columns,
         required=required,
         collect=collect,
     )
+    absent = absent_mapped_columns(schema.columns, original_columns)
     normalized_columns = (
         tuple(frame.collect_schema().names())
         if isinstance(frame, pl.LazyFrame)
@@ -156,6 +158,7 @@ def adapt_backtest(
                 "artifact": schema.artifact,
                 "source_type": source_type,
                 "semantics": semantics,
+                "absent_optional_columns": absent,
                 "materialized": isinstance(frame, pl.DataFrame),
                 "methodology_executed": False,
             },

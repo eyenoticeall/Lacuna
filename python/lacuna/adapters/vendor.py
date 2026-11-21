@@ -9,7 +9,8 @@ from typing import Literal, cast
 
 import polars as pl
 
-from lacuna.adapters.types import AdaptedFrame, normalize_mapped_frame
+from lacuna.adapters.polars import source_type_name
+from lacuna.adapters.types import AdaptedFrame, absent_mapped_columns, normalize_mapped_frame
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
 
@@ -102,11 +103,35 @@ class VendorSchema:
             )
 
 
-def _validate_timezones(frame: pl.DataFrame | pl.LazyFrame, schema: VendorSchema) -> None:
+def _validate_absent_columns(schema: VendorSchema, absent: tuple[str, ...]) -> None:
+    """Reject absent optional columns that the declared temporal semantics depend on."""
+
+    if schema.availability == "point_in_time" and "available_time" in absent:
+        raise DataContractError(
+            "point_in_time vendor schema maps available_time to "
+            f"{schema.columns['available_time']!r}, but that source column is absent; "
+            "point-in-time safety cannot be established without it"
+        )
+    revision_columns = {"revision_time", "revision_id"}.intersection(schema.columns)
+    if schema.revisions == "versioned" and revision_columns.issubset(absent):
+        raise DataContractError(
+            "versioned vendor schema maps "
+            f"{', '.join(sorted(revision_columns))}, but every mapped revision source column is "
+            "absent; revision history cannot be established without one"
+        )
+
+
+def _validate_timezones(
+    frame: pl.DataFrame | pl.LazyFrame,
+    schema: VendorSchema,
+    absent: tuple[str, ...] = (),
+) -> None:
     if not schema.timezone_columns:
         return
     physical_schema = frame.collect_schema()
     for column in schema.timezone_columns:
+        if column in absent:
+            continue
         dtype = physical_schema[column]
         observed = getattr(dtype, "time_zone", None)
         if observed is None:
@@ -128,14 +153,16 @@ def adapt_vendor(
 
     if not isinstance(schema, VendorSchema):
         raise MethodContractError("schema must be a VendorSchema")
-    source_type = f"{type(data).__module__}.{type(data).__name__}"
+    source_type = source_type_name(data)
     frame, original_columns = normalize_mapped_frame(
         data,
         columns=schema.columns,
         required=schema.required,
         collect=collect,
     )
-    _validate_timezones(frame, schema)
+    absent = absent_mapped_columns(schema.columns, original_columns)
+    _validate_absent_columns(schema, absent)
+    _validate_timezones(frame, schema, absent)
     normalized_columns = (
         tuple(frame.collect_schema().names())
         if isinstance(frame, pl.LazyFrame)
@@ -163,6 +190,7 @@ def adapt_vendor(
                 "timezone_columns": schema.timezone_columns,
                 "price_adjustment": schema.price_adjustment,
                 "identifier_policy": schema.identifier_policy,
+                "absent_optional_columns": absent,
                 "materialized": isinstance(frame, pl.DataFrame),
                 "transformations": ("explicit_column_rename",),
             },

@@ -24,6 +24,7 @@ from lacuna.types import AnalysisResult, FindingState, JsonValue
 
 ReportFormat = Literal["json", "markdown", "html"]
 _MAX_EVIDENCE_BYTES = 16 * 1024 * 1024
+_NO_COLOR_HELP = "accepted for compatibility; has no effect because output is never colored"
 
 
 def _positive_int(value: str) -> int:
@@ -47,13 +48,57 @@ def _non_negative_int(value: str) -> int:
     return parsed
 
 
-def _scan_frame(path: str) -> pl.LazyFrame:
+_ISO_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+_UTC_OFFSET_PATTERN = r"(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$"
+
+
+def _parse_csv_time_column(frame: pl.LazyFrame, column: str, source: Path) -> pl.LazyFrame:
+    """Parse one CSV time column that Polars read as text.
+
+    Only the declared time column is touched. Instrument identifiers and every other column keep the
+    type Polars inferred, so ticker-like or date-looking identifiers are never reinterpreted. Values
+    must be ISO 8601: calendar dates (``YYYY-MM-DD``) become ``Date``; datetimes become
+    ``Datetime``.
+    A column whose datetimes all carry a UTC offset becomes timezone-aware UTC; a column with no
+    offsets stays naive. Mixing offset and naive values is rejected rather than guessed. Integer
+    time columns are already numeric and are not changed.
+    """
+
+    message = (
+        f"time column {column!r} in {source} could not be parsed as ISO 8601 dates or datetimes; "
+        "use YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS (all values with or all without a UTC offset), "
+        "or whole-number time indices"
+    )
+    try:
+        text = frame.select(pl.col(column)).collect().to_series().drop_nulls()
+        is_date = text.len() > 0 and bool(text.str.contains(_ISO_DATE_PATTERN).all())
+        offsets = text.str.contains(_UTC_OFFSET_PATTERN)
+        if not is_date and offsets.any() and not offsets.all():
+            raise DataContractError(message)
+        if is_date:
+            parser = pl.col(column).str.to_date(format="%Y-%m-%d", strict=True)
+        elif offsets.any():
+            parser = pl.col(column).str.to_datetime(time_zone="UTC", strict=True)
+        else:
+            parser = pl.col(column).str.to_datetime(strict=True)
+        text.to_frame(column).select(parser)
+    except pl.exceptions.PolarsError as error:
+        raise DataContractError(message) from error
+    return frame.with_columns(parser)
+
+
+def _scan_frame(path: str, time_columns: Sequence[str] = ()) -> pl.LazyFrame:
     source = Path(path)
     suffix = source.suffix.lower()
     if suffix in {".parquet", ".pq"}:
         return pl.scan_parquet(source)
     if suffix == ".csv":
-        return pl.scan_csv(source)
+        frame = pl.scan_csv(source)
+        schema = frame.collect_schema()
+        for column in dict.fromkeys(time_columns):
+            if column in schema and schema[column] == pl.String:
+                frame = _parse_csv_time_column(frame, column, source)
+        return frame
     if suffix in {".arrow", ".feather", ".ipc"}:
         return pl.scan_ipc(source)
     raise DataContractError(
@@ -131,8 +176,8 @@ def _run_signal(arguments: argparse.Namespace) -> int:
     _require_distinct_outputs(arguments)
     horizons = tuple(arguments.horizon or ("1D", "5D", "20D"))
     study = SignalStudy(
-        signal=_scan_frame(arguments.signal),
-        prices=_scan_frame(arguments.prices),
+        signal=_scan_frame(arguments.signal, (arguments.signal_time,)),
+        prices=_scan_frame(arguments.prices, (arguments.price_time,)),
         horizons=horizons,
         signal_time=arguments.signal_time,
         price_time=arguments.price_time,
@@ -284,7 +329,7 @@ def _parser() -> argparse.ArgumentParser:
         default="strategy",
         help="research scope controlling required, optional, and inapplicable evidence",
     )
-    audit.add_argument("--no-color", action="store_true", help="disable terminal color")
+    audit.add_argument("--no-color", action="store_true", help=_NO_COLOR_HELP)
     audit.add_argument(
         "--format",
         choices=("json", "markdown", "html"),
@@ -372,7 +417,7 @@ def _parser() -> argparse.ArgumentParser:
         help="declare whether complete research trial history is available",
     )
     signal.add_argument("--no-native", action="store_true", help="use Python references only")
-    signal.add_argument("--no-color", action="store_true", help="disable terminal color")
+    signal.add_argument("--no-color", action="store_true", help=_NO_COLOR_HELP)
     signal.add_argument(
         "--format",
         choices=("json", "markdown", "html"),

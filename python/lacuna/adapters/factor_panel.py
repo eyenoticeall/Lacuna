@@ -9,7 +9,8 @@ from typing import cast
 
 import polars as pl
 
-from lacuna.adapters.types import AdaptedFrame, normalize_mapped_frame
+from lacuna.adapters.polars import source_type_name
+from lacuna.adapters.types import AdaptedFrame, absent_mapped_columns, normalize_mapped_frame
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import (
     AnalysisResult,
@@ -193,7 +194,7 @@ def adapt_factor_panel(
         }
         for canonical, source in sorted(schema.columns.items())
     )
-    source_type = f"{type(data).__module__}.{type(data).__name__}"
+    source_type = source_type_name(data)
     input_lazy = isinstance(data, pl.LazyFrame)
     materialized = isinstance(frame, pl.DataFrame)
     evidence = AnalysisResult(
@@ -205,6 +206,7 @@ def adapt_factor_panel(
                 "schema_version": schema.schema_version,
                 "source_type": source_type,
                 "semantics": semantics,
+                "absent_optional_columns": absent_mapped_columns(schema.columns, original_columns),
                 "mapped_pandas_index_levels": mapped_index_levels,
                 "lazy_input": input_lazy,
                 "materialized": materialized,

@@ -70,12 +70,20 @@ def normalize_mapped_frame(
     )
     original_columns = frame_summary(frame).columns
     require_columns(frame, [columns[column] for column in required])
-    rename = {source: canonical for canonical, source in columns.items() if source != canonical}
+    # A mapped column that is not required may be absent from the source. It is skipped (not
+    # renamed) rather than failing inside Polars; callers record it via ``absent_mapped_columns``.
+    rename = {
+        source: canonical
+        for canonical, source in columns.items()
+        if source != canonical and source in original_columns
+    }
     moving_sources = set(rename)
+    # Collision checks cover every mapping, including skipped optional ones: an unrelated source
+    # column already named like a canonical target must never be mistaken for that canonical field.
     collisions = sorted(
         canonical
-        for source, canonical in rename.items()
-        if canonical in original_columns and canonical not in moving_sources and canonical != source
+        for canonical, source in columns.items()
+        if source != canonical and canonical in original_columns and canonical not in moving_sources
     )
     if collisions:
         raise DataContractError(
@@ -84,6 +92,18 @@ def normalize_mapped_frame(
     normalized = frame.rename(rename)
     require_columns(normalized, required)
     return normalized, original_columns
+
+
+def absent_mapped_columns(
+    columns: Mapping[str, str],
+    original_columns: Sequence[str],
+) -> tuple[str, ...]:
+    """Return sorted canonical names whose mapped source column is absent from the data."""
+
+    present = set(original_columns)
+    return tuple(
+        sorted(canonical for canonical, source in columns.items() if source not in present)
+    )
 
 
 __all__ = ["AdaptedFrame"]

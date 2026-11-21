@@ -39,6 +39,11 @@ class SklearnCV:
     from changing folds between estimator evaluations. The class deliberately
     avoids importing scikit-learn; its ``split`` and ``get_n_splits`` methods
     satisfy the public cross-validator protocol.
+
+    Fold indices are positions in the rows of ``data`` as supplied here. ``split`` checks
+    only that ``X`` (and ``y``) have the same number of rows; it cannot check their order.
+    The caller must pass ``X`` and ``y`` in exactly the row order of ``data``, or the folds
+    index the wrong observations and the temporal separation no longer holds.
     """
 
     def __init__(

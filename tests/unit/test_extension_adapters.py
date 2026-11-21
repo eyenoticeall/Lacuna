@@ -73,12 +73,11 @@ def test_duckdb_adapter_prefers_arrow_reader_and_records_materialization() -> No
     assert result.evidence.metrics["row_count"] == 2
 
 
-def test_duckdb_adapter_preserves_lazy_reader_output_when_requested() -> None:
-    source = _DuckDBSource(pl.DataFrame({"value": [1]}).lazy())
-    result = from_duckdb(source, collect=False)
-
-    assert result.lazy is True
-    assert result.evidence.metrics["row_count"] is None
+def test_duckdb_adapter_rejects_deferred_collection_instead_of_ignoring_it() -> None:
+    source = _DuckDBSource(pl.DataFrame({"value": [1]}))
+    with pytest.raises(MethodContractError, match="cannot defer collection"):
+        from_duckdb(source, collect=False)
+    assert source.calls == []
 
 
 def test_duckdb_adapter_supports_declared_legacy_path() -> None:

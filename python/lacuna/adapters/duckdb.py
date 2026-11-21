@@ -7,7 +7,12 @@ from numbers import Integral
 
 import polars as pl
 
-from lacuna.adapters.polars import frame_summary, require_columns, to_polars
+from lacuna.adapters.polars import (
+    frame_summary,
+    require_columns,
+    source_type_name,
+    to_polars,
+)
 from lacuna.adapters.types import AdaptedFrame
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import AnalysisResult, ResultMetadata
@@ -53,12 +58,21 @@ def from_duckdb(
     for query construction and parameter binding. The preferred DuckDB API is
     ``to_arrow_reader``; the legacy ``fetch_record_batch`` path is recorded
     when required for compatibility.
+
+    The Arrow stream is always consumed eagerly into a ``polars.DataFrame``; the result is never
+    lazy. ``collect`` is kept for signature compatibility and must be ``True``: ``collect=False``
+    raises :class:`~lacuna.exceptions.MethodContractError` instead of being silently ignored.
     """
 
     if isinstance(batch_size, bool) or not isinstance(batch_size, Integral) or batch_size < 1:
         raise MethodContractError("batch_size must be a positive integer")
     if not isinstance(collect, bool):
         raise MethodContractError("collect must be boolean")
+    if not collect:
+        raise MethodContractError(
+            "from_duckdb cannot defer collection: the DuckDB Arrow record-batch stream is "
+            "consumed eagerly into a Polars DataFrame; pass collect=True (the default)"
+        )
     if any(not isinstance(column, str) or not column for column in required):
         raise MethodContractError("required must contain non-empty column names")
     if len(set(required)) != len(required):
@@ -79,7 +93,7 @@ def from_duckdb(
             method="adapters.duckdb_arrow",
             method_version=1,
             parameters={
-                "source_type": f"{type(source).__module__}.{type(source).__name__}",
+                "source_type": source_type_name(source),
                 "reader_method": reader_method,
                 "batch_size": int(batch_size),
                 "required_columns": tuple(required),

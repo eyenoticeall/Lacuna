@@ -23,6 +23,22 @@ class FrameSummary:
     source_type: str
 
 
+def source_type_name(data: object) -> str:
+    """Return the public spelling of ``data``'s type for provenance.
+
+    Polars frames use ``polars.DataFrame``/``polars.LazyFrame`` rather than the private
+    ``polars.dataframe.frame`` module path; other types use their top-level package plus class name
+    (for example ``pandas.DataFrame`` and ``pyarrow.Table``), matching label and study diagnostics.
+    """
+
+    if isinstance(data, pl.LazyFrame):
+        return "polars.LazyFrame"
+    if isinstance(data, pl.DataFrame):
+        return "polars.DataFrame"
+    module = type(data).__module__.split(".", maxsplit=1)[0]
+    return f"{module}.{type(data).__name__}"
+
+
 def _as_dataframe(frame: pl.DataFrame | pl.Series) -> pl.DataFrame:
     return frame.to_frame() if isinstance(frame, pl.Series) else frame
 

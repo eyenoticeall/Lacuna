@@ -11,7 +11,7 @@ from typing import Literal, TypeAlias
 
 import polars as pl
 
-from lacuna.adapters.polars import require_columns, to_polars
+from lacuna.adapters.polars import require_columns, source_type_name, to_polars
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.types import JsonValue
 
@@ -22,15 +22,6 @@ CopyClassification: TypeAlias = Literal[
     "one_copy",
     "materializing",
 ]
-
-
-def _source_type(data: object) -> str:
-    if isinstance(data, pl.LazyFrame):
-        return "polars.LazyFrame"
-    if isinstance(data, pl.DataFrame):
-        return "polars.DataFrame"
-    module = type(data).__module__.split(".", maxsplit=1)[0]
-    return f"{module}.{type(data).__name__}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,7 +103,7 @@ def eager_frame(
         frame = normalized
         materialization_reason = None
     return frame, FrameDiagnostics(
-        source_type=_source_type(data),
+        source_type=source_type_name(data),
         rows=frame.height,
         columns=tuple(frame.columns),
         lazy_input=lazy_input,
