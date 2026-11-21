@@ -239,3 +239,118 @@ def test_empirical_residual_rejects_missing_nonpositive_and_overwrite_contracts(
 def test_validate_chain_rejects_invalid_year_basis(year_basis: object) -> None:
     with pytest.raises(MethodContractError, match="positive finite"):
         validate_chain(_chain_records(), year_basis=year_basis)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("column", ["strike", "bid", "iv", "open_interest"])
+def test_validate_chain_rejects_decimal_columns_with_a_data_contract_error_naming_column_and_dtype(
+    column: str,
+) -> None:
+    # Contract: numeric fields must be float/integer; Decimal must not leak a raw Polars error.
+    records = _chain_records()
+    records.setdefault("open_interest", [10.0, 20.0])
+    frame = pl.DataFrame(records).with_columns(pl.col(column).cast(pl.Decimal(18, 4)))
+
+    with pytest.raises(DataContractError, match=rf"invalid dtypes: {column}=Decimal"):
+        validate_chain(frame)
+
+
+def test_empirical_residual_rejects_decimal_inputs_with_a_data_contract_error() -> None:
+    # Contract: residual inputs follow the same float/integer-only rule as the chain.
+    chain = validate_chain(_chain_records())
+    frame = chain.frame.with_columns(pl.col("expected_iv").cast(pl.Decimal(18, 4)))
+    decimal_chain = OptionChain(frame=frame, evidence=chain.evidence)
+
+    with pytest.raises(DataContractError, match=r"invalid dtypes: expected_iv=Decimal"):
+        empirical_residual(decimal_chain, expected="expected_iv")
+
+
+def test_delta_buckets_labels_are_distinct_when_edges_differ_by_less_than_one_hundredth() -> None:
+    # Contract: distinct edges must yield distinct bucket labels, so counts never merge buckets.
+    records = _chain_records()
+    records["delta"] = [0.001, 0.004]
+    chain = validate_chain(records)
+
+    result = delta_buckets(chain, edges=(0.0, 0.003, 0.004, 1.0))
+
+    labels = result.frame.get_column("delta_bucket").to_list()
+    assert labels == ["[0.000,0.003)", "[0.004,1.000]"]
+    counts = {row["delta_bucket"]: row["quotes"] for row in result.evidence.table("bucket_counts")}
+    assert counts == {"[0.000,0.003)": 1, "[0.004,1.000]": 1}
+    assert result.evidence.metrics["occupied_buckets"] == 2
+
+
+def test_delta_buckets_keep_two_decimal_labels_when_edges_are_already_distinct() -> None:
+    # Stability contract: existing outputs do not change for edges distinct at two decimals.
+    chain = validate_chain(_chain_records())
+
+    result = delta_buckets(chain)
+
+    assert result.frame.get_column("delta_bucket").to_list() == ["[0.40,0.60)", "[0.10,0.25)"]
+
+
+def test_delta_buckets_labels_stay_distinct_for_edges_needing_extreme_precision() -> None:
+    records = _chain_records()
+    records["delta"] = [5e-301, 1.5e-300]
+    chain = validate_chain(records)
+
+    result = delta_buckets(chain, edges=(0.0, 1e-300, 2e-300, 1.0))
+
+    labels = result.frame.get_column("delta_bucket").to_list()
+    assert len(set(labels)) == 2
+    assert labels[0] != labels[1]
+    assert result.evidence.metrics["occupied_buckets"] == 2
+
+
+@pytest.mark.parametrize("derived", ["forward", "time_to_expiry_years", "log_moneyness"])
+def test_validate_chain_rejects_input_columns_that_collide_with_derived_columns(
+    derived: str,
+) -> None:
+    # Contract: derived columns are never silently overwritten.
+    records = _chain_records()
+    records[derived] = [123.0, 456.0]
+
+    with pytest.raises(DataContractError, match=rf"derived columns.*{derived}"):
+        validate_chain(records)
+
+
+def test_validate_chain_names_every_colliding_derived_column() -> None:
+    records = _chain_records()
+    records["forward"] = [1.0, 2.0]
+    records["log_moneyness"] = [0.0, 0.0]
+
+    with pytest.raises(DataContractError, match="forward, log_moneyness"):
+        validate_chain(records)
+
+
+def test_delta_buckets_rejects_existing_delta_bucket_column() -> None:
+    # Contract: delta_bucket is derived; an input column of that name must not be overwritten.
+    records = _chain_records()
+    records["delta_bucket"] = ["mine", "mine"]
+    chain = validate_chain(records)
+
+    with pytest.raises(DataContractError, match="delta_bucket"):
+        delta_buckets(chain)
+
+
+@pytest.mark.parametrize("name", ["iv", "expected_iv"])
+def test_empirical_residual_rejects_output_that_overwrites_an_input_column(name: str) -> None:
+    # Contract: the residual output must not replace the observed or expected column.
+    chain = validate_chain(_chain_records())
+
+    with pytest.raises(MethodContractError, match="must not overwrite an input column"):
+        empirical_residual(chain, observed="iv", expected="expected_iv", output=name)
+    assert chain.frame.get_column(name).to_list() == _chain_records()[name]
+
+
+def test_empirical_residual_input_overwrite_is_rejected_even_when_the_input_is_missing() -> None:
+    chain = validate_chain(_chain_records())
+
+    with pytest.raises(MethodContractError, match="must not overwrite an input column"):
+        empirical_residual(chain, expected="absent", output="absent")
+
+
+def test_option_chain_constructor_is_documented_as_unvalidated() -> None:
+    # Contract (documented, behaviour unchanged): direct construction bypasses validation.
+    assert OptionChain.__doc__ is not None
+    assert "validate_chain" in OptionChain.__doc__
+    assert "not validate" in OptionChain.__doc__.replace("\n", " ")

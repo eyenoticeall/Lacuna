@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Fixed
+
+- `validate_chain` (and `empirical_residual`) now reject Decimal numeric columns with a
+  `DataContractError` naming the column and dtype (`invalid dtypes: strike=Decimal(...)`) instead
+  of leaking a raw Polars `InvalidOperationError`. Only float and integer columns are accepted;
+  Decimal is not cast to Float64 because that would silently change quoted values.
+- `delta_buckets` labels are always distinct for distinct edges. Labels keep two decimals (so
+  existing outputs are unchanged) unless two edges would collapse at that precision, in which case
+  all labels use the fewest decimals that separate every edge. Previously edges closer than 0.01
+  shared a label and their `bucket_counts` and `occupied_buckets` were merged.
+- `validate_chain` raises `DataContractError` when the input already has a `forward`,
+  `time_to_expiry_years`, or `log_moneyness` column, `delta_buckets` raises when the chain already
+  has `delta_bucket`, and `empirical_residual` raises `MethodContractError` when `output` equals
+  `observed` or `expected`. Previously these columns were silently overwritten. Callers that re-validated a
+  previously validated frame must drop the derived columns first.
+
+### Documentation
+
+- `OptionChain` and the subsystem guide now state that `validate_chain` is the validated entry
+  point and that constructing `OptionChain(...)` directly performs no validation (behavior
+  unchanged).
+- The subsystem guide now describes the residual evidence the code produces (mean, median, RMSE,
+  positive fraction, and `(time, underlying, expiration)` groups) and states that lazy frames are
+  accepted and collected in full by `validate_chain`.
+
+### Deferred
+
+- Evidence results do not yet carry an `input_fingerprint`. A faithful fingerprint needs a
+  timezone-portable, null- and dtype-explicit serialization of the source frame that the public
+  `lacuna.experiment.fingerprint` does not provide (the core's helper for that is private), so it
+  needs its own contract and method-version decision.
+
 ## [0.2.1] - 2026-08-28
 
 ### Changed

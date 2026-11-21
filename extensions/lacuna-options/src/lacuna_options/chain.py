@@ -30,6 +30,7 @@ REQUIRED_CHAIN_COLUMNS = (
     "rate",
     "dividend",
 )
+_DERIVED_CHAIN_COLUMNS = ("forward", "time_to_expiry_years", "log_moneyness")
 OPTIONAL_CHAIN_COLUMNS = (
     "mid",
     "iv",
@@ -52,7 +53,14 @@ class OptionFrameResult:
 
 @dataclass(frozen=True, slots=True)
 class OptionChain(OptionFrameResult):
-    """A chain that passed the `lacuna-options` normalized schema."""
+    """A chain produced by :func:`validate_chain` under the `lacuna-options` schema.
+
+    :func:`validate_chain` is the validated entry point. Constructing
+    ``OptionChain(frame=..., evidence=...)`` directly does not validate the
+    frame, derive coordinates, or check the evidence; it is a plain frozen
+    container. Downstream functions check only that their input is an
+    ``OptionChain`` instance, so a hand-built chain carries no guarantee.
+    """
 
 
 def _mapping(columns: Mapping[str, str] | None) -> dict[str, str]:
@@ -103,7 +111,13 @@ def _rename(frame: pl.DataFrame, columns: Mapping[str, str]) -> pl.DataFrame:
 
 
 def _require_numeric(frame: pl.DataFrame, columns: Sequence[str]) -> None:
-    invalid_dtypes = [column for column in columns if not frame.schema[column].is_numeric()]
+    # Only float and integer columns are accepted. Decimal reports ``is_numeric()`` but has no
+    # lossless finite check, and a Float64 cast would silently change quoted values.
+    invalid_dtypes = [
+        column
+        for column in columns
+        if not (frame.schema[column].is_float() or frame.schema[column].is_integer())
+    ]
     if invalid_dtypes:
         details = ", ".join(f"{column}={frame.schema[column]}" for column in invalid_dtypes)
         raise DataContractError(f"option numeric columns have invalid dtypes: {details}")
@@ -141,6 +155,12 @@ def validate_chain(
     :math:`S exp((r-q)T)`. ``log_moneyness`` is :math:`log(K/F)`. The caller
     supplies rates, dividend yields, and the day-count denominator; Lacuna does
     not infer them from vendor or market conventions.
+
+    ``data`` may be eager or lazy; a lazy frame is collected in full here (the
+    collection boundary). Numeric fields must be float or integer columns
+    (Decimal is rejected). Input columns named ``forward``,
+    ``time_to_expiry_years`` or ``log_moneyness`` are rejected instead of being
+    overwritten.
     """
 
     if isinstance(year_basis, bool) or not isinstance(year_basis, int | float):
@@ -153,6 +173,13 @@ def validate_chain(
     if isinstance(normalized, pl.LazyFrame):  # pragma: no cover - collect=True contract
         normalized = normalized.collect()
     frame = _rename(normalized, resolved_columns)
+    derived_collisions = [column for column in _DERIVED_CHAIN_COLUMNS if column in frame.columns]
+    if derived_collisions:
+        raise DataContractError(
+            "option chain input columns collide with derived columns: "
+            + ", ".join(derived_collisions)
+            + "; rename or drop them before validation"
+        )
     if frame.is_empty():
         raise DataContractError("option chain must contain at least one quote")
     if any(frame.get_column(column).null_count() for column in REQUIRED_CHAIN_COLUMNS):
@@ -252,6 +279,17 @@ def validate_chain(
     return OptionChain(frame=frame, evidence=evidence)
 
 
+def _edge_labels(edges: FloatArray) -> tuple[str, ...]:
+    """Format edges with the fewest decimals (at least two) that keep them all distinct."""
+
+    for decimals in range(2, 18):
+        text = tuple(f"{float(edge):.{decimals}f}" for edge in edges)
+        if len(set(text)) == len(text):
+            return text
+    # Edges below 1e-17 apart or tiny positive edges: repr round-trips every distinct float.
+    return tuple(repr(float(edge)) for edge in edges)
+
+
 def delta_buckets(
     chain: OptionChain,
     *,
@@ -278,9 +316,14 @@ def delta_buckets(
         raise MethodContractError(
             "edges must be strictly increasing finite boundaries starting at 0 and ending at 1"
         )
+    if "delta_bucket" in chain.frame.columns:
+        raise DataContractError(
+            "chain already has a 'delta_bucket' column; delta_buckets would overwrite it"
+        )
+    edge_text = _edge_labels(resolved_edges)
     labels = tuple(
-        f"[{left:.2f},{right:.2f}{']' if index == resolved_edges.size - 2 else ')'}"
-        for index, (left, right) in enumerate(pairwise(resolved_edges))
+        f"[{left},{right}{']' if index == resolved_edges.size - 2 else ')'}"
+        for index, (left, right) in enumerate(pairwise(edge_text))
     )
     delta: FloatArray = (
         chain.frame.get_column("delta").abs().to_numpy().astype(np.float64, copy=False)
@@ -319,7 +362,11 @@ def empirical_residual(
         raise MethodContractError("chain must be the result of validate_chain")
     if any(not isinstance(name, str) or not name for name in (observed, expected, output)):
         raise MethodContractError("residual column names must be non-empty strings")
-    if output in chain.frame.columns and output not in {observed, expected}:
+    if output in {observed, expected}:
+        raise MethodContractError(
+            f"residual output column must not overwrite an input column: {output!r}"
+        )
+    if output in chain.frame.columns:
         raise DataContractError(f"residual output column already exists: {output!r}")
     missing = sorted({observed, expected}.difference(chain.frame.columns))
     if missing:

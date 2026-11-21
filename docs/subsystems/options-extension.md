@@ -43,9 +43,19 @@ boundary, exceptions, and evidence types instead of duplicating them.
 
 ## Normalized chain contract
 
-`validate_chain(...)` accepts any eager table-like input supported by `lacuna.adapters.to_polars`.
-The extension materializes globally because it validates cross-row and complete-column invariants;
-its evidence records `materialized=True`.
+`validate_chain(...)` accepts any table-like input supported by `lacuna.adapters.to_polars`,
+including Polars `LazyFrame` inputs. It calls `to_polars(..., collect=True)`, so a lazy plan is
+executed once and in full at the `validate_chain` call; that is the collection boundary, and no
+validation or derived column is evaluated lazily. The extension materializes globally because it
+validates cross-row and complete-column invariants; its evidence records `materialized=True` for
+eager and lazy sources alike, and `source_type` records the original container type. Everything
+after `validate_chain` (`OptionChain.frame`, `delta_buckets`, `empirical_residual`) is eager.
+
+`validate_chain` is the validated entry point. `OptionChain` is a plain frozen container:
+constructing `OptionChain(frame=..., evidence=...)` directly performs no validation, derives no
+coordinates, and does not check the evidence. Downstream functions only check that their argument
+is an `OptionChain` instance, so a hand-built chain carries none of the guarantees in this
+document. Obtain chains only from `validate_chain`.
 
 Required canonical fields:
 
@@ -72,8 +82,12 @@ Optional fields:
 | `theta` | finite; sign is model convention and is not constrained |
 | `open_interest`, `volume` | finite and non-negative |
 
-All required fields reject nulls. Every numeric field present rejects null, NaN, and infinity. Empty
-chains fail. The adapter preserves input order and extra columns; it neither deduplicates contracts
+All required fields reject nulls. Every numeric field present must be a float or integer column
+and rejects null, NaN, and infinity; other numeric dtypes such as Decimal are rejected with a
+`DataContractError` naming the column and dtype rather than being cast to Float64. Empty chains
+fail. Input columns named `forward`, `time_to_expiry_years`, or `log_moneyness` are reserved for
+derived coordinates and are rejected with a `DataContractError` that names them instead of being
+overwritten. The adapter preserves input order and extra columns; it neither deduplicates contracts
 nor invents a sort order. Callers that require one quote per contract/time must establish that key
 before using downstream research methods.
 
@@ -142,7 +156,14 @@ Buckets use absolute delta and are left-closed/right-open, except the final buck
 
 This convention assigns `|delta| == 1` exactly once and makes boundary behavior deterministic.
 The returned `OptionFrameResult` adds `delta_bucket` and records edges, closure, coordinate, quote
-count, occupied-bucket count, and bucket counts. It does not redefine a supplied delta model.
+count, occupied-bucket count, and bucket counts. It does not redefine a supplied delta model. A
+chain that already has a `delta_bucket` column is rejected with a `DataContractError` rather than
+overwritten.
+
+Labels print each edge with two decimals. If two edges would print identically at two decimals
+(for example `0.003` and `0.004`), every label instead uses the fewest decimals that separates all
+edges, so distinct edges always produce distinct labels and bucket counts never merge buckets.
+Edges that are already distinct at two decimals keep the two-decimal labels.
 
 ## Empirical surface residuals
 
@@ -153,11 +174,19 @@ computes:
 residual = observed - expected.
 \]
 
-Both inputs must exist, be finite numeric columns, and use distinct non-empty names; the output may
-not overwrite an existing field. Evidence records the coordinate convention, field mapping,
-residual mean/standard deviation/mean absolute value, and summaries by underlying and expiration.
-The operation evaluates an already supplied expectation. It does not fit a surface or choose a fair
-volatility model.
+Both inputs must exist, be float or integer columns without nulls or non-finite values, and be
+strictly positive (volatilities); names must be non-empty strings. The `output` name must not be
+the observed or expected column (`MethodContractError`) and must not match any other existing
+column (`DataContractError`); neither case overwrites. The operation evaluates an already supplied
+expectation. It does not fit a surface or choose a fair volatility model.
+
+Evidence (`options.empirical_residual`, version 1) records the observed, expected, and output
+column names and the `observed_minus_expected` definition. Its metrics are `quote_count`,
+`mean_residual`, `median_residual`, `rmse` (root mean square, not a standard deviation), and
+`positive_fraction` (share of residuals strictly greater than zero), computed over all quotes. The
+`surface_groups` table has one row per `(time, underlying, expiration)` group, sorted by those keys,
+with `quotes`, `mean_residual`, and `rmse`. There is no standard-deviation or mean-absolute-value
+metric.
 
 ## Deliberate non-claims
 
