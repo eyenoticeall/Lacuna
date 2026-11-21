@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import numbers
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -32,6 +34,11 @@ TemporalPoint: TypeAlias = date | datetime | int
 
 _LEFT_ROW = "__lacuna_left_row"
 _RIGHT_TIME = "__lacuna_right_available_time"
+_INT64_MAX = 2**63 - 1
+# Fixed-length duration units only. Calendar-variable units (mo, q, y) are rejected by
+# Polars in as-of tolerances, the index unit "i" has no meaning for temporal columns, and
+# Polars silently accepts a leading "-" (a negative tolerance), so the grammar is strict.
+_FIXED_DURATION = re.compile(r"(?:\d+(?:ns|us|ms|s|m|h|d|w))+")
 
 
 def _trimmed(value: str, *, name: str) -> str:
@@ -87,6 +94,84 @@ def _time_unit(dtype: pl.DataType) -> str:
             "ms": "milliseconds",
         }[dtype.time_unit]
     return "input_units"
+
+
+def _is_temporal_dtype(dtype: pl.DataType) -> bool:
+    return dtype == pl.Date or isinstance(dtype, pl.Datetime | pl.Duration)
+
+
+def _resolve_asof_tolerance(
+    tolerance: AsOfTolerance | None,
+    *,
+    time_dtype: pl.DataType,
+) -> AsOfTolerance | None:
+    """Validate a tolerance against the unit system of the time column.
+
+    Index time (integer or whole-number float) takes a non-negative whole-number tolerance in
+    the same index units. Temporal time (Date, Datetime, Duration) takes a ``timedelta`` or a
+    fixed-length duration string such as ``"30d"`` or ``"1h30m"``; a bare number has no unit
+    there and is rejected. Validation happens before any join so Polars never sees a tolerance
+    it can only reject by panicking.
+    """
+
+    if tolerance is None:
+        return None
+    if _is_temporal_dtype(time_dtype):
+        if isinstance(tolerance, timedelta):
+            return tolerance
+        if isinstance(tolerance, str):
+            if not _FIXED_DURATION.fullmatch(tolerance):
+                raise MethodContractError(
+                    f"tolerance {tolerance!r} is not a fixed-length duration string; use "
+                    "positive units ns, us, ms, s, m, h, d, or w (for example '30d' or "
+                    "'1h30m'). Calendar-variable units (mo, q, y) are not supported"
+                )
+            return tolerance
+        raise MethodContractError(
+            f"numeric tolerance has no unit for {time_dtype} time columns; pass a "
+            "timedelta or a fixed-length duration string such as '30d'"
+        )
+    if isinstance(tolerance, str | timedelta):
+        raise MethodContractError(
+            f"tolerance must be a whole number of index units for {time_dtype} time columns; "
+            "duration strings and timedelta apply only to Date, Datetime, or Duration columns"
+        )
+    value = float(tolerance)
+    if not value.is_integer() or value > _INT64_MAX:
+        raise MethodContractError(
+            "tolerance must be a whole number within the int64 range for index time columns"
+        )
+    return int(tolerance) if isinstance(tolerance, numbers.Integral) else tolerance
+
+
+def _require_orderable_revision(frame: pl.DataFrame, revision: str) -> None:
+    """Require a revision dtype whose sort order is an intended version order."""
+
+    dtype = frame.schema[revision]
+    if dtype == pl.Null and frame.is_empty():
+        return
+    if dtype.is_float():
+        series = frame.get_column(revision)
+        if not bool(series.is_finite().all()):
+            raise DataContractError(f"revision column {revision!r} must contain finite values")
+        return
+    if dtype.is_integer() or _is_temporal_dtype(dtype) or isinstance(dtype, pl.Enum):
+        return
+    raise DataContractError(
+        f"revision column {revision!r} has dtype {dtype}, which has no declared version order "
+        "(strings and categoricals sort lexicographically, so '10' would rank below '9'); "
+        "use an integer, finite float, Date, Datetime, Duration, or ordered Enum revision"
+    )
+
+
+def _future_match_count(frame: pl.DataFrame, *, left_time: str, matched_time: str) -> int:
+    """Count matched rows whose selected availability is later than the decision time."""
+
+    return int(
+        frame.select(
+            (pl.col(matched_time).is_not_null() & (pl.col(matched_time) > pl.col(left_time))).sum()
+        ).item()
+    )
 
 
 def _information_ages(
@@ -231,6 +316,8 @@ def _validate_asof_inputs(
     require_time_key(left, left_time, name="left input")
     for column in by:
         require_identifier(left, column, name="left input")
+    if revision is not None:
+        _require_orderable_revision(right, revision)
     if right.is_empty():
         if right.schema[right_time] != left.schema[left_time]:
             raise DataContractError("left and right time columns must use matching dtypes")
@@ -276,7 +363,21 @@ def asof_join(
     unmatched: UnmatchedPolicy = "keep",
     suffix: str = "_right",
 ) -> PointInTimeJoinResult:
-    """Join the latest record known by each decision without using future data."""
+    """Join the latest record known by each decision without using future data.
+
+    ``effective_time`` is validated as a time column on the right input and recorded in
+    provenance, but it does not affect matching: admissibility and recency are decided by
+    ``right_time`` (availability) alone, with ``revision`` resolving availability ties. An
+    economic effective date is not an availability timestamp.
+
+    ``revision`` must have an intended sort order (integer, finite float, Date, Datetime,
+    Duration, or Enum); string and categorical revisions are rejected because they sort
+    lexicographically.
+
+    ``tolerance`` must match the unit system of ``left_time``: a whole number for integer
+    time, or a ``timedelta`` / fixed-length duration string (``ns``, ``us``, ``ms``, ``s``,
+    ``m``, ``h``, ``d``, ``w``) for Date, Datetime, and Duration time.
+    """
 
     _trimmed(left_time, name="left_time")
     _trimmed(right_time, name="right_time")
@@ -294,7 +395,9 @@ def asof_join(
     if tolerance is not None:
         if isinstance(tolerance, bool):
             raise MethodContractError("tolerance must not be bool")
-        if isinstance(tolerance, int | float) and (
+        if not isinstance(tolerance, str | timedelta | numbers.Real):
+            raise MethodContractError("tolerance must be a number, timedelta, or duration string")
+        if isinstance(tolerance, numbers.Real) and (
             not math.isfinite(float(tolerance)) or tolerance < 0
         ):
             raise MethodContractError("numeric tolerance must be finite and non-negative")
@@ -322,6 +425,7 @@ def asof_join(
         by=resolved_by,
         revision=revision,
     )
+    resolved_tolerance = _resolve_asof_tolerance(tolerance, time_dtype=left_frame.schema[left_time])
     if effective_time is not None:
         require_time_key(right_frame, effective_time, name="right input")
     output_right_time = (
@@ -343,7 +447,7 @@ def asof_join(
         "by": resolved_by,
         "strategy": "backward",
         "suffix": suffix,
-        "tolerance": tolerance,
+        "tolerance": resolved_tolerance,
         "allow_exact_matches": allow_exact_matches,
         "check_sortedness": False,
     }
@@ -374,8 +478,13 @@ def asof_join(
         left_time=left_time,
         matched_time=output_right_time,
     )
-    if bool((ages < 0).any()):  # pragma: no cover - defensive assertion over join_asof
-        raise RuntimeError("point-in-time join selected future data")
+    future_matches = _future_match_count(
+        joined, left_time=left_time, matched_time=output_right_time
+    )
+    if future_matches:  # pragma: no cover - defensive assertion over join_asof
+        raise RuntimeError(
+            f"point-in-time join selected future data for {future_matches} decision rows"
+        )
 
     findings: list[Finding] = []
     if unmatched_count:
@@ -493,7 +602,7 @@ def asof_join(
             "median_information_age": float(np.median(ages)) if ages.size else None,
             "max_information_age": int(np.max(ages)) if ages.size else None,
             "information_age_unit": _time_unit(left_frame.schema[left_time]),
-            "future_matches": 0,
+            "future_matches": future_matches,
         },
         findings=tuple(findings),
         tables={
@@ -502,6 +611,14 @@ def asof_join(
         warnings=(
             "The join proves availability ordering for supplied timestamps; it does not "
             "prove source timestamps are accurate.",
+            *(
+                (
+                    "effective_time was validated and recorded but does not affect matching; "
+                    "the join selects by availability time and revision only.",
+                )
+                if effective_time is not None
+                else ()
+            ),
         ),
     )
     return PointInTimeJoinResult(frame=joined, evidence=evidence)
@@ -1036,6 +1153,22 @@ def survivorship_diagnostics(
                 category="bias.survivorship",
             )
         )
+    elif not structural_failure and not missing_availability and not delisted_rows:
+        findings.append(
+            Finding(
+                code="BIAS_SURVIVORSHIP_DELISTINGS_NOT_OBSERVED",
+                title="No delisted instruments were observed",
+                message=(
+                    "The source declares delisted history is included, but the delisted column "
+                    "marks no row as delisted, so the declaration is not corroborated by the "
+                    "data."
+                ),
+                state=FindingState.UNKNOWN,
+                severity=Severity.HIGH,
+                category="bias.survivorship",
+                evidence={"delisted_rows": delisted_rows, "includes_delisted": includes_delisted},
+            )
+        )
     elif not structural_failure and not missing_availability:
         findings.append(
             Finding(
@@ -1059,7 +1192,7 @@ def survivorship_diagnostics(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="bias.survivorship_diagnostics",
-            method_version=1,
+            method_version=2,
             parameters={
                 "identity": identities,
                 "valid_from": valid_from,
@@ -1351,7 +1484,33 @@ def universe_drift(
     transition_count = transition_frame.height
     drift_values = transition_frame.get_column("drift").to_list() if transition_count else []
     high_drift = sum(float(value) >= warning_threshold for value in drift_values)
+    snapshots_per_universe = membership.group_by(identity_columns).agg(
+        pl.col(snapshot_time).n_unique().alias("snapshots")
+    )
+    universe_count = snapshots_per_universe.height
+    universes_without_transitions = int(
+        snapshots_per_universe.select((pl.col("snapshots") < 2).sum()).item()
+    )
     findings: list[Finding] = []
+    if universes_without_transitions:
+        findings.append(
+            Finding(
+                code="BIAS_UNIVERSE_DRIFT_UNDEFINED",
+                title="Universe drift is undefined without two snapshots",
+                message=(
+                    f"{universes_without_transitions} of {universe_count} universes have fewer "
+                    "than two snapshots, so consecutive-snapshot drift cannot be measured."
+                ),
+                state=FindingState.UNKNOWN,
+                severity=Severity.MEDIUM,
+                category="bias.universe",
+                evidence={
+                    "universes": universe_count,
+                    "universes_without_transitions": universes_without_transitions,
+                    "transitions": transition_count,
+                },
+            )
+        )
     if high_drift:
         findings.append(
             Finding(
@@ -1412,7 +1571,7 @@ def universe_drift(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="bias.universe_drift",
-            method_version=1,
+            method_version=2,
             parameters={
                 "snapshot_time": snapshot_time,
                 "instrument": instrument,
@@ -1427,8 +1586,10 @@ def universe_drift(
             "rows": frame.height,
             "snapshots": unique_snapshots,
             "transitions": transition_count,
-            "mean_drift": float(np.mean(drift_values)) if drift_values else 0.0,
-            "maximum_drift": max(drift_values, default=0.0),
+            "universes": universe_count,
+            "universes_without_transitions": universes_without_transitions,
+            "mean_drift": float(np.mean(drift_values)) if drift_values else None,
+            "maximum_drift": max(drift_values) if drift_values else None,
             "high_drift_transitions": high_drift,
             "source_status": status,
         },
