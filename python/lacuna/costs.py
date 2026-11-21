@@ -1005,7 +1005,14 @@ class SquareRootImpactModel:
 
 @dataclass(frozen=True, slots=True)
 class BorrowCostModel:
-    """Annualized borrow charged over explicit short holding intervals."""
+    """Annualized borrow charged over explicit short holding intervals.
+
+    The model is stateless: it holds no position history. Every row with a negative signed
+    quantity is charged ``notional * rate * holding_days / day_count``, so ``holding_days``
+    must be the short exposure interval that row opens. A sell that closes or reduces a long
+    position opens no short exposure and must carry ``holding_days = 0`` (or be excluded);
+    otherwise it is charged as if it were a short sale.
+    """
 
     borrow_rate: str = "borrow_rate"
     holding_days: str = "holding_days"
@@ -1341,6 +1348,19 @@ def _period_aggregate_matrix(
     }
 
 
+# The trade ledger is the only period source: a period with no trade has no row and cannot
+# contribute a zero. The caller's annualization therefore has to describe traded periods.
+_TRADED_PERIOD_WARNING = (
+    "Sharpe and CAGR use only periods that contain at least one trade. Periods without trades "
+    "are absent from the ledger and contribute no zero return, so with an annualization that "
+    "counts every calendar period the statistic can be overstated for sparse ledgers."
+)
+
+
+def _path_warnings(annualization: float | None) -> tuple[str, ...]:
+    return () if annualization is None else (_TRADED_PERIOD_WARNING,)
+
+
 def _sharpe(values: FloatArray, *, annualization: float | None) -> float | None:
     if annualization is None or values.size < 2:
         return None
@@ -1568,6 +1588,7 @@ def stress(
         warnings=(
             "Quoted spread_bps is a full bid/ask spread; the stress surface charges half-spread.",
             "Scenario results are path-independent estimates, not simulated executions.",
+            *_path_warnings(annualization),
         ),
     )
 
@@ -1792,6 +1813,7 @@ def break_even_cost(
         tables={"solver_trace": tuple(trace)},
         warnings=(
             "The solution is valid only inside the declared bracket; no extrapolation is used.",
+            *_path_warnings(annualization),
         ),
     )
 
@@ -2197,6 +2219,7 @@ def capacity_curve(
         warnings=(
             "Square-root impact is a declared scenario model, not a universal market law.",
             "The result intentionally returns a curve and does not infer one capacity number.",
+            *_path_warnings(annualization),
         ),
     )
 
