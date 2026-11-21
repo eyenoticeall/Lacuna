@@ -63,11 +63,14 @@ Terms in this glossary are normative where they describe Lacuna data and evidenc
 **Forward return**
 : Return from a declared entry price/time to a future exit price/time. Horizon alone is insufficient to define it.
 
+**Horizon (`"5D"`)**
+: The label or evaluation span. The same string has different units in different APIs: in `lacuna.labels.forward_returns`, `"5D"` means five ordered observations per instrument (trading-observation horizon, not calendar days); in `lacuna.cv.WalkForward` calendar mode, `"5D"` means five calendar days regardless of how many observations fall in them. Integer `train`/`test`/`step` values in `WalkForward` are observation counts.
+
 **Information coefficient (IC)**
 : Cross-sectional association between a signal and subsequent label, commonly Pearson or Spearman correlation at each evaluation date.
 
 **Information coefficient information ratio (ICIR)**
-: Mean IC divided by its variability, with an explicitly declared annualization and dependence treatment.
+: Mean IC divided by its variability. In `lacuna.signal.ic` this is `ic_information_ratio`: the mean of the per-period ICs divided by their sample standard deviation (`ddof=1`), per summary group, and null when the deviation is zero or undefined. It is a per-period quantity: `ic` has no annualization parameter and applies no autocorrelation or other dependence adjustment, so any annualization or dependence treatment is a separate, declared step outside this metric.
 
 **Quantile portfolio**
 : Groups formed by signal rank or value boundaries for comparing subsequent outcomes.
@@ -96,7 +99,7 @@ Terms in this glossary are normative where they describe Lacuna data and evidenc
 : Excluding observations near a test boundary to reduce information leakage or dependence.
 
 **Combinatorial purged cross-validation (CPCV)**
-: A later-stage validation design that evaluates combinations of test groups with purging and uses the resulting paths to assess selection risk.
+: A validation design that evaluates combinations of test groups with purging and an embargo, and uses the resulting paths to assess selection risk. Implemented as `lacuna.cv.CombinatorialPurgedKFold`, which also reconstructs the complete chronological paths.
 
 **Bootstrap**
 : Resampling procedure used to approximate a statistic's sampling distribution.
@@ -105,7 +108,7 @@ Terms in this glossary are normative where they describe Lacuna data and evidenc
 : Bootstrap that resamples contiguous observations or blocks to preserve local dependence.
 
 **Stationary bootstrap**
-: Block bootstrap with geometrically distributed block lengths, conventionally parameterized so expected block length is `1 / p`.
+: Block bootstrap with geometrically distributed block lengths. The conventional restart probability `p` relates to the expected block length as `1 / p`; the Lacuna API takes `expected_block_length` and uses `p = 1 / expected_block_length` internally.
 
 **Permutation test**
 : Test that compares an observed statistic with values under a declared exchangeability-preserving permutation scheme.

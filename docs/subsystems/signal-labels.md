@@ -162,6 +162,11 @@ n_observations
 Tables include period IC, observation count, excluded count, and optional group/horizon keys.
 Inference over the IC time series must account for serial dependence when claimed.
 
+With multi-horizon labels the headline metrics describe one horizon and never pool horizons: the
+first horizon in a `LabelResult`'s declared order (recorded as `headline_horizon`), or null with an
+`IC_HEADLINE_HORIZON_UNDECLARED` / `QUANTILE_HEADLINE_HORIZON_UNDECLARED` finding for a bare
+multi-horizon label frame. Horizon tables are ordered by horizon length, not as text.
+
 When `by` contains declared group columns, subgroup rows and pooled headline rows are computed
 independently. Group columns survive alignment and appear in the period/horizon tables. A headline
 metric never comes from the first subgroup. `group_available_time` proves that classifications were
@@ -249,7 +254,10 @@ Turnover exposes distinct concepts:
 - signal autocorrelation.
 
 `lags=(1, ...)` uses positive global observation-index lags and always includes one. The legacy
-`turnover_by_period` and lag-one headlines remain unchanged. Additive tables expose every requested
+`turnover_by_period` table and lag-one rank-turnover and autocorrelation headlines keep their
+definitions. Membership turnover (method version 2) is measured on the same balanced midpoint
+quantile sets as `quantiles`; version 1 floored the rank and could place a boundary instrument one
+bucket away. Additive tables expose every requested
 lag, common-instrument count, exact from/to observation times, rank turnover, autocorrelation, and
 symmetric membership turnover for every bucket.
 
@@ -267,7 +275,9 @@ A half-life estimate requires four positive horizons, twenty common periods, pos
 means, convergence away from the upper bound, a finite stationary-block-bootstrap interval, and the
 configured minimum `R²`. Failure returns `null` fields and a `WARN` or `UNKNOWN` finding. SciPy is
 loaded only at the call site through `lacuna-quant[statistics]`; optimizer, bounds, dependency version,
-root entropy, substream derivation, and joint resampling policy are provenance.
+root entropy, substream derivation, and joint resampling policy are provenance. A caller-supplied
+`seed` is also recorded as `metadata.seed` (null when none was given; generated root entropy stays in
+`parameters["root_entropy"]`).
 
 ## Diagnostic portfolio projection
 
@@ -310,7 +320,16 @@ The immutable result preserves `source_signal`, places residuals in canonical `s
 coefficients, matrix rank, condition, residual degrees of freedom, weighted fit diagnostics, and
 attrition. Rank deficiency uses the minimum-norm solution with a finding. Insufficient residual
 degrees of freedom raise by default. Exposure availability is verified when provided, future-dated
-rows raise, and absent availability remains `UNKNOWN`.
+rows raise, and absent availability remains `UNKNOWN`. Because `exposures` is required, exposure
+attributes are always externally supplied inputs, so `GROUP_AVAILABILITY_UNKNOWN` is emitted even
+for the default `by="time"`; its message and evidence (`exposure_columns`, `group_columns`) name the
+inputs concerned.
+
+Categorical encoding (method version 2): with an intercept every categorical drops a reference
+level. With `intercept=False` the first categorical keeps its full dummy set (it spans the constant,
+so residuals are demeaned within every level) and later categoricals drop a reference level to stay
+full rank; the encoding is recorded as `categorical_encoding`. Method version 1 dropped a level even
+without an intercept, which left the dropped level's rows un-demeaned.
 
 Neutralization is a transformation result with diagnostics, not a hidden option inside IC. It does
 not standardize, winsorize, join historical revisions, or choose exposures for the caller.

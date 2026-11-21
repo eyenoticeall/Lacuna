@@ -2,6 +2,124 @@
 
 All notable changes to Lacuna will be documented here. The project intends to follow [Semantic Versioning](https://semver.org/) once its public release process begins.
 
+## [Unreleased]
+
+Corrections from a documentation-driven review of 0.14.1. Several entries change results or reject
+inputs that were previously accepted; each names the method or rule version that identifies it.
+
+### Fixed
+
+- **Statistical correction:** the headline metrics of `signal.ic`, `signal.quantiles`, and
+  `signal.bucket_returns` (method version 2) no longer pool horizons. With multi-horizon labels the
+  IC summary, `mean_top_bottom_spread`, and the monotonicity metrics averaged every
+  `(period, horizon)` row, mixing different estimands, and the headline monotonicity came from the
+  first horizon in text order. They now describe one horizon: the first in a `LabelResult`'s
+  declared order, recorded as `headline_horizon`, the same default `SignalStudy.audit` infers on. A
+  bare multi-horizon label frame declares no order, so those metrics are null with an
+  `IC_HEADLINE_HORIZON_UNDECLARED`, `BUCKET_HEADLINE_HORIZON_UNDECLARED`, or
+  `QUANTILE_HEADLINE_HORIZON_UNDECLARED` finding (`UNKNOWN`). The headline never moves to a later
+  horizon: when the declared one has no aligned rows its metrics are empty
+  (`BUCKET_HEADLINE_HORIZON_EMPTY` for bucket returns). Per-horizon tables and single-horizon
+  results are unchanged.
+- `QUANTILE_MONOTONICITY` (rule version 2) scores the audit's `inference_horizon` row of the
+  monotonicity table. It read the headline metric, which could belong to another horizon, and is
+  now `UNKNOWN` for multi-horizon evidence without a matching `inference_horizon` policy.
+- Horizon tables in `signal.ic`, `signal.quantiles`, `signal.bucket_returns`, and `signal.decay`
+  are ordered by horizon length; as text, `"10D"` sorted before `"1D"` and `"5D"`.
+- `signal.turnover` (method version 2) measures membership turnover on the balanced
+  midpoint-position quantile sets that `quantiles` and `bucketize` use, recorded as
+  `membership_bucket_rule`. It floored the rank, so a boundary instrument could sit in different
+  buckets for returns and for turnover whenever the period size was not a multiple of the quantile
+  count. Rank turnover and signal autocorrelation are unchanged. The midpoint rule keeps the top
+  and bottom legs the same size; `quantiles` adopted it in 0.10.0 without a version bump or a
+  methodology-doc update, which this release corrects.
+- `SignalStudy(instrument=...)` with a non-default identifier column no longer breaks `ic`,
+  `quantiles`, `bucket_returns`, `decay`, and `audit` with `missing required columns`. Label and
+  bucket frames produced by Lacuna always carry the canonical `instrument` column; the join now
+  reads it instead of the source name.
+- `labels.forward_returns(missing="raise")` no longer rejects end-of-sample censoring, which made
+  the policy fail on every finite panel. It still rejects null or NaN source prices and labels whose
+  entry and exit observations exist without a defined return. Outputs of valid calls are unchanged.
+  This replaces the documented rule that `"raise"` rejects any horizon censoring.
+- `PURGED_VALIDATION_SUPPLIED` (rule version 2) accepts `cv.combinatorial_purged_kfold` evidence,
+  and `SignalStudy.audit(split=...)` accepts a `CombinatorialSplitResult`. The rule is `UNKNOWN`
+  without a purge count and `WARN` when the split purged nothing although the inference horizon's
+  labels span two or more observations; only a split of non-overlapping sampled labels
+  legitimately purges nothing there, and the rule cannot tell the two apart. A pass now records `data_identity_verified: false`: split
+  evidence carries no input fingerprint, so the rule cannot verify the split came from the audited
+  labels.
+- `signal.ic` rejects infinite signal or label values on the declared inputs, including rows without
+  a join partner; they previously passed uncounted.
+- `signal.decay` (method version 2) names the spread period count in `ic_decay` `n_spread_periods`
+  instead of the join-suffixed `n_periods_right`, and orders the table by horizon length.
+- `validation.sharpe_inference` (method version 2) adds `DEFLATED_SHARPE_SUPPORTED` or
+  `DEFLATED_SHARPE_UNCERTAIN` when `trial_sharpes` is supplied. The existing PSR finding ignored
+  selection, so the best of many null strategies showed only a pass; it now records
+  `selection_adjusted: false` and names the deflated finding to read with it.
+- `validation.bootstrap(expected_block_length=0)` and negative values raise `MethodContractError`
+  instead of silently using the default block length.
+- `validation.multiple_testing` on an `ExperimentRegistry` applies the same `[0, 1]` p-value range
+  and `null_policy` validation as array input.
+- `validation.parameter_surface` raises `MethodContractError` when a `selection_sample_id` that
+  differs from `sample_id` is given without `selected_parameters`, instead of discarding it.
+- `PurgedKFold` validates `n_splits` and `embargo` types at construction like
+  `CombinatorialPurgedKFold`; strings, floats, bools, and NumPy integers raise
+  `MethodContractError`.
+- `WalkForward` (method version 2) in calendar mode over `Date` times keeps a final window whose
+  exclusive end is one day past the last observation, matching observation-count mode. `Datetime`
+  behavior is unchanged.
+- `bias.asof_join` validates `tolerance` against the time column's units before joining and raises
+  `MethodContractError` instead of a Polars error or panic. Numeric tolerances on temporal columns,
+  fractional tolerances on integer time, and calendar-variable or negative duration strings are
+  rejected. String, categorical, and other unordered `revision` dtypes are rejected with
+  `DataContractError` because they sort lexicographically. `future_matches` is computed from the
+  joined output, and a warning states that `effective_time` does not affect matching.
+- `bias.survivorship_diagnostics` (method version 2) reports `UNKNOWN`
+  (`BIAS_SURVIVORSHIP_DELISTINGS_NOT_OBSERVED`) for a `confirmed_safe` source whose delisted column
+  marks no row. `bias.universe_drift` (method version 2) reports `UNKNOWN`
+  (`BIAS_UNIVERSE_DRIFT_UNDEFINED`) for universes with fewer than two snapshots, and `mean_drift`
+  and `maximum_drift` are null instead of `0.0` when no transition exists.
+- `regime.quantile_regimes` (method version 2) no longer implies source availability from fixed or
+  trailing thresholds. `REGIME_THRESHOLDS_POINT_IN_TIME` covers threshold fitting only, and
+  availability is reported separately as `REGIME_SOURCE_AVAILABILITY_UNKNOWN`,
+  `REGIME_SOURCE_AVAILABLE`, or `REGIME_SOURCE_NOT_AVAILABLE`.
+- `signal.neutralize(intercept=False)` (method version 2) keeps the full dummy set of the first
+  categorical, so residuals are demeaned within every level; the first level was previously left
+  un-demeaned. `GROUP_AVAILABILITY_UNKNOWN` names the exposure and group columns it concerns.
+- `events.event_response` (method version 2) carries the supplied windows' `WARN`, `FAIL`, and
+  `UNKNOWN` findings and records its clustering unit and overlap-cluster counts. The offset-0
+  response of `events.event_windows` is exactly `0.0`.
+- `events.event_response` and `signal.fit_decay` record a caller-supplied seed in `metadata.seed`.
+- `lacuna signal` parses ISO date and datetime text in the declared time columns of CSV inputs;
+  unparseable time text is a data-contract error.
+- Vendor, backtest, and factor-panel adapters skip mapped optional columns that are absent from the
+  data and record them as `absent_optional_columns` instead of raising a Polars error.
+  Point-in-time and versioned vendor schemas reject a missing availability or revision column.
+- `adapters.from_duckdb(collect=False)` raises `MethodContractError`; the Arrow stream is always
+  materialized and the argument was silently ignored.
+
+### Changed
+
+- Adapter evidence records `source_type` with the public spelling (`polars.DataFrame`,
+  `polars.LazyFrame`) used by the rest of the package.
+- `costs.stress`, `costs.break_even_cost`, and `costs.capacity_curve` warn, whenever
+  `annualization` is given, that Sharpe and CAGR use only periods containing a trade.
+- `regime.regime_analysis` records `classification_provenance="declared_unverified"` and warns that
+  a `point_in_time` mode is a caller declaration.
+- `--no-color` is documented as a compatibility no-op; the CLI never emits color.
+
+### Documentation
+
+- State that `SklearnCV` cannot check the row order of `X` and `y` against the split's data.
+- State the forward-return `missing` policy, the stateless `BorrowCostModel` contract, the
+  observed-spread divisor, walk-forward calendar coverage, as-of join `effective_time`, `revision`,
+  and `tolerance` rules, the DSR threshold and findings, and the regime availability findings as
+  implemented.
+- Correct the glossary (ICIR, CPCV, stationary bootstrap, horizon units), the Alphalens migration
+  guide, the parameter-stability outputs, bundle determinism and integrity wording, backend
+  reproducibility claims, the `lc.audit` function-versus-module note, and the reserved
+  `NativeExtensionError`.
+
 ## [0.14.1] - 2026-09-28
 
 ### Fixed

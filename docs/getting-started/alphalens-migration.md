@@ -64,7 +64,7 @@ temporal construction.
 | `mean_information_coefficient` | `ic` summary tables or an explicit aggregation of stored period IC | Frequency/calendar aggregation is never inferred. |
 | `mean_return_by_quantile` | `bucketize` then `bucket_returns` | Bucket definition, ties, edge closure, and exclusions are evidence. |
 | `quantile_turnover` | `turnover(..., lags=(1, ...))` | Lags are exact observation-index endpoints; gaps are not consecutive. |
-| factor rank autocorrelation | `turnover` autocorrelation tables | Computed only on instruments present at both exact endpoints. |
+| factor rank autocorrelation | `turnover` `signal_autocorrelation` (not a rank correlation); `rank_turnover` for rank movement | `signal_autocorrelation` is the Pearson correlation of the raw signal values at the two exact endpoints, not a Spearman/rank correlation, so it can differ from Alphalens' rank autocorrelation. `rank_turnover` is the mean absolute change in tie-averaged rank fraction. Both are computed only on instruments present at both endpoints. |
 | factor returns / factor weights | `portfolio_projection` | An explicit diagnostic cohort projection, never a backtest. |
 | event return tables | `lacuna.events.event_windows` and `event_response` | Availability is the default anchor and dependence-aware inference is explicit. |
 | tearsheet plots | `AuditReport.to_html(renderer="plotly", view="signal")` | Charts render retained evidence and never recompute statistics. |
@@ -132,9 +132,18 @@ Other defaults that must become declarations include:
 - weighting, demeaning, group neutrality, and gross exposure;
 - uncertainty estimator, dependence unit, confidence, and random seed.
 
-If any item is unknown, use the literal `"unknown"`. The adapter records an `UNKNOWN` finding and
-downstream audits retain that uncertainty. This is intentional: container shape and index frequency
-are not evidence that a research panel was decision-time safe.
+If any item is unknown, use the literal `"unknown"`. Only `adapt_factor_panel` turns this into a
+finding: each `FactorPanelSemantics` field (signal observation, decision-time rule, forward-return
+entry and exit, horizon clock, timezone, calendar, adjustment policy, group availability, and
+imported bucket definition) set to `"unknown"` (case-insensitive) records an `UNKNOWN` finding
+(`FACTOR_PANEL_SEMANTICS_UNKNOWN`), and downstream audits retain that uncertainty. The other
+adapters do not emit findings for unknown items: the vendor-schema adapter only records its declared
+`availability` and `revisions` policies (which may be `"unknown"`) in the result parameters, and the
+Polars, DuckDB, backtest, and scikit-learn adapters declare no such fields. Items in the list above
+that are not `FactorPanelSemantics` fields (quantile count, weighting, uncertainty estimator, and so
+on) are parameters of the analytical calls, not of the adapter, and the adapter does not record them.
+This is intentional: container shape and index frequency are not evidence that a research panel was
+decision-time safe.
 
 ## Compatibility fixtures
 

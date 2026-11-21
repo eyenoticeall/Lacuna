@@ -29,8 +29,12 @@ dtypes fail before sorting. The optional delisting-return column must be numeric
 
 Prices must be finite and strictly positive when present. Duplicate bars and infinite values are errors.
 `missing="drop"` censors individual labels that lack a usable entry or exit; `missing="raise"` rejects
-missing source prices or any horizon censoring. Other policy values are rejected rather than treated
-as an implicit drop policy.
+missing source prices and any label whose entry and exit observations exist but yield no defined
+return. End-of-sample censoring (observations with no entry or exit bar left in the series) is not
+a data defect: every finite panel has it, so both policies drop those rows and count them in
+`coverage_by_horizon` and `data_attrition`. Through 0.14.1 `"raise"` also rejected that tail and
+therefore failed on every panel. Other policy values are rejected rather than treated as an implicit
+drop policy.
 
 ## Horizon clock
 

@@ -54,7 +54,8 @@ horizons estimate different quantities and are never pooled. Consecutive IC peri
 `h`-observation horizon share `h - 1` returns, so the bootstrap keeps only periods whose label
 intervals are disjoint (earliest first: a period is kept when its observation time is at or after
 every label end of the previously kept period) and resamples them IID. `IC_DEFINED` and
-`IC_PERIOD_SUPPORT` read the declared horizon's IC summary, and `BOOTSTRAP_INTERVAL` warns instead of
+`IC_PERIOD_SUPPORT` read the declared horizon's IC summary, `QUANTILE_MONOTONICITY` (rule version 2)
+reads the same horizon's monotonicity row, and `BOOTSTRAP_INTERVAL` warns instead of
 passing when fewer than 30 disjoint periods remain. The audit records `inference_horizon` and
 `ic_inference_sampling="non_overlapping_label_intervals"` as policies and in rule evidence.
 

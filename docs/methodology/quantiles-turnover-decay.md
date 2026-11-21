@@ -5,14 +5,24 @@ methods return structured tables before any report is rendered.
 
 ## Balanced quantile assignment
 
-`lacuna.signal.quantiles` sorts each group by signal and then instrument identity. With (n)
-observations, requested count (Q), and one-based ordinal position (r):
+`lacuna.signal.quantiles` and `bucketize` sort each group by signal and then instrument identity. With
+(n) observations, requested count (Q), and one-based ordinal position (r), each row takes the midpoint
+position of its rank and is compared with the (Q - 1) equally spaced interior boundaries:
 
 ```text
-quantile = floor((r - 1) × Q / n) + 1
+position = (r - 0.5) / n
+quantile = 1 + count of k in 1..Q-1 with position >= k / Q
+         = floor((r - 0.5) × Q / n) + 1        (away from exact boundary ties)
 ```
 
-This conserves every eligible row and makes bin sizes differ by at most one. `ascending=True` places
+This conserves every eligible row and makes bin sizes differ by at most one. Because the rule is
+symmetric in rank, the top and bottom quantiles have the same size when (n) is not a multiple of (Q),
+so a top-minus-bottom spread compares equal legs; the only exceptions are positions that land exactly
+on a boundary. The earlier `floor((r - 1) × Q / n) + 1` rule always made the bottom quantile the
+larger one in that case. `quantiles` has used the midpoint rule since 0.10.0, when it moved onto
+`bucketize`; that change was not versioned at the time. `turnover` kept the floor rule until method
+version 2, so through 0.14.1 a boundary instrument could sit in different buckets for returns and
+for membership turnover. `ascending=True` places
 the lowest signal in quantile 1. With `ascending=False`, signal order reverses while instrument identity
 remains the deterministic final tie-breaker.
 
@@ -34,6 +44,16 @@ spread_t = mean_return(t, Q) - mean_return(t, 1)
 
 `mean_top_bottom_spread` is the arithmetic mean of defined period spreads. No costs, leverage, or
 portfolio normalization are applied.
+
+With multi-horizon labels the period and summary tables carry one row set per horizon, ordered by
+horizon length. The headline metrics (`mean_top_bottom_spread`, `spearman_monotonicity`,
+`adjacent_order_fraction`) describe one horizon and never pool them: the first horizon in a
+`LabelResult`'s declared order, recorded as `headline_horizon`. If that horizon has no aligned rows
+the headline metrics are null with `BUCKET_HEADLINE_HORIZON_EMPTY`; a later horizon never takes its
+place. A bare label frame with several
+horizons declares no order, so those headline metrics are null and the result carries
+`QUANTILE_HEADLINE_HORIZON_UNDECLARED` (`BUCKET_HEADLINE_HORIZON_UNDECLARED` from `bucket_returns`).
+`signal.quantiles` and `signal.bucket_returns` are method version 2.
 
 Two monotonicity components are exposed:
 
@@ -60,7 +80,9 @@ rank_turnover_t = mean_i(abs(rank_fraction(i,t) - rank_fraction(i,t-1)))
 The table also contains Pearson correlation between raw current and previous signal values and the
 number of common instruments. Instruments separated by a period gap are not treated as consecutive.
 
-Top and bottom membership turnover uses the balanced quantile sets (A) and (B):
+Membership turnover uses the same balanced quantile sets as `quantiles` (the midpoint rule above;
+`signal.turnover` method version 2 records `membership_bucket_rule`). For consecutive sets (A) and (B)
+of one quantile:
 
 ```text
 membership_turnover = |A symmetric_difference B| / (|A| + |B|)

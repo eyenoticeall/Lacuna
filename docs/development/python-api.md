@@ -77,6 +77,14 @@ Simple valid calls should be short, while risky assumptions remain inspectable:
 lc.audit(results={"ic": ic_result, "bootstrap": bootstrap_result})
 ```
 
+On the package root, `lc.audit` is the audit **function**, not the `lacuna.audit` module: the
+function shadows the submodule attribute, so `lc.audit.default_rules` does not resolve (it raises
+`AttributeError`), and `import lacuna.audit as audit_module` also binds the function. Import
+module-level names with `from lacuna.audit import AuditContext, default_rules, run_audit`, or use the
+root re-exports `lc.Applicability`, `lc.ApplicabilityState`, `lc.AuditContext`, `lc.AuditRule`,
+`lc.default_rules`, and `lc.run_audit`. Other submodules (`lc.signal`, `lc.validation`, and so on)
+are not shadowed.
+
 An advanced method exposes its model explicitly:
 
 ```python
@@ -126,7 +134,7 @@ Use Lacuna's exception hierarchy:
 
 - `DataContractError` for invalid schema, semantics, or unsupported input;
 - `ConfigurationError` for invalid execution or method configuration;
-- `NativeExtensionError` when a requested capability requires an unavailable native module;
+- `NativeExtensionError`, exported from the package root and reserved for failures that require an unavailable native module. It is not raised anywhere in v0.14.1: when the native extension is missing, `use_native=True` paths fall back to the Python reference implementation, `lacuna.native.native_status()` reports availability, and the diagnostics report the state. Do not write code that depends on catching it yet;
 - method-specific subclasses only when callers can act on them differently.
 
 Errors state what was expected, what was observed, and how to correct it. Avoid broad exception swallowing around numerical or adapter calls.

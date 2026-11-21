@@ -25,7 +25,12 @@ must all use the observation-count family or all use the calendar family.
 
 Windows are half-open in time: training precedes the test start and test times satisfy
 `test_start <= time < test_end`. The final partial test window is dropped unless
-`allow_incomplete=True`. Rows retain their original source indices even though unique times are sorted
+`allow_incomplete=True`. A calendar window is partial when the data do not cover it: for `Date`
+times each observation covers its whole day, so a window is complete when
+`test_end <= last_observation + 1 day` (the same rule as observation-count mode, method version 2);
+a `Datetime` observation is an instant with no implied bar length, so the window must satisfy
+`test_end <= last_observation`. In calendar mode `"5D"` means five calendar days, unlike
+`labels.forward_returns`, where it counts observations. Rows retain their original source indices even though unique times are sorted
 to construct windows.
 
 ## Label intervals

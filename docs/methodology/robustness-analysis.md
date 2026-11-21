@@ -56,7 +56,9 @@ not bracket the apparent optimum.
 If the function chooses the best point itself, the evaluation sample necessarily performed the
 selection and receives `PARAMETER_SELECTION_REUSE`. Supplying an explicit point and a distinct
 `selection_sample_id` records separation; identities are provenance claims, not proof that the
-underlying samples are disjoint.
+underlying samples are disjoint. A `selection_sample_id` that differs from `sample_id` is only
+valid together with `selected_parameters`; without an explicit point it raises
+`MethodContractError` instead of being discarded.
 
 ## Continuous perturbation
 

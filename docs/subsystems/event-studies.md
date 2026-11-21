@@ -25,7 +25,10 @@ uses row position across instruments or the nearest earlier price.
 
 Offsets are integers from `-before` through `+after`, inclusive. The event path is the price at each
 offset divided by the anchor price minus one. Provenance records the equivalent half-open
-observation-index interval `[-before, after + 1)`.
+observation-index interval `[-before, after + 1)`. The offset-0 row is the anchor price itself, so
+its response is the exact identity `p/p - 1 = 0`; it is emitted as a literal `0.0`, never as a
+rounded or residual value. Other offsets are computed as `price / anchor_price - 1` and stored at
+full precision.
 
 Each result row contains event identity, instrument, event/availability/anchor/aligned times,
 offset, price time, price, anchor price, and raw response. Missing leading or trailing observations
@@ -43,9 +46,26 @@ aligned anchor time and grouped into anchor-time clusters so cross-sectional eve
 remain together. A stationary block bootstrap resamples those ordered clusters jointly across all
 offsets.
 
+The resampling unit is the aligned anchor time only. The `overlap_cluster` column on the windows
+table (same-instrument windows that share a price observation) is carried as evidence but is **not**
+a resampling unit; the stationary block bootstrap over ordered anchor-time clusters is the only
+dependence adjustment applied. `EVENT_CLUSTERED_INFERENCE_AVAILABLE` therefore states
+`clustering_unit="aligned_anchor_time"`, `overlap_cluster_used_for_resampling=false`, and the number
+of overlap clusters with more than one event and the events they contain (`null` when a hand-built
+windows frame has no `overlap_cluster` column).
+
+The response result propagates every `WARN`, `FAIL`, and `UNKNOWN` finding of the supplied windows
+result unchanged (overlap, censoring, retrospective lookahead, unknown price adjustment), after its
+own finding and in the windows result's stored order, without duplicates. An audit that sees only
+the response therefore cannot miss them. This applies to both the inferential and the
+insufficient-support results.
+
 Stored outputs include mean response, pointwise percentile limits, simultaneous
 max-standardized-deviation bands, event/cluster counts, and pre-event diagnostics. Root entropy,
-stable substream identity, block configuration, and confidence are provenance.
+stable substream identity, block configuration, and confidence are provenance. A caller-supplied
+`seed` is also recorded as `metadata.seed` (null when no seed was given; the generated root entropy
+is then only in `parameters["root_entropy"]`). `events.event_response` is method version 2:
+version 2 adds the propagated findings, the explicit clustering-unit evidence, and `metadata.seed`.
 
 Fewer than the declared minimum clusters returns descriptive means with inferential fields `null`
 and an `UNKNOWN` finding. Zero-variance offsets likewise have no standardized simultaneous bound.

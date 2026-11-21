@@ -241,6 +241,22 @@ evidence, and later pushes compare against the corrected output.
 | Release | Case | Reason | Same-machine median, before → after |
 | --- | --- | --- | --- |
 | 0.14.1 | `study.audit` | Audit IC inference moved to one declared horizon over disjoint label intervals (`fe67d86`) | 907–949 ms → 726–772 ms (small tier, `--no-native`, three interleaved runs) |
+| Unreleased | `study.audit` | `QUANTILE_MONOTONICITY` and `PURGED_VALIDATION_SUPPLIED` rule version 2, single-horizon headline metrics, horizon tables ordered by length, and the midpoint turnover buckets | 762 ms → 800 ms |
+| Unreleased | `workflow.standard_audit.strategy` | Carries the `signal.ic`, `signal.quantiles`, and `signal.turnover` method version 2 evidence below | 3196 ms → 3164 ms |
+| Unreleased | `signal.ic.reference` | `signal.ic` method version 2: the headline describes the first declared horizon instead of pooling horizons | 282 ms → 280 ms |
+| Unreleased | `signal.quantiles` | `signal.quantiles` method version 2: single-horizon headline and horizon tables ordered by length | 62.0 ms → 64.4 ms |
+| Unreleased | `signal.decay.reference` | `signal.decay` method version 2: `n_spread_periods` replaces `n_periods_right`; `ic_decay` ordered by horizon length | 351 ms → 364 ms |
+| Unreleased | `signal.turnover` | `signal.turnover` method version 2: membership buckets use the balanced midpoint rule of `bucketize` | 19.8 ms → 20.2 ms |
+| Unreleased | `signal.turnover.multi_lag` | Same `signal.turnover` method version 2 change | 31.1 ms → 32.1 ms |
+| Unreleased | `signal.neutralize.grouped` | `signal.neutralize` method version 2: recorded categorical encoding and the columns named by the availability finding | 74.0 ms → 73.7 ms |
+| Unreleased | `signal.bucketize.grouped_nulls` | The availability finding records the group columns it concerns | 50.0 ms → 50.1 ms |
+| Unreleased | `adapters.factor_panel.chunked` | Adapter evidence records `absent_optional_columns` and the public `source_type` spelling | 0.10 ms → 0.11 ms |
+
+The Unreleased rows are the fastest of three interleaved small-tier `--no-native` runs per side on
+one development machine that was under other load (load average 5 to 7), where single-run medians
+varied by up to 20% for cases with no code change. Every changed case's best run is within about 5%
+of the comparison checkout. They show the corrections are not a material slowdown; they are not
+release evidence, which the same-runner CI job provides.
 
 For v0.14, native admission additionally requires the result to reproduce in both scheduled CI and
 the exact-source non-publishing release preflight. Import latency above 115% of the v0.13 same-runner

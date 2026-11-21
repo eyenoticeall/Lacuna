@@ -72,6 +72,8 @@ Support fixed per order/trade, per unit/share, and percentage of notional. Minim
 
 Half-spread assumes execution from mid to the relevant side. Full-spread may represent round-trip stress. If bid/ask is unavailable, a fixed-bps scenario is an assumption, not observed spread.
 
+For observed bid/ask, `SpreadModel` computes the quoted fraction as `(ask - bid) / reference_price` and charges `notional * fraction`, times 0.5 in half mode and 1.0 in full mode, where notional is `abs(quantity) * price`. It divides by the declared `reference_price` column, which equals the quote mid only when the caller supplies the mid as `reference_price`; the model does not compute or substitute the mid itself. It requires `bid > 0` and `ask >= bid`, and rejects missing or non-finite quotes.
+
 ### Fixed or percentage slippage
 
 Apply adverse price movement by side. A buy's execution price moves upward and a sell's downward. Tests verify sign symmetry.
@@ -93,6 +95,12 @@ The implementation defines volume horizon, cap/floor behavior, coefficient sourc
 ### Borrow cost
 
 Borrow cost integrates an annualized rate over a short exposure interval and notional. Missing borrow availability/rate produces unknown evidence or an explicit conservative scenario.
+
+`BorrowCostModel` is stateless and holds no position history. It charges every row with a negative
+signed quantity over that row's `holding_days`, so the caller declares the short exposure interval
+each row opens. A sell that closes or reduces a long position opens no short exposure: give it
+`holding_days = 0` or exclude it, otherwise it is charged as a short sale. Position-aware borrow
+accrual is not implemented.
 
 ## Composition
 
@@ -123,6 +131,12 @@ net Sharpe where defined
 turnover and sample support
 status/warnings
 ```
+
+Net Sharpe and CAGR are computed over the periods present in the trade ledger (the `period` column,
+grouped and summed). A period without a trade has no row and contributes no zero return, so the
+`annualization` supplied must describe traded periods; with a calendar-period annualization a sparse
+ledger overstates Sharpe. `stress`, `break_even_cost`, and `capacity_curve` attach a result warning
+saying so whenever `annualization` is given. Supplying a full period calendar is not implemented.
 
 The implementation validates the trade table once, evaluates each optional base model once, and
 stores its values and explicit validity in a private contiguous component batch. It preaggregates

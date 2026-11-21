@@ -69,6 +69,25 @@ The splitter defines incomplete final-window behavior, timezone/calendar handlin
 
 No random shuffle occurs.
 
+Duration conventions:
+
+- `train`, `test`, and `step` are either all observation counts (`int`, counted over sorted unique
+  observation times) or all calendar durations (`"5D"`, `"2W"`, `"3M"`, `"1Y"`).
+- A duration string in `WalkForward` is a **calendar** span: `"5D"` is five calendar days regardless
+  of how many observations they contain. This differs from `lacuna.labels.forward_returns`, where
+  `"5D"` is a count of observations.
+- Test windows are half-open `[test_start, test_end)`. Without `allow_incomplete=True`, a window is
+  kept only when the data fully cover it.
+- Calendar mode over `Date` times: each observation covers its whole day, so a window is complete
+  when `test_end <= last_observation + 1 day`. This agrees with observation-count mode, where a
+  window ending exactly at the last observation is kept, and ensures the last observation is
+  tested. A window ending two or more days past the last observation is incomplete.
+- Calendar mode over `Datetime` times: an instant has no implied bar length and Lacuna does not
+  infer cadence, so a window is complete only when `test_end <= last_observation`. Cast daily
+  `Datetime` bars to `Date`, or set `allow_incomplete=True`, to test the final window.
+- Method version 2 (from version 1) adds the `Date` coverage rule above; version 1 dropped a final
+  `Date` window ending exactly one day past the last observation.
+
 ## Purging
 
 Purging removes a training observation when its label interval overlaps any test label interval for the fold. It is based on earning intervals, not an arbitrary number of adjacent rows.
@@ -93,6 +112,10 @@ An embargo can be expressed as:
 - a fraction of available observations only in a later, explicitly named method.
 
 The output separates purged and embargoed samples so users can understand why data was excluded.
+
+`PurgedKFold` and `CombinatorialPurgedKFold` validate `n_splits`/`n_groups` and `embargo` at
+construction: each must be an `int` (not `bool`, `float`, or a duration string such as `"5D"`), or
+`MethodContractError` is raised. The embargo is an observation-period count only.
 
 ## Purged walk-forward
 
@@ -165,6 +188,9 @@ current block with probability `1 - p` or restarting uniformly with probability 
 block length is `1 / p`.
 
 The implementation validates positive expected length and records the exact parameterization.
+`expected_block_length` must be an integer between 1 and the sample size; `0` or a negative value is
+rejected (it does not fall back to the default), consistent with the joint bootstrap, Reality Check,
+and SPA.
 
 ## Confidence intervals
 
@@ -188,6 +214,15 @@ The p-value calculation defines whether the observed arrangement is included and
 
 The alternative (`two_sided`, `greater`, `less`) is explicit. A within-date signal test must not
 accidentally permute labels across dates.
+
+## Multiple testing
+
+`validation.multiple_testing` accepts an array, a frame, or an `ExperimentRegistry`. All three
+inputs pass through the same validation: at least one trial, the `null_policy` (`"raise"` by
+default), rejection of infinities, and every p-value in `[0, 1]`. A registry additionally requires
+every current trial to have a completed metric under the named `p_value` metric; a missing trial is
+a family-completeness error and is never dropped by `null_policy`, because dropping it would shrink
+the family and understate multiplicity.
 
 ## Sharpe inference
 

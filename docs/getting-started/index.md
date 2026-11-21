@@ -141,11 +141,27 @@ lacuna signal \
 lacuna bundle verify study.lacuna
 ```
 
+`lacuna bundle verify` prints `Integrity    verified` followed by `Authenticity not verified (use
+signed release/provenance channels separately)`. The check confirms the archive structure and the
+SHA-256 digests recorded inside the archive; it detects accidental corruption and partial edits. It
+is not authenticity: the bundle is unsigned, so someone who edits an artifact and also rewrites the
+manifest and digests produces an archive that still verifies. Establish provenance through a
+separate trusted channel.
+
+"Deterministic" here describes ordering and canonical encoding: for fixed evidence, resolved
+configuration, environment summary, and result timestamp, the report JSON/HTML and the bundle bytes
+are reproducible. Each run of the CLI computes new evidence stamped with the current UTC
+`created_at`, so two CLI runs over the same inputs produce different report timestamps and different
+bundle SHA-256 digests. Lacuna provides no `SOURCE_DATE_EPOCH` support or CLI option to pin
+`created_at`. Compare runs by their evidence (input fingerprints, metrics, findings), not by bundle
+digest; re-bundling the same stored `AuditReport` object yields identical bytes.
+
 Use `--format json` without `--out` for clean machine-readable stdout. Reports use exclusive file
 creation unless `--overwrite` is explicit. Parquet and Arrow-family files preserve typed temporal
-columns. The CSV scanner does not infer ISO date strings: encode `time` as a whole-number
-observation index, or convert it to a Date/Datetime column before writing Parquet or Arrow IPC.
-See the
+columns. For CSV input the declared time columns may hold whole-number observation indices or ISO 8601
+dates/datetimes (`YYYY-MM-DD`, or `YYYY-MM-DDTHH:MM:SS` with offsets on all values or none); only
+those columns are parsed, so identifier columns keep their inferred type. Unparseable time values
+fail with a data-contract error. See the
 [Alphalens migration guide](alphalens-migration.md) when converting an existing factor workflow.
 
 ## Configuration

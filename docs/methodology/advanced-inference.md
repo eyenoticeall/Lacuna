@@ -143,6 +143,16 @@ count must lie between one and the visible trial count. If omitted, Lacuna uses 
 records the independence assumption, and warns. It never infers the hidden number of experiments
 from the winning result. The `trial_sharpes` table preserves the full declared family.
 
+`SR*` includes the trial-family mean `mu_SR`, so it is the expected maximum of the declared family
+rather than the zero-mean special case, and the DSR threshold replaces `benchmark` instead of adding
+to it. The result (method version 2) reports two separate findings. `SHARPE_EXCEEDS_BENCHMARK` or
+`SHARPE_UNCERTAIN` is decided by PSR against `benchmark` alone and ignores selection; its evidence
+always records `selection_adjusted: false` and, when a trial family is supplied, names the deflated
+finding to read with it. When
+`trial_sharpes` is supplied, `DEFLATED_SHARPE_SUPPORTED` (`PASS`) or `DEFLATED_SHARPE_UNCERTAIN`
+(`WARN`, high severity) is decided by DSR against the same `confidence_level`, so a selected
+strategy cannot show only the undeflated verdict.
+
 PSR/DSR are asymptotic moment-based procedures. Short samples, unstable fourth moments,
 autocorrelation, changing strategy behavior, unrecorded trials, and post-selection edits can make
 the result misleading even when the calculation is exact.

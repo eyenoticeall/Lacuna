@@ -18,7 +18,11 @@ class MethodContractError(LacunaError, ValueError):
 
 
 class NativeExtensionError(LacunaError, RuntimeError):
-    """Raised when a required native capability is unavailable."""
+    """Reserved for a required native capability that is unavailable.
+
+    No current code path raises it: native kernels fall back to the reference
+    implementation and record the backend used.
+    """
 
 
 class ReportError(LacunaError, RuntimeError):

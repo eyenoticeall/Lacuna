@@ -153,6 +153,15 @@ Reproduction has levels:
 
 Reports must claim only the level verified.
 
+Native and reference backends are held to level 3, not level 4. For the same seed they generate
+identical resample indices, but floating-point reduction order differs, so results agree within the
+declared method tolerance rather than bit for bit. For example, the native and NumPy-reference
+bootstrap backends were observed to differ by about one ulp (units in the last place) in
+`confidence_lower` or `confidence_upper` at the same seed. Provenance records the backend, so a
+result is *numerically reproducible within tolerance* across backends and *bitwise reproducible*
+only for the same backend, platform, and dependency versions, where that has been verified. A cache
+or comparison that requires equal bytes must include the backend in its key.
+
 Bundle v1 claims only level 1. A checksummed archive establishes identity and corruption detection;
 it does not make inaccessible data accessible, run a computation, compare numerical tolerances, or
 authenticate the author. Higher-level claims remain future work.

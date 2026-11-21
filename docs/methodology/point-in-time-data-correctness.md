@@ -67,7 +67,17 @@ a genuinely absent historical record.
 Two records with the same identity and availability time are ambiguous unless an explicit revision
 column resolves the tie. Incidental input order is never a version policy. With a revision field,
 the greatest declared revision at the latest admissible availability time wins; duplicate
-identity/availability/revision rows are rejected.
+identity/availability/revision rows are rejected. The `asof_join` revision column must have a
+declared order (integer, finite float, Date, Datetime, Duration, or Enum). String and categorical
+revisions sort lexicographically (`"10"` below `"9"`) and are rejected with `DataContractError`.
+
+`effective_time` is validated as a time column and recorded in provenance, but it does not affect
+matching: admissibility and recency are decided by availability time, with `revision` resolving
+ties. The result carries a warning saying so whenever `effective_time` is supplied.
+
+`tolerance` must match the time column's units: a whole number for integer time, or a `timedelta`
+or fixed-length duration string (`ns`, `us`, `ms`, `s`, `m`, `h`, `d`, `w`) for Date, Datetime, and
+Duration time. Calendar-variable units and mismatched types raise `MethodContractError`.
 
 `revision_mode` records what the source can establish:
 

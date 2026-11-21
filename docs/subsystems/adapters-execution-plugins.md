@@ -49,7 +49,14 @@ state, adapter assumptions, column counts, and eager row count when known.
 
 Mapping APIs take `canonical -> source`, not the inverse. They reject empty names, duplicate source
 targets, missing required canonical fields, and renames that would overwrite an unrelated existing
-canonical column. They preserve row order and extra columns. Normalization is not authorization to
+canonical column. A mapped column that is not required may be absent from the data: it is skipped
+rather than failing inside Polars, listed in the evidence parameter `absent_optional_columns`, and
+its canonical name is still protected against an unrelated source column of the same name. A vendor
+schema whose declared semantics depend on an absent column is rejected with `DataContractError`:
+`point_in_time` needs the mapped `available_time` source, and `versioned` needs at least one mapped
+revision source. Evidence records `source_type` with the public spelling (`polars.DataFrame`,
+`polars.LazyFrame`, `pandas.DataFrame`, `pyarrow.Table`), the same as label and study diagnostics.
+They preserve row order and extra columns. Normalization is not authorization to
 sort, impute, join, aggregate, deduplicate, or reinterpret identifiers.
 
 ## Generic factor-panel ingestion
@@ -122,7 +129,9 @@ path when encountered. The adapter never accepts or creates SQL, so query constr
 parameter binding remain with the caller.
 
 The stream enters Polars through the ordinary Arrow boundary; pandas is never an intermediate.
-`batch_size` is a positive integer, `required` names unique non-empty fields, and the result evidence
+The stream is always consumed eagerly into a `polars.DataFrame`. `collect` stays in the signature for
+compatibility but must be `True`; `collect=False` raises `MethodContractError` rather than being
+ignored. `batch_size` is a positive integer, `required` names unique non-empty fields, and the result evidence
 records the reader method, batch size, materialization state, copy classification, columns, and row
 count when eager. DuckDB itself is neither imported nor required at core import time.
 
@@ -281,11 +290,17 @@ lacuna signal \
 ```
 
 Parquet, CSV, Arrow IPC, and Feather inputs are scanned lazily before the public services apply
-their explicit materialization boundary. Requested results go to stdout; file-write diagnostics and
+their explicit materialization boundary. For CSV, only the declared `--signal-time` and
+`--price-time` columns are parsed when Polars reads them as text: `YYYY-MM-DD` becomes `Date`, and
+ISO 8601 datetimes become `Datetime` (timezone-aware UTC when every value carries an offset, naive
+when none does; mixing is rejected). Other columns, including instrument identifiers that look like
+dates or numbers, keep the type Polars infers. Whole-number time columns are unchanged, and
+unparseable time text is a `DataContractError`. Reading the time column once to validate it is the
+only eager CSV read before the study's own boundary. Requested results go to stdout; file-write diagnostics and
 errors go to stderr. Existing artifacts are not replaced without `--overwrite`. Exit code `0` means
 execution completed under the requested finding policy, `1` means execution failed, and `3` means
 `--fail-on fail` or `--fail-on warn` matched an audit finding. `--format json` emits JSON without
-progress or color sequences. `--no-color` is accepted and terminal output is currently plain text.
+progress or color sequences. `--no-color` is accepted for compatibility and has no effect: the CLI never emits color sequences.
 
 v0.8 adds a second thin path over `standard_audit`:
 

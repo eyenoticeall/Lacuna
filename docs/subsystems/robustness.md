@@ -55,12 +55,16 @@ The surface table contains one row per attempted point:
 
 ```text
 parameter columns
+point_id            (fingerprint of the point's parameters)
 status
 objective
-sample count
+error_category
 warnings
-runtime/fingerprint
+grid_index          (ordered-grid indices)
 ```
+
+The result also carries a `selected_neighborhood` table with the same columns. Per-point sample
+count and runtime/fingerprint columns are planned and not emitted in v0.14.1.
 
 Failed points remain visible. Silently dropping failures can make a boundary optimum look stable.
 
@@ -78,18 +82,31 @@ Categorical and continuous parameters are not treated as the same distance witho
 
 ## Stability components
 
-Expose components:
+Implemented in `validation.parameter_surface` (v0.14.1). Adjacency is fixed to
+`ordered_grid_manhattan` over each parameter's declared ordered grid, with `neighborhood_radius`
+grid steps; the other neighborhood definitions listed above are not implemented.
 
-- neighborhood median and dispersion;
-- fraction positive/profitable;
-- fraction passing a declared evidence threshold;
-- local gradient and curvature where meaningful;
-- peak isolation ratio;
-- plateau width/connected component;
-- rank persistence across folds or subperiods;
-- failed/undefined neighborhood fraction.
+Emitted metrics:
 
-An isolated-peak finding records the selected point, neighborhood definition, local summary, and threshold.
+- `neighbor_count` and `local_median` / `local_mad` (median and median absolute deviation of
+  successful neighbors);
+- `isolation_score`: the selected objective's gap to the neighborhood median, in units of the
+  neighborhood MAD (floored away from zero), and `objective_to_local_median_ratio`;
+- `plateau_width`: the number of grid points in the connected component (unit Manhattan steps) of
+  points within `plateau_tolerance` (relative) of the selected objective;
+- `neighbor_positive_fraction`, and `neighbor_passing_fraction` when `evidence_threshold` is given;
+- `neighbor_failed_fraction`, `failed_points`, and `boundary_parameters` (dimensions where the
+  selected point sits on the grid edge).
+
+Emitted findings: `PARAMETER_ISOLATED_OPTIMUM` (warning when `isolation_score >=
+isolation_threshold` and `plateau_width == 1`; records the isolation score, threshold, local
+median/MAD, and plateau width), `PARAMETER_LOCAL_STABILITY`, `PARAMETER_ISOLATION_UNKNOWN` (fewer
+than two successful neighbors), `PARAMETER_BOUNDARY_OPTIMUM`, `PARAMETER_SURFACE_FAILURES`,
+`PARAMETER_SELECTION_SAMPLE_UNKNOWN`, `PARAMETER_SELECTION_REUSE`, and
+`PARAMETER_SELECTION_SEPARATION`. The neighborhood definition is recorded in the result parameters.
+
+Planned, not implemented: local gradient and curvature estimates, and rank persistence across folds
+or subperiods. `subperiod_analysis` reports per-period metrics and does not compute rank persistence.
 
 ## Selection separation
 
@@ -168,6 +185,25 @@ The provider contract defines:
 
 A full-sample quantile used to label earlier “high volatility” periods is not point-in-time safe unless explicitly treated as retrospective descriptive analysis.
 
+### Point-in-time findings (method version 2)
+
+`quantile_regimes` keeps two claims separate for the `fixed`, `expanding`, and `rolling` methods:
+
+- `REGIME_THRESHOLDS_POINT_IN_TIME` (`PASS`): the thresholds are caller-supplied or strictly
+  trailing and are not fitted to the classified or later values. It says nothing about when the
+  classified values were published.
+- Source availability: without `available_time` the result carries
+  `REGIME_SOURCE_AVAILABILITY_UNKNOWN` (`UNKNOWN`); with it, `REGIME_SOURCE_AVAILABLE` (`PASS`) or
+  `REGIME_SOURCE_NOT_AVAILABLE` (`FAIL`, rows with `available_time > time`).
+
+`regime_analysis` receives only a table, so `classification_mode` is a caller declaration that is
+not checked against how the labels were built. The result records
+`classification_provenance="declared_unverified"`, and a `point_in_time` result carries a warning
+that labels and outcomes are paired on the same time key: Lacuna cannot verify that the outcome
+starts after its label was available or that the label inputs were point-in-time. `regime_analysis`
+does not yet accept a `quantile_regimes` result as input, so no cross-check of mode against label
+provenance exists; that is open work. `quantile_regimes` is method version 2.
+
 ## Conditional evidence
 
 For each regime, report:
@@ -181,6 +217,13 @@ For each regime, report:
 - fraction of total observations and outcome.
 
 Small regimes remain visible with an insufficient-evidence state.
+
+`regime_analysis` implements this for one supplied outcome column. Its `conditional_evidence` table
+has `mean_outcome`, `standard_deviation`, `sharpe`, `hit_rate`, `maximum_drawdown`, `total_outcome`,
+`sample_count`, `raw_observations`, `excluded_outcomes`, `effective_sample_size`, `confidence_lower`,
+`confidence_upper`, `observation_share`, `net_outcome_share`, `absolute_outcome_share`, and
+`leave_one_regime_out_total`. Per-regime turnover and per-regime IC/spread are not computed; pass a
+precomputed per-period metric as the outcome to condition it on regimes.
 
 ## Concentration
 

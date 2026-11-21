@@ -236,11 +236,11 @@ The implemented rule set is:
 | --- | ---: | --- | --- |
 | `IC_DEFINED` | 12 | `ic` | rule v2: IC exists for the declared inference horizon |
 | `IC_PERIOD_SUPPORT` | 12 | `ic` | rule v2: inference-horizon periods; pass at 60, warn at 20 |
-| `QUANTILE_MONOTONICITY` | 10 | `quantiles` | pass at 0.7, warn at 0.4 |
+| `QUANTILE_MONOTONICITY` | 10 | `quantiles` | rule v2: pass at 0.7, warn at 0.4, read from the `inference_horizon` row of the monotonicity table; unknown for multi-horizon evidence without a matching `inference_horizon` policy |
 | `BOOTSTRAP_INTERVAL` | 12 | `bootstrap` | rule v2: pass if positive with at least 30 resampled periods |
 | `HORIZON_DECAY_COVERAGE` | 10 | `decay` | rule v2: pass at three horizons with defined IC, warn at two; unknown without the `ic_decay` table |
 | `LABEL_INTERVALS_PRESENT` | 10 | `labels` | explicit forward-label timing evidence |
-| `PURGED_VALIDATION_SUPPLIED` | 10 | `split` | evidence must come from `cv.purged_kfold` |
+| `PURGED_VALIDATION_SUPPLIED` | 10 | `split` | rule v2: evidence must come from `cv.purged_kfold` or `cv.combinatorial_purged_kfold` and report its purge count; warn when nothing was purged although the inference horizon spans two or more observations (consecutive labels of that horizon overlap a test boundary; only a split of non-overlapping sampled labels purges nothing). Split evidence carries no input fingerprint, so a pass does not verify the split was built from the audited labels (`data_identity_verified: false`) |
 | `PRICE_ADJUSTMENT_DECLARED` | 8 | `labels` | adjustment semantics are not unknown |
 | `DELISTING_HANDLING_DECLARED` | 8 | `labels` | a delisting-return field was supplied |
 | `TURNOVER_MEASURED` | 4 | `turnover` | rank turnover is defined |
@@ -313,8 +313,12 @@ persists the corresponding format with exclusive creation by default; pass `over
 explicitly to replace a file. `write(path, format=...)` is the format-selecting equivalent.
 
 `AuditReport.bundle(path, ...)` creates the versioned portable evidence boundary. It stores those
-same projections, never recomputes them, and may add named `AnalysisResult` evidence. The archive's
-internal SHA-256 verification is not an authenticity signature. See the
+same projections, never recomputes them, and may add named `AnalysisResult` evidence. Bundle
+verification (`verify_bundle`, `lacuna bundle verify`) reports `integrity_verified: true` and
+`authenticity_verified: false`; the CLI prints `Integrity    verified` and `Authenticity not verified
+(use signed release/provenance channels separately)`. The digests live inside the archive, so
+verification detects accidental corruption and partial edits but is not an authenticity signature:
+an edit that also rewrites the manifest and digests still verifies. See the
 [bundle v1 reference](../reference/reproducibility-bundle.md).
 
 ## HTML and plots

@@ -127,6 +127,8 @@ root seed + method version
 
 Record the root seed and RNG algorithm/version. Differential tests compare native and reference index generation on small fixtures.
 
+Identical random streams do not make native and reference results bit-identical. The native kernel reduces in a different floating-point order, so for the same seed bootstrap results such as `confidence_lower` and `confidence_upper` agree to about one ulp, not exactly. Claim *numerically reproducible within the declared tolerance* across backends, not *bitwise reproducible*; differential tests compare outputs with method-specific absolute and relative tolerances, never exact equality.
+
 ## Numerical policy
 
 - Default to `f64`.

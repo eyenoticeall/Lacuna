@@ -97,7 +97,7 @@ Stable-ABI wheels support CPython 3.11+ on Linux x86-64/arm64, macOS arm64, and 
 | **Overfitting** | Bootstrap and permutation inference, PBO/CSCV, PSR/DSR, Reality Check, SPA, and multiple-testing correction |
 | **Fragile conclusions** | Parameter surfaces, perturbations, subperiods, regimes, universe transitions, and append-only trial history |
 | **Unrealistic trading assumptions** | Commission, spread, slippage, impact, borrow, stress, break-even, liquidity, and capacity evidence |
-| **Unreproducible research** | Immutable `AnalysisResult` values, standardized audits, deterministic JSON/HTML, and verifiable `.lacuna` bundles |
+| **Unreproducible research** | Immutable `AnalysisResult` values, standardized audits, canonical JSON/HTML with deterministic ordering and encoding for fixed evidence, and `.lacuna` bundles whose internal SHA-256 integrity is verifiable (integrity, not authenticity: bundles are unsigned) |
 
 Additional support includes availability-anchored event studies, generic factor-panel ingestion,
 DuckDB and scikit-learn adapters, Arrow-compatible and optional pandas boundaries, and an

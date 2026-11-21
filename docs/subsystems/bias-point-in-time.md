@@ -59,6 +59,29 @@ It should return the joined table plus evidence containing:
 - violations rejected before joining;
 - resolved column mappings and time-zone assumptions.
 
+### Implemented parameter semantics
+
+- **`effective_time`** is validated as a time column on the right input and recorded in
+  provenance. It does **not** affect matching: admissibility and recency use `available_time`
+  alone, with `revision` resolving availability ties, and the result carries a warning saying so.
+  Consequently a late restatement of an older period outranks a newer period's first print.
+  Whether matching should additionally order by effective time is an open design question; no
+  such semantics are defined or implied.
+- **`tolerance`** must match the unit system of the decision-time column. Integer (or
+  whole-number float) time takes a non-negative whole number of index units. Date, Datetime,
+  and Duration time take a `timedelta` or a fixed-length duration string built from `ns`, `us`,
+  `ms`, `s`, `m`, `h`, `d`, `w` (for example `"30d"`, `"1h30m"`). A bare number on temporal time,
+  a duration string on index time, negative strings, uppercase units, and calendar-variable units
+  (`mo`, `q`, `y`) are rejected with `MethodContractError` before any join runs.
+- **`revision`** must have an intended sort order: integer, finite float, Date, Datetime,
+  Duration, or Enum (declared category order). String and categorical revisions are rejected
+  with `DataContractError` because they sort lexicographically (`"10"` ranks below `"9"`); cast
+  to an integer or declare an Enum. The dtype is checked whenever `revision` is declared, not only
+  when ties exist.
+- **`future_matches`** is computed from the joined output (matched rows whose availability is
+  later than the decision time) rather than asserted. A nonzero count raises rather than returning
+  a frame containing future data.
+
 The implementation must sort deliberately or prove that input ordering is valid. It must not mutate either input and must preserve the left row identity.
 
 ### Invariants
@@ -111,6 +134,16 @@ The audit distinguishes:
 - **unknown**: the source cannot establish historical membership.
 
 Unknown is not equivalent to pass. However, it should not be converted into a failure without evidence.
+
+A `confirmed_safe` declaration is corroborated only when the delisted column marks at least one
+row. If it marks none (all `False` or null), `survivorship_diagnostics` emits
+`BIAS_SURVIVORSHIP_DELISTINGS_NOT_OBSERVED` (`UNKNOWN`) instead of `BIAS_SURVIVORSHIP_SAFE`.
+
+`universe_drift` compares consecutive snapshots, so drift is undefined for a universe with fewer
+than two snapshots. Any such universe (including one hidden behind another universe's
+transitions) yields `BIAS_UNIVERSE_DRIFT_UNDEFINED` (`UNKNOWN`), never
+`BIAS_UNIVERSE_DRIFT_MEASURED`, and `mean_drift` / `maximum_drift` are `null` when there are no
+transitions. Both methods are at `method_version` 2.
 
 ## Materiality
 

@@ -40,8 +40,11 @@ Values at or below the lower threshold receive `low`; values at or above the upp
 `high`; other finite values receive `middle`. All four labels are configurable and must be unique.
 
 An optional availability column must have the same physical time dtype as the observation time.
-Rows where `available_time > time` produce a failing point-in-time finding. Absence of an
-availability column does not alter threshold arithmetic; it limits what the provenance can prove.
+Rows where `available_time > time` produce a failing point-in-time finding
+(`REGIME_SOURCE_NOT_AVAILABLE`). Absence of an availability column does not alter threshold
+arithmetic; it limits what the provenance can prove: `quantile_regimes` then reports
+`REGIME_SOURCE_AVAILABILITY_UNKNOWN` alongside the narrower `REGIME_THRESHOLDS_POINT_IN_TIME` pass,
+which covers only how thresholds were fitted.
 Retrospective classification always carries a high-severity descriptive-only warning.
 
 ## User-defined regimes

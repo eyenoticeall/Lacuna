@@ -77,6 +77,10 @@ policy declarations never substitute for missing evidence. See
 Exports: `Applicability`, `ApplicabilityState`, `AuditContext`, `AuditRule`, `audit`, `default_rules`,
 `run_audit`.
 
+On the package root, `lacuna.audit` is the `audit` function and shadows this module: `lc.audit.default_rules`
+does not resolve. Use `from lacuna.audit import ...` or the root re-exports `lc.Applicability`,
+`lc.ApplicabilityState`, `lc.AuditContext`, `lc.AuditRule`, `lc.default_rules`, and `lc.run_audit`.
+
 ## `lacuna.audit_profiles`
 
 Defines versioned signal, strategy, and options evidence inventories and composes recognized source

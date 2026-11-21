@@ -61,8 +61,20 @@ no sample standard deviation, ratio, or t-statistic. Fewer than 20 defined group
 
 With long-form labels, IC is evaluated separately by observation period and horizon. The
 `ic_by_horizon` table reports mean, median, sample standard deviation, information ratio, defined-period
-count, and observation count per horizon. It is an aggregation of the period ICs, not a pooled
-cross-section.
+count, and observation count per horizon, ordered by horizon length. It is an aggregation of the
+period ICs, not a pooled cross-section.
+
+Different horizons are different estimands, so the top-level metrics (`mean_ic`, `median_ic`,
+`std_ic`, `ic_information_ratio`, `t_statistic`, `positive_fraction`, `n_periods`,
+`n_observations`) describe exactly one horizon and never average across them. For a `LabelResult`
+that is the first horizon in its declared order, the same default `SignalStudy.audit` uses for
+inference; the result records it as `headline_horizon`. The headline stays on that horizon even
+when it has no aligned rows (the metrics are then empty), and never moves to a later horizon that
+happens to have data. A bare label frame with several horizons
+declares no order: those metrics are null and the result carries `IC_HEADLINE_HORIZON_UNDECLARED`
+(`UNKNOWN`) instead of preferring a horizon by text order. `IC_PERIOD_SUPPORT_LOW` counts the headline
+horizon's defined periods. `signal.ic.*` is method version 2; version 1 pooled every
+(period, horizon) row into the headline.
 
 ## Example
 
