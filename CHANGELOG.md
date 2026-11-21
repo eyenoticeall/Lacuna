@@ -107,6 +107,10 @@ inputs that were previously accepted; each names the method or rule version that
 - `regime.regime_analysis` records `classification_provenance="declared_unverified"` and warns that
   a `point_in_time` mode is a caller declaration.
 - `--no-color` is documented as a compatibility no-op; the CLI never emits color.
+- Wheels no longer include the private `lacuna._migration_benchmark` module, which is release and
+  CI tooling rather than runtime code. It remains in the repository and the source distribution.
+  The corrections in this release took the wheel past the 20% growth limit against the v0.13
+  baseline; removing the tooling keeps it inside that limit without changing the limit.
 
 ### Extension
 

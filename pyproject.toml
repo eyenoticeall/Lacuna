@@ -86,6 +86,11 @@ include = [
   { path = "LICENSE", format = "sdist" },
   { path = "schemas/**/*", format = "sdist" },
 ]
+# Release and CI tooling, not runtime: it stays in the repository and the source
+# distribution, and is run from a source checkout by the migration-benchmark script.
+exclude = [
+  { path = "python/lacuna/_migration_benchmark.py", format = "wheel" },
+]
 
 [tool.uv]
 cache-keys = [
