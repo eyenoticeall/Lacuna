@@ -2,7 +2,7 @@
 
 All notable changes to Lacuna will be documented here. The project intends to follow [Semantic Versioning](https://semver.org/) once its public release process begins.
 
-## [Unreleased]
+## [0.14.2] - 2026-11-21
 
 Corrections from a documentation-driven review of 0.14.1. Several entries change results or reject
 inputs that were previously accepted; each names the method or rule version that identifies it.
@@ -107,6 +107,12 @@ inputs that were previously accepted; each names the method or rule version that
 - `regime.regime_analysis` records `classification_provenance="declared_unverified"` and warns that
   a `point_in_time` mode is a caller declaration.
 - `--no-color` is documented as a compatibility no-op; the CLI never emits color.
+
+### Extension
+
+- Publish `lacuna-options` 0.2.2 with its own corrections: Decimal columns are rejected with a
+  contract error, close delta-bucket edges keep distinct labels, and derived or residual columns no
+  longer overwrite same-named inputs. Its `lacuna-quant>=0.13,<0.15` range is unchanged.
 
 ### Documentation
 

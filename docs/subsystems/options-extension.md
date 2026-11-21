@@ -1,7 +1,7 @@
 # Options-research extension
 
 **Status:** implemented as the separately versioned `lacuna-options` package for the Lacuna 0.6
-milestone. The `0.2.1` release target supports the PyPI core distribution through Lacuna 0.14; it
+milestone. The `0.2.2` release target supports the PyPI core distribution through Lacuna 0.14; it
 remains optional and is not a core dependency.
 
 The extension provides empirical option-chain normalization and transparent derived coordinates.
@@ -35,6 +35,9 @@ range and migration notes.
 
 `0.2.0` changed distribution identity; `0.2.1` only widens the compatible core range after joint
 installation against both supported core minors. Neither release changes analytical semantics.
+`0.2.2` is a correction release: it rejects Decimal numeric columns with a contract error, keeps
+distinct labels for delta-bucket edges closer than 0.01, and refuses to overwrite input columns
+with derived or residual columns. Its core range is unchanged.
 Older `0.1.x` releases depend on the historical distribution named `lacuna`, while `0.2.x` safely
 depends on `lacuna-quant`.
 

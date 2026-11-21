@@ -134,7 +134,7 @@ Use Lacuna's exception hierarchy:
 
 - `DataContractError` for invalid schema, semantics, or unsupported input;
 - `ConfigurationError` for invalid execution or method configuration;
-- `NativeExtensionError`, exported from the package root and reserved for failures that require an unavailable native module. It is not raised anywhere in v0.14.1: when the native extension is missing, `use_native=True` paths fall back to the Python reference implementation, `lacuna.native.native_status()` reports availability, and the diagnostics report the state. Do not write code that depends on catching it yet;
+- `NativeExtensionError`, exported from the package root and reserved for failures that require an unavailable native module. It is not raised anywhere in v0.14.2: when the native extension is missing, `use_native=True` paths fall back to the Python reference implementation, `lacuna.native.native_status()` reports availability, and the diagnostics report the state. Do not write code that depends on catching it yet;
 - method-specific subclasses only when callers can act on them differently.
 
 Errors state what was expected, what was observed, and how to correct it. Avoid broad exception swallowing around numerical or adapter calls.

@@ -64,7 +64,7 @@ grid_index          (ordered-grid indices)
 ```
 
 The result also carries a `selected_neighborhood` table with the same columns. Per-point sample
-count and runtime/fingerprint columns are planned and not emitted in v0.14.1.
+count and runtime/fingerprint columns are planned and not emitted in v0.14.2.
 
 Failed points remain visible. Silently dropping failures can make a boundary optimum look stable.
 
@@ -82,7 +82,7 @@ Categorical and continuous parameters are not treated as the same distance witho
 
 ## Stability components
 
-Implemented in `validation.parameter_surface` (v0.14.1). Adjacency is fixed to
+Implemented in `validation.parameter_surface` (v0.14.2). Adjacency is fixed to
 `ordered_grid_manhattan` over each parameter's declared ordered grid, with `neighborhood_radius`
 grid steps; the other neighborhood definitions listed above are not implemented.
 

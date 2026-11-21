@@ -279,10 +279,17 @@ labels, counts only defined horizons for decay coverage, and honors the robustne
 for constraint errors. The four affected audit rules are at rule version 2; see
 [Audit scoring](../methodology/audit-scoring.md#signal-study-assembly).
 
+`0.14.2` is a second correctness patch within the line, from a documentation-driven review of
+0.14.1. Unlike 0.14.1 it increments analytical method versions, because the corrections change
+results: multi-horizon headline metrics describe one horizon instead of pooling them, membership
+turnover uses the same balanced bucket rule as quantiles, and several findings stop passing on
+evidence that cannot establish safety. Public signatures, the schema-v1 result envelope, c14n-v1
+identities, and RNG streams are preserved. The changelog names every method and rule version.
+
 ## Open follow-ups from the 0.14.1 review
 
-A documentation-driven review of 0.14.1 in November 2026 produced the corrections listed under
-**Unreleased** in the changelog. The items below were found in the same review and deliberately
+A documentation-driven review of 0.14.1 in November 2026 produced the corrections released as
+0.14.2. The items below were found in the same review and deliberately
 left open. Each is its own change: none is a quick patch, and several alter scoring, persisted
 identities, or methodology. They are recorded here so they are not rediscovered from scratch.
 
@@ -334,15 +341,13 @@ one horizon and never pool horizons, and every balanced quantile assignment uses
 | Open | `lacuna-options` evidence carries no `input_fingerprint`. | The core fingerprint helpers that handle timezones portably are private; the extension needs a public one, and a decision on what the fingerprint covers. | `extensions/lacuna-options/CHANGELOG.md` ("Deferred"); `_frames.frame_records`. |
 | Open | `NativeExtensionError` is exported but never raised. | Removing an export breaks the frozen API; raising it needs a capability that has no fallback. | `python/lacuna/exceptions.py`. |
 
-### Before the release that ships the Unreleased corrections
+### Release follow-through
 
-- Run the gates that were not run on the development machine: `cargo clippy`, `cargo test`,
-  `uv build`, and the pandas, pyarrow, DuckDB, and scikit-learn paths.
-- Expect the same-runner benchmark guard to fail once on the ten changed checksums recorded in the
-  [performance guide](performance.md). The recorded timings were taken on a loaded machine; replace
-  them with the CI job's same-runner numbers.
-- The website documentation describes released behavior. It needs an update pass when the release
-  ships, including the turnover bucket rule and the multi-horizon headline definition.
+- The same-runner benchmark guard fails once, by design, on the push that changes the ten
+  checksums recorded in the [performance guide](performance.md). The timings recorded there were
+  taken on a loaded development machine and should be read as bounds, not as release evidence.
+- The website documentation describes released behavior and needs an update pass for 0.14.2,
+  including the turnover bucket rule and the multi-horizon headline definition.
 
 ## Historical v0.1 boundary
 
