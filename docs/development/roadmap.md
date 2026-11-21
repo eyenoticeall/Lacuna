@@ -343,9 +343,9 @@ one horizon and never pool horizons, and every balanced quantile assignment uses
 
 ### Release follow-through
 
-- The same-runner benchmark guard fails once, by design, on the push that changes the ten
-  checksums recorded in the [performance guide](performance.md). The timings recorded there were
-  taken on a loaded development machine and should be read as bounds, not as release evidence.
+- The same-runner benchmark guard failed once, by design, on the push that changed the ten
+  checksums recorded in the [performance guide](performance.md), which holds the same-runner
+  timings for each.
 - The website documentation describes released behavior and needs an update pass for 0.14.2,
   including the turnover bucket rule and the multi-horizon headline definition.
 
