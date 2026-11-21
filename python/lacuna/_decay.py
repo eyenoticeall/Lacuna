@@ -90,6 +90,7 @@ def _result_without_half_life(
                 "optimizer": "scipy.optimize.curve_fit",
                 "bounds": "amplitude>0,tau>0",
             },
+            seed=seed,
         ),
         metrics={
             "amplitude": candidate_amplitude,
@@ -416,6 +417,7 @@ def fit_decay(
                 "bounds": {"amplitude": (0.0, None), "tau": (0.0, tau_upper)},
                 "scipy_version": scipy.__version__,
             },
+            seed=seed,
         ),
         metrics={
             "amplitude": amplitude,

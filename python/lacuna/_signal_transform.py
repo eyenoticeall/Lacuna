@@ -213,20 +213,42 @@ def _normalized_by(by: str | Sequence[str], *, time: str) -> tuple[str, ...]:
 
 
 def _availability_finding(
-    *, grouped: bool, availability_column: str | None, verified: bool
+    *,
+    grouped: bool,
+    availability_column: str | None,
+    verified: bool,
+    group_columns: Sequence[str] = (),
+    exposure_columns: Sequence[str] = (),
 ) -> tuple[Finding, ...]:
+    """Describe availability of externally supplied group and exposure attributes.
+
+    The finding concerns attributes joined to the signal, not the observation time used as a
+    grouping key. ``grouped=False`` means no such attribute participates, so nothing is emitted.
+    """
+
     if not grouped:
         return ()
+    subjects = {
+        "group_columns": tuple(group_columns),
+        "exposure_columns": tuple(exposure_columns),
+    }
+    named = "; ".join(
+        f"{label.replace('_', ' ')}: {', '.join(cols)}" for label, cols in subjects.items() if cols
+    )
+    subject_text = f" ({named})" if named else ""
     if verified:
         return (
             Finding(
                 code="GROUP_AVAILABILITY_VERIFIED",
                 title="Group attributes satisfy the availability cutoff",
-                message="Every grouped row was available by its observation time.",
+                message=(
+                    f"Every row of the supplied attributes{subject_text} was available by its "
+                    "observation time."
+                ),
                 state=FindingState.PASS,
                 severity=Severity.INFO,
                 category="temporal_integrity",
-                evidence={"available_time_column": availability_column},
+                evidence={"available_time_column": availability_column, **subjects},
             ),
         )
     return (
@@ -234,11 +256,13 @@ def _availability_finding(
             code="GROUP_AVAILABILITY_UNKNOWN",
             title="Group availability is not established",
             message=(
-                "Grouped analysis cannot prove that classifications were historically available."
+                f"Without an available_time column Lacuna cannot prove that the supplied "
+                f"attributes{subject_text} were historically available at the observation time."
             ),
             state=FindingState.UNKNOWN,
             severity=Severity.HIGH,
             category="temporal_integrity",
+            evidence={"available_time_column": None, **subjects},
         ),
     )
 
@@ -642,6 +666,7 @@ def bucketize(
             grouped=any(key != "observation_time" for key in normalized_by),
             availability_column=available_time,
             verified=availability_verified,
+            group_columns=tuple(key for key in normalized_by if key != "observation_time"),
         )
     )
     if effective < selected.count:
@@ -895,10 +920,14 @@ def neutralize(
         for name in continuous:
             columns.append(group.get_column(name).to_numpy().astype(np.float64, copy=False))
             coefficient_identity.append((name, "continuous", None))
-        for name in categorical_names:
+        for categorical_index, name in enumerate(categorical_names):
             raw_values = group.get_column(name).to_list()
             levels = _stable_levels(raw_values)
-            for level in levels[1:]:
+            # With an intercept every categorical drops a reference level. Without one, the
+            # first categorical keeps its full dummy set (it spans the constant, so the fit is
+            # still identified); later categoricals drop a reference level to stay full rank.
+            kept_levels = levels if not intercept and categorical_index == 0 else levels[1:]
+            for level in kept_levels:
                 columns.append(
                     np.asarray([value == level for value in raw_values], dtype=np.float64)
                 )
@@ -979,6 +1008,14 @@ def neutralize(
             grouped=True,
             availability_column=available_time,
             verified=availability_verified,
+            # Availability is only checked on the frame that carries ``available_time``; group
+            # columns taken from a separate signal frame are not covered by that check.
+            group_columns=(
+                ()
+                if availability_verified and exposure_data is not None
+                else tuple(key for key in normalized_by if key != "observation_time")
+            ),
+            exposure_columns=exposure_names,
         )
     )
     if rank_deficient_groups:
@@ -1019,7 +1056,7 @@ def neutralize(
     evidence = AnalysisResult(
         metadata=ResultMetadata(
             method="signal.neutralize",
-            method_version=1,
+            method_version=2,
             parameters={
                 "exposures": exposure_names,
                 "categorical": categorical_names,
@@ -1027,6 +1064,11 @@ def neutralize(
                 "weight": weight,
                 "available_time": available_time,
                 "intercept": intercept,
+                "categorical_encoding": (
+                    "reference_level_drop_per_categorical"
+                    if intercept
+                    else "full_dummies_first_categorical_reference_drop_others"
+                ),
                 "minimum_residual_df": min_residual_df,
                 "insufficient_policy": insufficient_policy,
                 "null_policy": null_policy,

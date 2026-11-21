@@ -307,29 +307,65 @@ def quantile_regimes(
                 category="bias",
             )
         )
-    elif future_availability:
-        findings.append(
-            Finding(
-                code="REGIME_SOURCE_NOT_AVAILABLE",
-                title="Regime source was unavailable at observation time",
-                message="One or more point-in-time labels use a source published later.",
-                state=FindingState.FAIL,
-                severity=Severity.HIGH,
-                category="bias",
-                evidence={"future_available_rows": future_availability},
-            )
-        )
     else:
+        # Thresholds and source availability are separate claims. The threshold claim holds by
+        # construction for fixed (caller-supplied, not fitted to this series) and strictly
+        # trailing thresholds; whether each classified value was published by its observation
+        # time can only be established from an availability column.
         findings.append(
             Finding(
                 code="REGIME_THRESHOLDS_POINT_IN_TIME",
                 title="Regime thresholds exclude future observations",
-                message="Fixed or trailing thresholds do not use later source values.",
+                message=(
+                    "Fixed or strictly trailing thresholds are not fitted to the classified or "
+                    "later source values. This does not establish that the values were "
+                    "available at the decision time."
+                ),
                 state=FindingState.PASS,
                 severity=Severity.INFO,
                 category="bias",
+                evidence={"method": method},
             )
         )
+        if available_time is None:
+            findings.append(
+                Finding(
+                    code="REGIME_SOURCE_AVAILABILITY_UNKNOWN",
+                    title="Regime source availability is unknown",
+                    message=(
+                        "Without an availability column Lacuna cannot establish that each "
+                        "classified value was available at its observation time."
+                    ),
+                    state=FindingState.UNKNOWN,
+                    severity=Severity.MEDIUM,
+                    category="bias",
+                    evidence={"method": method, "available_time_column": None},
+                )
+            )
+        elif future_availability:
+            findings.append(
+                Finding(
+                    code="REGIME_SOURCE_NOT_AVAILABLE",
+                    title="Regime source was unavailable at observation time",
+                    message="One or more point-in-time labels use a source published later.",
+                    state=FindingState.FAIL,
+                    severity=Severity.HIGH,
+                    category="bias",
+                    evidence={"future_available_rows": future_availability},
+                )
+            )
+        else:
+            findings.append(
+                Finding(
+                    code="REGIME_SOURCE_AVAILABLE",
+                    title="Regime source was available by observation time",
+                    message="No supplied availability timestamp is later than its observation.",
+                    state=FindingState.PASS,
+                    severity=Severity.INFO,
+                    category="bias",
+                    evidence={"available_time_column": available_time},
+                )
+            )
     if unknown_count:
         findings.append(
             Finding(
@@ -359,7 +395,7 @@ def quantile_regimes(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="regime.quantile_regimes",
-            method_version=1,
+            method_version=2,
             parameters={
                 "time": time,
                 "value": value,
@@ -420,6 +456,17 @@ def _row_float(row: dict[str, JsonValue], key: str) -> float:
     if not isinstance(value, Real) or isinstance(value, bool):  # pragma: no cover - invariant
         raise RuntimeError(f"internal regime row {key!r} is not numeric")
     return float(value)
+
+
+# ``regime_analysis`` receives a bare label column. Every point-in-time call carries this
+# limit, so it is a result warning and a recorded parameter rather than a finding: a finding
+# that fires on every valid call is not evidence about the data.
+_DECLARED_MODE_WARNING = (
+    "classification_mode='point_in_time' is a caller declaration: the regime column carries no "
+    "construction provenance, and labels are paired with outcomes on the same time key, so "
+    "Lacuna does not verify how the labels were built or that each outcome starts after its "
+    "label was available."
+)
 
 
 def regime_analysis(
@@ -703,6 +750,7 @@ def regime_analysis(
                 "regime": regime,
                 "outcome": outcome,
                 "classification_mode": classification_mode,
+                "classification_provenance": "declared_unverified",
                 "available_time": available_time,
                 "mutually_exclusive": mutually_exclusive,
                 "unknown_label": unknown_label,
@@ -733,10 +781,13 @@ def regime_analysis(
         tables={"conditional_evidence": tuple(rows), "observations": records},
         warnings=(
             "Net outcome shares may be negative or exceed one when regimes contain losses.",
-            "Overlapping regimes double-count observations and outcomes across labels.",
-        )
-        if not mutually_exclusive
-        else ("Net outcome shares may be negative or exceed one when regimes contain losses.",),
+            *(
+                ()
+                if mutually_exclusive
+                else ("Overlapping regimes double-count observations and outcomes across labels.",)
+            ),
+            *((_DECLARED_MODE_WARNING,) if classification_mode == "point_in_time" else ()),
+        ),
     )
 
 

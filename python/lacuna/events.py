@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import secrets
 from dataclasses import dataclass
@@ -325,7 +326,15 @@ def event_windows(
             pl.col("_price_time").alias("price_time"),
             pl.col("_price").alias("price"),
             pl.col("_anchor_price").alias("anchor_price"),
-            (pl.col("_price") / pl.col("_anchor_price") - 1.0).alias("response"),
+            # The reference row (offset 0) is the anchor price itself, so its cumulative
+            # response is the exact identity p/p - 1 = 0. Emit that literal zero instead of
+            # relying on how the expression engine evaluates the division; a one-ulp residual
+            # was reported on some builds. All other offsets keep price/anchor - 1.
+            # A null or non-finite anchor price falls through and stays undefined.
+            pl.when((pl.col("offset") == 0) & pl.col("_anchor_price").is_finite())
+            .then(pl.lit(0.0, dtype=pl.Float64))
+            .otherwise(pl.col("_price") / pl.col("_anchor_price") - 1.0)
+            .alias("response"),
         )
         .sort(["aligned_anchor_time", "event_id", "offset"])
     )
@@ -530,6 +539,56 @@ def event_windows(
     return EventWindowResult(_frame=output, evidence=evidence)
 
 
+_PROPAGATED_STATES = frozenset({FindingState.WARN, FindingState.FAIL, FindingState.UNKNOWN})
+
+
+def _response_findings(
+    windows: EventWindowResult,
+    own: tuple[Finding, ...],
+) -> tuple[Finding, ...]:
+    """Return response findings followed by the windows' non-PASS findings, unchanged.
+
+    Order is deterministic: the response's own findings first, then the windows result's
+    findings in their stored order. A finding already present (same serialized content) is
+    not repeated.
+    """
+
+    combined: list[Finding] = []
+    seen: set[str] = set()
+    inherited = tuple(
+        finding for finding in windows.evidence.findings if finding.state in _PROPAGATED_STATES
+    )
+    for finding in (*own, *inherited):
+        key = json.dumps(finding.to_dict(), sort_keys=True)
+        if key in seen:
+            continue
+        seen.add(key)
+        combined.append(finding)
+    return tuple(combined)
+
+
+def _overlap_cluster_summary(frame: pl.DataFrame) -> dict[str, JsonValue]:
+    """Summarize same-instrument overlap clusters carried by the windows table."""
+
+    if "overlap_cluster" not in frame.columns:
+        # A hand-built windows frame may omit the column; state that rather than imply zero.
+        return {
+            "overlap_clusters_with_multiple_events": None,
+            "events_in_overlap_clusters": None,
+        }
+    per_cluster = (
+        frame.select("event_id", "overlap_cluster")
+        .unique()
+        .group_by("overlap_cluster")
+        .agg(pl.col("event_id").n_unique().alias("_events"))
+    )
+    multi = per_cluster.filter(pl.col("_events") > 1)
+    return {
+        "overlap_clusters_with_multiple_events": multi.height,
+        "events_in_overlap_clusters": int(multi.get_column("_events").sum() or 0),
+    }
+
+
 def event_response(
     windows: EventWindowResult,
     *,
@@ -647,16 +706,19 @@ def event_response(
         return AnalysisResult(
             metadata=ResultMetadata(
                 method="events.event_response",
-                method_version=1,
+                method_version=2,
                 parameters={
                     "source_method": windows.metadata.method,
+                    "source_method_version": windows.metadata.method_version,
                     "confidence": confidence,
                     "resamples": resamples,
                     "expected_block_length": block_length,
                     "seed": seed,
                     "min_clusters": min_clusters,
                     "resampling_unit": "ordered_anchor_time_cluster_complete_paths",
+                    "overlap_cluster_used_for_resampling": False,
                 },
+                seed=seed,
             ),
             metrics={
                 "n_events": input_events,
@@ -664,15 +726,20 @@ def event_response(
                 "n_clusters": n_clusters,
                 "successful_resamples": 0,
             },
-            findings=(
-                Finding(
-                    code="EVENT_INFERENCE_SUPPORT_INSUFFICIENT",
-                    title="Event response inference is unavailable",
-                    message="Fewer than the required complete anchor-time clusters are available.",
-                    state=FindingState.UNKNOWN,
-                    severity=Severity.HIGH,
-                    category="statistical_validity",
-                    evidence={"n_clusters": n_clusters, "minimum": min_clusters},
+            findings=_response_findings(
+                windows,
+                (
+                    Finding(
+                        code="EVENT_INFERENCE_SUPPORT_INSUFFICIENT",
+                        title="Event response inference is unavailable",
+                        message=(
+                            "Fewer than the required complete anchor-time clusters are available."
+                        ),
+                        state=FindingState.UNKNOWN,
+                        severity=Severity.HIGH,
+                        category="statistical_validity",
+                        evidence={"n_clusters": n_clusters, "minimum": min_clusters},
+                    ),
                 ),
             ),
             tables={
@@ -763,9 +830,10 @@ def event_response(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="events.event_response",
-            method_version=1,
+            method_version=2,
             parameters={
                 "source_method": windows.metadata.method,
+                "source_method_version": windows.metadata.method_version,
                 "confidence": confidence,
                 "resamples": resamples,
                 "expected_block_length": block_length,
@@ -774,9 +842,11 @@ def event_response(
                 "substream_identity": "SeedSequence(root_entropy).spawn(1)[0]",
                 "min_clusters": min_clusters,
                 "resampling_unit": "ordered_anchor_time_cluster_complete_paths",
+                "overlap_cluster_used_for_resampling": False,
                 "pointwise_interval": "percentile",
                 "simultaneous_band": "max_standardized_deviation",
             },
+            seed=seed,
         ),
         metrics={
             "n_events": input_events,
@@ -787,15 +857,27 @@ def event_response(
             "pre_event_mean_response": pre_event_mean,
             "pre_event_max_absolute_mean": pre_event_max,
         },
-        findings=(
-            Finding(
-                code="EVENT_CLUSTERED_INFERENCE_AVAILABLE",
-                title="Clustered complete-path event inference is available",
-                message="Pointwise and simultaneous bands use ordered anchor-time cluster blocks.",
-                state=FindingState.PASS,
-                severity=Severity.INFO,
-                category="statistical_validity",
-                evidence={"n_clusters": n_clusters, "n_complete_events": n_complete},
+        findings=_response_findings(
+            windows,
+            (
+                Finding(
+                    code="EVENT_CLUSTERED_INFERENCE_AVAILABLE",
+                    title="Clustered complete-path event inference is available",
+                    message=(
+                        "Pointwise and simultaneous bands use ordered anchor-time cluster blocks; "
+                        "same-instrument overlap clusters are reported, not resampled."
+                    ),
+                    state=FindingState.PASS,
+                    severity=Severity.INFO,
+                    category="statistical_validity",
+                    evidence={
+                        "n_clusters": n_clusters,
+                        "n_complete_events": n_complete,
+                        "clustering_unit": "aligned_anchor_time",
+                        "overlap_cluster_used_for_resampling": False,
+                        **_overlap_cluster_summary(frame),
+                    },
+                ),
             ),
         ),
         tables={
