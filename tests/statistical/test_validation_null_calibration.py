@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import polars as pl
 
+from lacuna.types import FindingState
 from lacuna.validation import bootstrap, permutation_test, sharpe_inference
 
 
@@ -82,6 +83,7 @@ def test_within_date_permutation_holds_null_size_under_a_shared_date_effect() ->
 def test_deflated_sharpe_discounts_the_best_of_many_null_strategies() -> None:
     psr_passes = 0
     dsr_passes = 0
+    deflated_finding_passes = 0
     for simulation in range(40):
         generator = np.random.default_rng(33_000 + simulation)
         returns = generator.normal(0.0, 0.01, size=(250, 50))
@@ -93,11 +95,29 @@ def test_deflated_sharpe_discounts_the_best_of_many_null_strategies() -> None:
         )
         psr_passes += int(float(result.metrics["probabilistic_sharpe_ratio"]) >= 0.95)  # type: ignore[arg-type]
         dsr_passes += int(float(result.metrics["deflated_sharpe_ratio"]) >= 0.95)  # type: ignore[arg-type]
+        # The findings must tell the same story as the metrics: an undeflated PSR pass is
+        # labelled as such and never appears without the deflated verdict beside it.
+        states = {finding.code: finding.state for finding in result.findings}
+        deflated_code = (
+            "DEFLATED_SHARPE_SUPPORTED"
+            if float(result.metrics["deflated_sharpe_ratio"]) >= 0.95  # type: ignore[arg-type]
+            else "DEFLATED_SHARPE_UNCERTAIN"
+        )
+        assert deflated_code in states
+        deflated_finding_passes += int(states[deflated_code] == FindingState.PASS)
+        psr_finding = next(
+            finding
+            for finding in result.findings
+            if finding.code in {"SHARPE_EXCEEDS_BENCHMARK", "SHARPE_UNCERTAIN"}
+        )
+        assert psr_finding.evidence["selection_adjusted"] is False
+        assert psr_finding.evidence["deflated_finding"] == deflated_code
 
     # Selecting the maximum of 50 zero-edge strategies makes the undeflated PSR look
     # conclusive; DSR must remove that selection effect.
     assert psr_passes >= 25
     assert dsr_passes <= 2
+    assert deflated_finding_passes == dsr_passes
 
 
 def _interval_misses(samples: list[np.ndarray], **options: object) -> int:

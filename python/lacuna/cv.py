@@ -24,6 +24,9 @@ from lacuna.types import AnalysisResult, JsonValue, ResultMetadata
 Duration: TypeAlias = str | int
 TimeValue: TypeAlias = int | date | datetime
 _DURATION_PATTERN = re.compile(r"^(?P<count>[1-9][0-9]*)(?P<unit>D|W|M|Y)$", re.IGNORECASE)
+# Version 2: calendar-mode windows over Date times ending exactly one day past the last
+# observation are complete (half-open coverage) and now produce a fold.
+_WALK_FORWARD_METHOD_VERSION = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -218,10 +221,13 @@ def _split_evidence(
     parameters: dict[str, JsonValue],
     folds: Sequence[Fold],
     source_times: Sequence[TimeValue],
+    method_version: int = 1,
 ) -> AnalysisResult:
     fold_rows = [row for fold in folds for row in _role_rows(fold, source_times)]
     return AnalysisResult(
-        metadata=ResultMetadata(method=method, method_version=1, parameters=parameters),
+        metadata=ResultMetadata(
+            method=method, method_version=method_version, parameters=parameters
+        ),
         metrics={
             "n_folds": len(folds),
             "purged_observations": sum(len(fold.purged_indices) for fold in folds),
@@ -233,7 +239,25 @@ def _split_evidence(
 
 @dataclass(frozen=True, slots=True)
 class WalkForward:
-    """Chronological expanding or rolling walk-forward splitter."""
+    """Chronological expanding or rolling walk-forward splitter.
+
+    ``train``, ``test``, and ``step`` are either all observation counts (``int``) or all
+    calendar durations (``"5D"``, ``"2W"``, ``"3M"``, ``"1Y"``). Observation counts
+    advance over sorted unique observation times. A duration string is a *calendar*
+    span: ``"5D"`` means five calendar days regardless of how many observations fall
+    in them, which differs from ``lacuna.labels.forward_returns``, where ``"5D"`` is
+    counted in observations.
+
+    Test windows are half-open ``[test_start, test_end)``. Unless ``allow_incomplete``
+    is set, a calendar window is kept only when the data fully cover it. For ``Date``
+    observation times each observation covers its whole day, so a window is complete
+    when ``test_end <= last_observation + 1 day``; this matches the observation-count
+    mode, where a window ending exactly at the last observation is kept. A ``Datetime``
+    observation is an instant with no implied bar length, so coverage is never
+    inferred: such a window must satisfy ``test_end <= last_observation``. Cast daily
+    ``Datetime`` bars to ``Date`` (or set ``allow_incomplete=True``) to test the final
+    window.
+    """
 
     train: Duration
     test: Duration
@@ -298,10 +322,17 @@ class WalkForward:
             assert isinstance(step_span, _CalendarSpan)
             calendar_times = _calendar_times(unique_times)
             train_origin = calendar_times[0]
+            last_time = calendar_times[-1]
+            # A Date covers its whole calendar day, so the half-open window
+            # [start, end) is fully observed iff end <= last + 1 day. A Datetime is
+            # an instant with no declared bar length: coverage is not inferred.
+            coverage_end = (
+                last_time if isinstance(last_time, datetime) else last_time + timedelta(days=1)
+            )
             test_start_time = _add_span(train_origin, train_span)
-            while test_start_time <= calendar_times[-1]:
+            while test_start_time <= last_time:
                 test_end_time = _add_span(test_start_time, test_span)
-                if test_end_time > calendar_times[-1] and not self.allow_incomplete:
+                if test_end_time > coverage_end and not self.allow_incomplete:
                     break
                 if self.mode == "expanding":
                     train_start_time = train_origin
@@ -346,6 +377,7 @@ class WalkForward:
             },
             folds=folds,
             source_times=source_times,
+            method_version=_WALK_FORWARD_METHOD_VERSION,
         )
         return SplitResult(folds=tuple(folds), evidence=evidence)
 
@@ -458,6 +490,15 @@ class PurgedKFold:
     use_native: bool = True
 
     def __post_init__(self) -> None:
+        invalid = [
+            name
+            for name, value in {"n_splits": self.n_splits, "embargo": self.embargo}.items()
+            if isinstance(value, bool) or not isinstance(value, int)
+        ]
+        if invalid:
+            raise MethodContractError(
+                f"PurgedKFold integer parameters have invalid types: {', '.join(invalid)}"
+            )
         if self.n_splits < 2:
             raise MethodContractError("n_splits must be at least 2")
         if self.embargo < 0:

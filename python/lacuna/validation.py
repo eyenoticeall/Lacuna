@@ -241,13 +241,19 @@ def bootstrap(
         raise MethodContractError("confidence_level must be between zero and one")
     if batch_memory_bytes < 1024:
         raise MethodContractError("batch_memory_bytes must be at least 1024")
+    if expected_block_length is not None:
+        # Explicit-None check: 0 is an invalid value, not "use the default".
+        if isinstance(expected_block_length, bool) or not isinstance(expected_block_length, int):
+            raise MethodContractError("expected_block_length must be an integer")
+        if expected_block_length < 1:
+            raise MethodContractError("expected_block_length must be between 1 and sample size")
     values, source, excluded = _values_array(data, value=value, null_policy=null_policy)
     statistic_name, statistic_function = _statistic_function(statistic)
     if expected_block_length is not None and block_length is not None:
         raise MethodContractError("pass block_length or expected_block_length, not both")
     if expected_block_length is not None and method != "stationary":
         raise MethodContractError("expected_block_length is only valid for stationary bootstrap")
-    resolved_block_length = expected_block_length or block_length
+    resolved_block_length = block_length if expected_block_length is None else expected_block_length
     if method == "iid":
         if resolved_block_length is not None:
             raise MethodContractError("block length does not apply to IID bootstrap")
@@ -441,7 +447,10 @@ def _p_value_frame(
     null_policy: Literal["drop", "raise"],
 ) -> tuple[pl.DataFrame, dict[str, JsonValue], int]:
     if isinstance(data, ExperimentRegistry):
-        return _registry_p_values(data, metric_name=p_value)
+        # Registry trials flow through the same emptiness, null-policy, and [0, 1]
+        # range validation as array and frame inputs below.
+        frame, diagnostics_parameters, _ = _registry_p_values(data, metric_name=p_value)
+        return _validated_p_value_frame(frame, diagnostics_parameters, null_policy=null_policy)
     if isinstance(data, np.ndarray):
         if data.ndim != 1:
             raise DataContractError("multiple-testing NumPy input must be one-dimensional")
@@ -480,6 +489,15 @@ def _p_value_frame(
         frame = frame.select(
             pl.col(trial).alias("trial_id"), pl.col(p_value).cast(pl.Float64).alias("p_value")
         )
+    return _validated_p_value_frame(frame, diagnostics.to_parameters(), null_policy=null_policy)
+
+
+def _validated_p_value_frame(
+    frame: pl.DataFrame,
+    source: dict[str, JsonValue],
+    *,
+    null_policy: Literal["drop", "raise"],
+) -> tuple[pl.DataFrame, dict[str, JsonValue], int]:
     if frame.is_empty():
         raise DataContractError("multiple testing requires at least one trial")
     frame, excluded = paired_numeric_policy(frame, ["p_value"], null_policy=null_policy)
@@ -490,7 +508,7 @@ def _p_value_frame(
     ).item()
     if out_of_range:
         raise DataContractError(f"multiple testing contains {out_of_range} p-values outside [0, 1]")
-    return frame, diagnostics.to_parameters(), excluded
+    return frame, source, excluded
 
 
 def _adjust_p_values(
@@ -816,6 +834,18 @@ def parameter_surface(
         raise MethodContractError("plateau_tolerance must be non-negative and finite")
     if evidence_threshold is not None and not math.isfinite(evidence_threshold):
         raise MethodContractError("evidence_threshold must be finite when provided")
+    if selection_sample_id is not None:
+        if not selection_sample_id or selection_sample_id.strip() != selection_sample_id:
+            raise MethodContractError("selection_sample_id must be a non-empty trimmed string")
+        if selected_parameters is None and selection_sample_id != sample_id:
+            # Without an explicit selected point the function picks the best point on
+            # sample_id itself, so that sample *is* the selection sample. A distinct
+            # selection_sample_id would be an unverifiable and misleading provenance claim.
+            raise MethodContractError(
+                "selection_sample_id differs from sample_id but selected_parameters was not "
+                "given; the surface then selects on sample_id itself, so supply "
+                "selected_parameters chosen on selection_sample_id or omit selection_sample_id"
+            )
 
     parameter_names, grid_values = _normalize_grid(grid, max_evaluations=max_evaluations)
     points: list[_SurfacePoint] = []

@@ -522,7 +522,7 @@ def sharpe_inference(
 
     lower = observed_sharpe - interval_z * standard_error
     upper = observed_sharpe + interval_z * standard_error
-    findings = (
+    findings: tuple[Finding, ...] = (
         Finding(
             code="SHARPE_EXCEEDS_BENCHMARK" if psr >= confidence_level else "SHARPE_UNCERTAIN",
             title=(
@@ -534,17 +534,68 @@ def sharpe_inference(
                 "The probabilistic Sharpe ratio reaches the declared confidence level."
                 if psr >= confidence_level
                 else "The probabilistic Sharpe ratio does not reach the declared confidence level."
+            )
+            + (
+                " This verdict is not adjusted for selection across the declared trial family; "
+                "read it with the deflated Sharpe finding."
+                if deflated_sharpe_ratio is not None
+                else ""
             ),
             state=FindingState.PASS if psr >= confidence_level else FindingState.WARN,
             severity=Severity.INFO if psr >= confidence_level else Severity.MEDIUM,
             category="statistical_validity",
-            evidence={"psr": psr, "confidence_level": confidence_level},
+            evidence={
+                "psr": psr,
+                "confidence_level": confidence_level,
+                "selection_adjusted": False,
+                "deflated_finding": (
+                    None
+                    if deflated_sharpe_ratio is None
+                    else "DEFLATED_SHARPE_SUPPORTED"
+                    if deflated_sharpe_ratio >= confidence_level
+                    else "DEFLATED_SHARPE_UNCERTAIN"
+                ),
+            },
         ),
     )
+    if deflated_sharpe_ratio is not None:
+        # The PSR finding above ignores selection. When the trial family is declared, the
+        # multiplicity-adjusted verdict is reported separately so a selected Sharpe cannot
+        # show only an undeflated PASS.
+        deflated_pass = deflated_sharpe_ratio >= confidence_level
+        findings = (
+            *findings,
+            Finding(
+                code="DEFLATED_SHARPE_SUPPORTED" if deflated_pass else "DEFLATED_SHARPE_UNCERTAIN",
+                title=(
+                    "Sharpe evidence survives selection deflation"
+                    if deflated_pass
+                    else "Sharpe evidence does not survive selection deflation"
+                ),
+                message=(
+                    "The deflated Sharpe ratio reaches the declared confidence level against "
+                    "the expected maximum of the declared trial family."
+                    if deflated_pass
+                    else "The deflated Sharpe ratio does not reach the declared confidence "
+                    "level: selection across the declared trial family can explain the "
+                    "observed Sharpe."
+                ),
+                state=FindingState.PASS if deflated_pass else FindingState.WARN,
+                severity=Severity.INFO if deflated_pass else Severity.HIGH,
+                category="statistical_validity",
+                evidence={
+                    "deflated_sharpe_ratio": deflated_sharpe_ratio,
+                    "deflated_sharpe_threshold": deflated_threshold,
+                    "confidence_level": confidence_level,
+                    "trial_count": trial_count,
+                    "independent_trials": effective_trials,
+                },
+            ),
+        )
     return AnalysisResult(
         metadata=ResultMetadata(
             method="validation.sharpe_inference",
-            method_version=1,
+            method_version=2,
             parameters={
                 "value_column": value,
                 "benchmark": benchmark,
