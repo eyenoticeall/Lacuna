@@ -33,10 +33,10 @@ python -m pip install lacuna-options
 ```
 
 The current releases are
-[`lacuna-quant` 0.14.2](https://pypi.org/project/lacuna-quant/0.14.2/) and
+[`lacuna-quant` 0.14.3](https://pypi.org/project/lacuna-quant/0.14.3/) and
 [`lacuna-options` 0.2.2](https://pypi.org/project/lacuna-options/0.2.2/). The same checksummed,
 provenance-attested files are attached to the
-[`v0.14.2` GitHub release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.14.2).
+[`v0.14.3` GitHub release](https://github.com/eyenoticeall/Lacuna/releases/tag/v0.14.3).
 
 !!! warning "Distribution name"
 

@@ -238,14 +238,14 @@ dependencies = [
 
 [[package]]
 name = "lacuna-core"
-version = "0.14.2"
+version = "0.14.3"
 dependencies = [
  "criterion",
 ]
 
 [[package]]
 name = "lacuna-python"
-version = "0.14.2"
+version = "0.14.3"
 dependencies = [
  "lacuna-core",
  "numpy",

@@ -150,7 +150,7 @@ universal `lacuna-options` wheel and source distribution, installs that wheel wi
 target-smoke-tested Linux core wheel, and runs the extension smoke contract.
 
 A separate job downloads the complete matrix, rejects missing or unexpected filenames/tags/names/
-versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.14.2`
+versions, inspects both wheels and source archives, and writes one `SHA256SUMS`. For a `v0.14.3`
 tag with extension `0.2.2`, the release set is exactly four `lacuna-quant` wheels, one
 `lacuna-options` wheel, two source distributions, and the checksum manifest.
 

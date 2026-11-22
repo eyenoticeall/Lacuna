@@ -64,7 +64,7 @@ grid_index          (ordered-grid indices)
 ```
 
 The result also carries a `selected_neighborhood` table with the same columns. Per-point sample
-count and runtime/fingerprint columns are planned and not emitted in v0.14.2.
+count and runtime/fingerprint columns are planned and not emitted in v0.14.3.
 
 Failed points remain visible. Silently dropping failures can make a boundary optimum look stable.
 
@@ -82,7 +82,7 @@ Categorical and continuous parameters are not treated as the same distance witho
 
 ## Stability components
 
-Implemented in `validation.parameter_surface` (v0.14.2). Adjacency is fixed to
+Implemented in `validation.parameter_surface` (v0.14.3). Adjacency is fixed to
 `ordered_grid_manhattan` over each parameter's declared ordered grid, with `neighborhood_radius`
 grid steps; the other neighborhood definitions listed above are not implemented.
 
@@ -202,7 +202,9 @@ not checked against how the labels were built. The result records
 that labels and outcomes are paired on the same time key: Lacuna cannot verify that the outcome
 starts after its label was available or that the label inputs were point-in-time. `regime_analysis`
 does not yet accept a `quantile_regimes` result as input, so no cross-check of mode against label
-provenance exists; that is open work. `quantile_regimes` is method version 2.
+provenance exists; that is open work. `quantile_regimes` is method version 2. `regime_analysis`
+(`regime.analysis`) stays at method version 1: the provenance record and the warning changed no
+value.
 
 ## Conditional evidence
 
