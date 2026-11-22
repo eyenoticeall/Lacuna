@@ -343,7 +343,7 @@ one horizon and never pool horizons, and every balanced quantile assignment uses
 | Open | Packaged schema `$id` values use `lacuna.dev`, while the project site is `lacuna.run`. | A `$id` is a persisted identity. Changing it needs a decision on whether old identifiers stay resolvable. | `schemas/*.schema.json`. |
 | Open | Bundle digests differ across CLI runs because `created_at` is stamped per run, and nothing pins it. | Needs a decision between a `SOURCE_DATE_EPOCH`-style input and excluding the timestamp from the digest. | `python/lacuna/bundle.py`, `python/lacuna/cli.py`. |
 | Open | `lacuna-options` evidence carries no `input_fingerprint`. | The core fingerprint helpers that handle timezones portably are private; the extension needs a public one, and a decision on what the fingerprint covers. | `extensions/lacuna-options/CHANGELOG.md` ("Deferred"); `_frames.frame_records`. |
-| Open | The core wheel has about 1 KB of headroom under the 20% growth limit against the v0.13 baseline. 0.14.2 reached 22% and came back under the limit only by leaving the private `_migration_benchmark` tooling out of the wheel. | The next addition trips the guard again. `benchmark.py` backs the public `lacuna bench` command and `lacuna.benchmark` API, so it cannot leave the wheel in a patch. Whether to move it, re-baseline the guard, or change the limit is a maintainer decision. | `package-regression` in `.github/workflows/ci.yml`; `[tool.maturin]` in `pyproject.toml`; `docs/development/performance.md`. |
+| Open | The core wheel has about 0.5 KB of headroom under the 20% growth limit against the v0.13 baseline. 0.14.2 reached 22% and came back under the limit only by leaving the private `_migration_benchmark` tooling out of the wheel, which left about 1.3 KB; the 0.14.3 corrections used about 0.8 KB of that. | The next addition trips the guard again. `benchmark.py` backs the public `lacuna bench` command and `lacuna.benchmark` API, so it cannot leave the wheel in a patch. Whether to move it, re-baseline the guard, or change the limit is a maintainer decision. | `package-regression` in `.github/workflows/ci.yml`; `[tool.maturin]` in `pyproject.toml`; `docs/development/performance.md`. |
 | Open | `NativeExtensionError` is exported but never raised. | Removing an export breaks the frozen API; raising it needs a capability that has no fallback. | `python/lacuna/exceptions.py`. |
 
 ### Found after the 0.14.2 release
@@ -378,8 +378,10 @@ One item from that pass stays open:
 - The website documentation describes released behavior. Its update pass for 0.14.2 was reported
   complete on 2026-11-22; what it found is listed under "Found after the 0.14.2 release". It needs
   a second pass for 0.14.3, which removes limitations that pass documented.
-- 0.14.3 changes the output checksums of the benchmark cases that carry `signal.quantiles`
-  evidence, so the same-runner guard fails once on that push as well.
+- 0.14.3 changes three benchmark output checksums (`signal.quantiles`, `bias.asof_join.reference`,
+  and `workflow.standard_audit.strategy`, which records the as-of join's method version), so the
+  same-runner guard failed once on that push as well. The
+  [performance guide](performance.md) holds the same-runner timings.
 
 ## Historical v0.1 boundary
 

@@ -251,12 +251,22 @@ evidence, and later pushes compare against the corrected output.
 | 0.14.2 | `signal.neutralize.grouped` | `signal.neutralize` method version 2: recorded categorical encoding and the columns named by the availability finding | 101 ms → 101 ms |
 | 0.14.2 | `signal.bucketize.grouped_nulls` | The availability finding records the group columns it concerns | 68.5 ms → 65.2 ms |
 | 0.14.2 | `adapters.factor_panel.chunked` | Adapter evidence records `absent_optional_columns` and the public `source_type` spelling | 0.20 ms → 0.18 ms |
+| 0.14.3 | `signal.quantiles` | `signal.quantiles` method version 3: `n_observations` counts the headline horizon only | 96.7 ms → 87.4 ms |
+| 0.14.3 | `bias.asof_join.reference` | `bias.asof_join` method version 2, the version its 0.14.2 changes owed; no value changes | 1071 ms → 1095 ms |
+| 0.14.3 | `workflow.standard_audit.strategy` | The audit records the as-of join's method version; no finding state or score changes | 3795 ms → 3867 ms |
 
 The 0.14.2 rows are same-runner medians from the pull-request guard on Ubuntu 24.04 (small tier,
 `--no-native`, three repetitions, baseline `54dbe4c` against candidate `040e19b`). Every changed
 case is within 3% of the baseline or faster. The same run measured `labels.forward_returns`, whose
 output did not change, 23% slower on the first candidate; `040e19b` removes that extra pass and the
 case returned to within 1%.
+
+The 0.14.3 rows are same-runner medians from the same guard (baseline `9a525a8` against candidate
+`7cc113a`). Every changed case is within 3% of the baseline or faster. That run also measured
+`labels.forward_returns` 13.5% slower with an unchanged checksum, inside the 15% budget. The only
+0.14.3 change to that function sits inside the `missing="raise"` branch, which the benchmark does
+not take, and interleaved runs of the two sources on one machine put the case within 3%, so the
+difference is read as runner noise.
 
 For v0.14, native admission additionally requires the result to reproduce in both scheduled CI and
 the exact-source non-publishing release preflight. Import latency above 115% of the v0.13 same-runner

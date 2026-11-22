@@ -26,8 +26,8 @@ against the published packages. Two entries change a reported value and carry a 
 - `bias.asof_join` works on `Duration` time and revision columns, which its documentation listed as
   supported but which always failed with a Polars `InvalidOperationError` in the evidence step.
   Evidence tables and fingerprints record durations as ISO 8601 text (`P1D`), independent of the
-  column's time unit. `bias.future_data_check` and the other bias diagnostics accept `Duration`
-  time columns for the same reason.
+  column's time unit. `bias.future_data_check` and `bias.revision_diagnostics` accept `Duration`
+  columns for the same reason.
 - `bias.asof_join` is method version 2. Its 0.14.2 changes (validated `tolerance`, rejected string
   and categorical revisions, computed `future_matches`) shipped under version 1, so a version-1
   result does not say which behavior produced it. No value changes between 0.14.2 and 0.14.3.
