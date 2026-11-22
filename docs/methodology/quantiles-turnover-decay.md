@@ -49,11 +49,18 @@ With multi-horizon labels the period and summary tables carry one row set per ho
 horizon length. The headline metrics (`mean_top_bottom_spread`, `spearman_monotonicity`,
 `adjacent_order_fraction`) describe one horizon and never pool them: the first horizon in a
 `LabelResult`'s declared order, recorded as `headline_horizon`. If that horizon has no aligned rows
-the headline metrics are null with `BUCKET_HEADLINE_HORIZON_EMPTY`; a later horizon never takes its
-place. A bare label frame with several
-horizons declares no order, so those headline metrics are null and the result carries
-`QUANTILE_HEADLINE_HORIZON_UNDECLARED` (`BUCKET_HEADLINE_HORIZON_UNDECLARED` from `bucket_returns`).
-`signal.quantiles` and `signal.bucket_returns` are method version 2.
+the headline metrics are null with `QUANTILE_HEADLINE_HORIZON_EMPTY`
+(`BUCKET_HEADLINE_HORIZON_EMPTY` from `bucket_returns`); a later horizon never takes its place. A
+bare label frame with several horizons declares no order, so those headline metrics are null and
+the result carries `QUANTILE_HEADLINE_HORIZON_UNDECLARED` (`BUCKET_HEADLINE_HORIZON_UNDECLARED` from
+`bucket_returns`).
+
+`n_observations` counts the aligned rows of the headline horizon only, like the metrics beside it:
+it is `0` when that horizon has no aligned rows and null when the headline is undeclared.
+`signal_rows`, `matched_rows_before_policy`, and `excluded_rows` are join diagnostics and cover
+every horizon. `signal.quantiles` and `signal.bucket_returns` are method version 3; version 2
+reported the row count of all horizons as `n_observations` and passed the empty-headline finding
+through `quantiles` under its `BUCKET_` name.
 
 Two monotonicity components are exposed:
 

@@ -60,8 +60,11 @@ def _portable_records(frame: pl.DataFrame) -> tuple[JsonValue, ...]:
                 .str.replace(r"\+00:00$", "Z")
                 .alias(column)
             )
-        elif dtype == pl.Date or isinstance(dtype, pl.Datetime | pl.Duration):
+        elif dtype == pl.Date or isinstance(dtype, pl.Datetime):
             expressions.append(pl.col(column).cast(pl.String).alias(column))
+        elif isinstance(dtype, pl.Duration):
+            # Polars cannot cast Duration to String; ISO 8601 text is exact and unit-independent.
+            expressions.append(pl.col(column).dt.to_string("iso").alias(column))
     normalized = frame.with_columns(expressions) if expressions else frame
     return frame_records(normalized)
 
@@ -553,7 +556,7 @@ def asof_join(
     evidence = AnalysisResult(
         metadata=ResultMetadata(
             method="bias.asof_join",
-            method_version=1,
+            method_version=2,
             parameters={
                 "left_time": left_time,
                 "right_time": right_time,
@@ -784,7 +787,11 @@ def revision_diagnostics(
     value: str | None = None,
     source_mode: RevisionMode = "unknown",
 ) -> AnalysisResult:
-    """Validate version identity and publication ordering within revised facts."""
+    """Validate version identity and publication ordering within revised facts.
+
+    ``revision`` follows the ``asof_join`` contract: integer, finite float, Date, Datetime,
+    Duration, or Enum. String and categorical revisions are rejected.
+    """
 
     entities = _by_columns(entity)
     _trimmed(effective_time, name="effective_time")
@@ -813,17 +820,7 @@ def revision_diagnostics(
     require_time_key(frame, available_time, name="revision source")
     if revision is not None:
         require_no_nulls(frame, [revision], name="revision source")
-        revision_dtype = frame.schema[revision]
-        if not (
-            revision_dtype.is_integer()
-            or revision_dtype == pl.String
-            or revision_dtype == pl.Categorical
-            or isinstance(revision_dtype, pl.Enum | pl.Datetime)
-            or revision_dtype == pl.Date
-        ):
-            raise DataContractError(
-                "revision must be an ordered integer, string, categorical, date, or datetime"
-            )
+        _require_orderable_revision(frame, revision)
 
     fact_keys = [*entities, effective_time]
     version_keys = [*fact_keys, revision] if revision is not None else [*fact_keys, available_time]
@@ -910,7 +907,7 @@ def revision_diagnostics(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="bias.revision_diagnostics",
-            method_version=1,
+            method_version=2,
             parameters={
                 "entity": entities,
                 "effective_time": effective_time,

@@ -286,6 +286,12 @@ turnover uses the same balanced bucket rule as quantiles, and several findings s
 evidence that cannot establish safety. Public signatures, the schema-v1 result envelope, c14n-v1
 identities, and RNG streams are preserved. The changelog names every method and rule version.
 
+`0.14.3` is a third correctness patch, from the website documentation pass over 0.14.2. It finishes
+what 0.14.2 started: the bucket and quantile observation count describes the headline horizon
+(`signal.quantiles` and `signal.bucket_returns` method version 3), `bias.asof_join` carries the
+method version its 0.14.2 changes owed, and the CLI rejects CSV time text it used to guess at. The
+same preservation guarantees hold.
+
 ## Open follow-ups from the 0.14.1 review
 
 A documentation-driven review of 0.14.1 in November 2026 produced the corrections released as
@@ -311,8 +317,6 @@ one horizon and never pool horizons, and every balanced quantile assignment uses
 | Status | Item | Why it was deferred | Starting point |
 | --- | --- | --- | --- |
 | Open | `asof_join(effective_time=...)` is validated and recorded but does not affect matching, so a late restatement of an older period outranks a newer period's first print. | The specification defines no matching role for it. Ordering by effective time is a methodology decision, not a fix. | `docs/subsystems/bias-point-in-time.md` ("Implemented parameter semantics"). |
-| Open | `revision_diagnostics` still accepts string and categorical revisions, which sort lexicographically (`"10"` below `"9"`). `asof_join` now rejects them. | Out of scope of the as-of fix; rejecting them changes an explicitly allowed input. | `revision_diagnostics` in `python/lacuna/bias.py`; reuse `_require_orderable_revision`. |
-| Open | `asof_join` on a `Duration` time column fails inside `_portable_records` with a Polars cast error. | Separate from the tolerance validation that surfaced it. | `_portable_records` in `python/lacuna/bias.py`. |
 
 ### Validation, events, and regimes
 
@@ -342,13 +346,40 @@ one horizon and never pool horizons, and every balanced quantile assignment uses
 | Open | The core wheel has about 1 KB of headroom under the 20% growth limit against the v0.13 baseline. 0.14.2 reached 22% and came back under the limit only by leaving the private `_migration_benchmark` tooling out of the wheel. | The next addition trips the guard again. `benchmark.py` backs the public `lacuna bench` command and `lacuna.benchmark` API, so it cannot leave the wheel in a patch. Whether to move it, re-baseline the guard, or change the limit is a maintainer decision. | `package-regression` in `.github/workflows/ci.yml`; `[tool.maturin]` in `pyproject.toml`; `docs/development/performance.md`. |
 | Open | `NativeExtensionError` is exported but never raised. | Removing an export breaks the frozen API; raising it needs a capability that has no fallback. | `python/lacuna/exceptions.py`. |
 
+### Found after the 0.14.2 release
+
+The website documentation pass for 0.14.2 reran every page example against the published packages
+and reported eleven items on 2026-11-22. Each was checked against the 0.14.2 source, and 0.14.3
+resolves them; the changelog lists each fix. Two rows that were open above, string revisions in
+`revision_diagnostics` and `Duration` columns in `asof_join`, are closed by the same release.
+
+Three reports were closed without a code change:
+
+- `lacuna-options` `validate_chain` accepts an input column named `delta_bucket`. That matches the
+  0.2.2 changelog, which places the collision check in `delta_buckets`: a chain may carry its own
+  column of that name as long as `delta_buckets` is not asked to overwrite it.
+- `fit_decay` leaves `root_entropy` null when it stops at a support or direction gate. No random
+  numbers are drawn on those paths, so there is no root entropy to record; the signal guide now
+  says so.
+- `regime.analysis` stays at method version 1. 0.14.2 added a recorded parameter and a warning and
+  changed no value, which is not what the method-version rule covers.
+
+One item from that pass stays open:
+
+| Status | Item | Why it was deferred | Starting point |
+| --- | --- | --- | --- |
+| Open | A caller-built label frame cannot name its instrument column separately from the signal's. 0.14.3 reads a bare frame with the declared name when present and the canonical `instrument` otherwise, which covers Lacuna-produced frames only. | A separate label-instrument parameter changes frozen public signatures, so it belongs to the next API revision. | `_aligned_panel` in `python/lacuna/signal.py`. |
+
 ### Release follow-through
 
 - The same-runner benchmark guard failed once, by design, on the push that changed the ten
   checksums recorded in the [performance guide](performance.md), which holds the same-runner
   timings for each.
-- The website documentation describes released behavior and needs an update pass for 0.14.2,
-  including the turnover bucket rule and the multi-horizon headline definition.
+- The website documentation describes released behavior. Its update pass for 0.14.2 was reported
+  complete on 2026-11-22; what it found is listed under "Found after the 0.14.2 release". It needs
+  a second pass for 0.14.3, which removes limitations that pass documented.
+- 0.14.3 changes the output checksums of the benchmark cases that carry `signal.quantiles`
+  evidence, so the same-runner guard fails once on that push as well.
 
 ## Historical v0.1 boundary
 

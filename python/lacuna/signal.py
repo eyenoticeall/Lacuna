@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from numbers import Real
 from typing import Any, Literal, TypeAlias, cast
 
@@ -33,6 +34,7 @@ from lacuna._signal_transform import (
     bucketize,
     neutralize,
 )
+from lacuna.adapters.polars import require_columns
 from lacuna.exceptions import DataContractError, MethodContractError
 from lacuna.labels import Horizon, LabelResult, forward_returns
 from lacuna.types import AnalysisResult, Finding, FindingState, JsonValue, ResultMetadata, Severity
@@ -159,20 +161,23 @@ def _aligned_panel(
             panel.height,
         )
 
-    # ``forward_returns`` and ``bucketize`` always write the canonical ``instrument`` column,
-    # whatever the source identifier was called; ``instrument`` names the column only in
-    # caller-built frames.
-    label_instrument = "instrument" if isinstance(labels, LabelResult) else instrument
+    label_instrument = instrument
     instrument = instrument if signal_instrument is None else signal_instrument
     signal_frame, signal_diagnostics = eager_frame(
         signal_data,
         required=[signal_time, instrument, signal_value, *extra_signal_columns],
     )
     label_source = labels.frame if isinstance(labels, LabelResult) else labels
-    label_frame, label_diagnostics = eager_frame(
-        label_source,
-        required=[label_time, label_instrument, label_value],
+    label_frame, label_diagnostics = eager_frame(label_source, required=[label_time, label_value])
+    # ``forward_returns`` and ``bucketize`` always write the canonical ``instrument`` column,
+    # whatever the source identifier was called. A bare frame is read with the caller's name
+    # when it has that column and with the canonical one otherwise.
+    canonical_fallback = not isinstance(labels, LabelResult) and (
+        label_instrument not in label_frame.columns and "instrument" in label_frame.columns
     )
+    if canonical_fallback or isinstance(labels, LabelResult):
+        label_instrument = "instrument"
+    require_columns(label_frame, [label_instrument])
     validate_panel_schema(
         signal_frame,
         time=signal_time,
@@ -205,6 +210,7 @@ def _aligned_panel(
         "inner_join_signal_labels",
     )
     label_diagnostics = label_diagnostics.with_execution(
+        *(("canonical_label_instrument",) if canonical_fallback else ()),
         "validate_label_frame",
         "project_and_cast_float64",
         "inner_join_signal_labels",
@@ -856,7 +862,10 @@ def bucket_returns(
     headline_horizon, headline_undeclared = _headline_horizon(panel, labels)
     findings = list(bucketed.evidence.findings)
     overall_record: Mapping[str, object]
+    # Like the spread and monotonicity beside it, the count describes the headline horizon only.
+    n_observations: int | None = _headline_rows(panel, headline_horizon).height
     if headline_undeclared:
+        n_observations = None
         mean_spread = None
         overall_record = {}
         findings.append(
@@ -931,7 +940,7 @@ def bucket_returns(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.bucket_returns",
-            method_version=2,
+            method_version=3,
             parameters={
                 "by": tuple(keys),
                 "headline_horizon": headline_horizon,
@@ -950,7 +959,7 @@ def bucket_returns(
                 JsonValue, overall_record.get("adjacent_order_fraction")
             ),
             "n_buckets": requested,
-            "n_observations": panel.height,
+            "n_observations": n_observations,
             "signal_rows": signal_rows,
             "matched_rows_before_policy": matched,
             "excluded_rows": excluded,
@@ -1044,6 +1053,14 @@ def quantiles(
             findings.append(
                 _undeclared_headline_finding("QUANTILE_HEADLINE_HORIZON_UNDECLARED", "quantile")
             )
+        elif finding.code == "BUCKET_HEADLINE_HORIZON_EMPTY":
+            findings.append(
+                replace(
+                    finding,
+                    code="QUANTILE_HEADLINE_HORIZON_EMPTY",
+                    message=finding.message.replace("bucket return", "quantile"),
+                )
+            )
         elif finding.code == "BUCKET_MONOTONICITY_WEAK":
             findings.append(
                 Finding(
@@ -1067,7 +1084,7 @@ def quantiles(
     return AnalysisResult(
         metadata=ResultMetadata(
             method="signal.quantiles",
-            method_version=2,
+            method_version=3,
             parameters={
                 "quantiles": quantiles,
                 "by": normalized_by,

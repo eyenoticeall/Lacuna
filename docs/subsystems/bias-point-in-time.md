@@ -77,7 +77,15 @@ It should return the joined table plus evidence containing:
   Duration, or Enum (declared category order). String and categorical revisions are rejected
   with `DataContractError` because they sort lexicographically (`"10"` ranks below `"9"`); cast
   to an integer or declare an Enum. The dtype is checked whenever `revision` is declared, not only
-  when ties exist.
+  when ties exist. `revision_diagnostics` (method version 2) applies the same rule; through 0.14.2
+  it accepted string and categorical revisions and could report a false
+  `BIAS_REVISION_ORDER_INVALID` from their lexicographic order.
+- **Duration** time and revision columns are supported. Evidence tables and fingerprints record a
+  duration as ISO 8601 text (`P1D`, `PT1H30M`), which does not depend on the column's time unit.
+  Through 0.14.2 every `Duration` column failed with a Polars cast error.
+- **Method version:** `bias.asof_join` is version 2. The validated tolerance, the rejected revision
+  dtypes, and the computed `future_matches` shipped in 0.14.2 while the result still reported
+  version 1, so version-1 results from 0.14.2 and from earlier releases are not comparable.
 - **`future_matches`** is computed from the joined output (matched rows whose availability is
   later than the decision time) rather than asserted. A nonzero count raises rather than returning
   a frame containing future data.

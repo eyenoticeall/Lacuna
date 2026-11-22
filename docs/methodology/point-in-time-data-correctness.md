@@ -113,7 +113,10 @@ not arbitrary sensitive feature values.
 ## Revision diagnostics
 
 `revision_diagnostics()` groups versions by identity and effective time. It requires unique version
-identities and tests whether availability is nondecreasing in explicit revision order.
+identities and tests whether availability is nondecreasing in explicit revision order. The revision
+column follows the `asof_join` rule: integer, finite float, Date, Datetime, Duration, or Enum.
+String and categorical revisions are rejected, because their lexicographic order (`"10"` below
+`"9"`) is not a version order.
 
 ```python
 revisions = lc.bias.revision_diagnostics(

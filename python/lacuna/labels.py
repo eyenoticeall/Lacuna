@@ -185,9 +185,17 @@ def forward_returns(
     )
     source_missing_count = int(frame.select(source_missing.sum()).item())
     if source_missing_count and missing == "raise":
-        raise DataContractError(
-            f"prices contain {source_missing_count} rows with null or NaN entry/exit values"
-        )
+        unhandled = source_missing
+        if delisting_return is not None:
+            # A null exit price with a declared delisting return is the terminal row that
+            # ``delisting_return`` exists to handle, not a missing source value.
+            delisted = pl.col(exit_column).is_null() & pl.col(delisting_return).is_not_null()
+            unhandled = source_missing & ~delisted
+        unhandled_count = int(frame.select(unhandled.sum()).item())
+        if unhandled_count:
+            raise DataContractError(
+                f"prices contain {unhandled_count} rows with null or NaN entry/exit values"
+            )
     if frame.filter((pl.col(entry_column) <= 0) | (pl.col(exit_column) <= 0)).height:
         raise DataContractError("entry and exit prices must be strictly positive")
 

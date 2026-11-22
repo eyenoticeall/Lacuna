@@ -348,7 +348,8 @@ def test_headline_stays_on_the_first_declared_horizon_when_it_has_no_aligned_row
     assert quantile_result.metadata.parameters["headline_horizon"] == "20D"
     assert quantile_result.metrics["mean_top_bottom_spread"] is None
     assert quantile_result.metrics["spearman_monotonicity"] is None
-    empty = next(f for f in quantile_result.findings if f.code == "BUCKET_HEADLINE_HORIZON_EMPTY")
+    # ``quantiles`` (method version 3) reports the finding under its own name.
+    empty = next(f for f in quantile_result.findings if f.code == "QUANTILE_HEADLINE_HORIZON_EMPTY")
     assert empty.state == FindingState.UNKNOWN
 
 

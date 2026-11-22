@@ -49,6 +49,9 @@ def _non_negative_int(value: str) -> int:
 
 
 _ISO_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+_ISO_DATETIME_PATTERN = (
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:[Zz]|[+-]\d{2}(?::?\d{2})?)?$"
+)
 _UTC_OFFSET_PATTERN = r"(?:[Zz]|[+-]\d{2}(?::?\d{2})?)$"
 
 
@@ -57,8 +60,10 @@ def _parse_csv_time_column(frame: pl.LazyFrame, column: str, source: Path) -> pl
 
     Only the declared time column is touched. Instrument identifiers and every other column keep the
     type Polars inferred, so ticker-like or date-looking identifiers are never reinterpreted. Values
-    must be ISO 8601: calendar dates (``YYYY-MM-DD``) become ``Date``; datetimes become
-    ``Datetime``.
+    must be ISO 8601: calendar dates (``YYYY-MM-DD``) become ``Date``; datetimes (the date, ``T``
+    or a space, then ``HH:MM[:SS[.fraction]]``) become ``Datetime``. Any other text, such as
+    ``01/02/2025``, is rejected instead of being left to format inference, which would guess the
+    day and month order.
     A column whose datetimes all carry a UTC offset becomes timezone-aware UTC; a column with no
     offsets stays naive. Mixing offset and naive values is rejected rather than guessed. Integer
     time columns are already numeric and are not changed.
@@ -73,6 +78,8 @@ def _parse_csv_time_column(frame: pl.LazyFrame, column: str, source: Path) -> pl
         text = frame.select(pl.col(column)).collect().to_series().drop_nulls()
         is_date = text.len() > 0 and bool(text.str.contains(_ISO_DATE_PATTERN).all())
         offsets = text.str.contains(_UTC_OFFSET_PATTERN)
+        if not is_date and not bool(text.str.contains(_ISO_DATETIME_PATTERN).all()):
+            raise DataContractError(message)
         if not is_date and offsets.any() and not offsets.all():
             raise DataContractError(message)
         if is_date:

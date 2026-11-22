@@ -131,6 +131,14 @@ _UNRESOLVED_HORIZON_MESSAGE = (
 )
 
 
+def _same_horizon(label: JsonValue, declared: JsonValue) -> bool:
+    """Match a horizon label to the policy; integer N also names the ``"ND"`` label."""
+
+    if label == declared:
+        return True
+    return isinstance(declared, int) and not isinstance(declared, bool) and label == f"{declared}D"
+
+
 def _inference_ic_summary(
     result: AnalysisResult,
     context: AuditContext,
@@ -152,7 +160,7 @@ def _inference_ic_summary(
     horizons = {row["horizon"] for row in rows}
     if declared is None and len(horizons) == 1:
         return rows[0], rows[0]["horizon"]
-    matching = tuple(row for row in rows if row["horizon"] == declared)
+    matching = tuple(row for row in rows if _same_horizon(row["horizon"], declared))
     if len(matching) != 1:
         return None, declared
     return matching[0], declared
@@ -252,9 +260,9 @@ def _inference_monotonicity(
         if len(horizons) == 1:
             return True, headline, next(iter(horizons))
         return False, None, declared
-    if result.metadata.parameters.get("headline_horizon") == declared:
+    if _same_horizon(result.metadata.parameters.get("headline_horizon"), declared):
         return True, headline, declared
-    matching = tuple(row for row in rows if row["horizon"] == declared)
+    matching = tuple(row for row in rows if _same_horizon(row["horizon"], declared))
     if len(matching) != 1:
         return False, None, declared
     return True, matching[0].get("spearman_monotonicity"), declared
@@ -472,6 +480,15 @@ _PURGED_SPLIT_METHODS = frozenset({"cv.purged_kfold", "cv.combinatorial_purged_k
 _OBSERVATION_HORIZON = re.compile(r"(?P<count>[1-9][0-9]*)D")
 
 
+def _horizon_observations(horizon: JsonValue) -> int | None:
+    """Observation count of an ``inference_horizon`` policy given as ``"ND"`` or integer N."""
+
+    if isinstance(horizon, int) and not isinstance(horizon, bool):
+        return horizon
+    match = _OBSERVATION_HORIZON.fullmatch(horizon) if isinstance(horizon, str) else None
+    return None if match is None else int(match.group("count"))
+
+
 def _split_count(result: AnalysisResult, name: str) -> int | None:
     value = result.metrics.get(name)
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
@@ -515,8 +532,8 @@ class _PurgedValidationRule(_ResultRule):
                 evidence=evidence,
             )
         horizon = context.policies.get("inference_horizon")
-        match = _OBSERVATION_HORIZON.fullmatch(horizon) if isinstance(horizon, str) else None
-        if match is not None and int(match.group("count")) >= 2 and purged == 0:
+        observations = _horizon_observations(horizon)
+        if observations is not None and observations >= 2 and purged == 0:
             return self._finding(
                 state=FindingState.WARN,
                 message=(

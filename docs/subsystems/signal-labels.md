@@ -167,6 +167,12 @@ first horizon in a `LabelResult`'s declared order (recorded as `headline_horizon
 `IC_HEADLINE_HORIZON_UNDECLARED` / `QUANTILE_HEADLINE_HORIZON_UNDECLARED` finding for a bare
 multi-horizon label frame. Horizon tables are ordered by horizon length, not as text.
 
+Label frames produced by `forward_returns` always carry the canonical `instrument` column, whatever
+the source identifier was called. `instrument=` names the signal's identifier column. A
+`LabelResult` is always read through `instrument`; a bare label frame is read with the declared
+name when it has that column and with `instrument` otherwise, and the label input's
+`execution_operations` then record `canonical_label_instrument`.
+
 When `by` contains declared group columns, subgroup rows and pooled headline rows are computed
 independently. Group columns survive alignment and appear in the period/horizon tables. A headline
 metric never comes from the first subgroup. `group_available_time` proves that classifications were
@@ -277,7 +283,8 @@ configured minimum `R²`. Failure returns `null` fields and a `WARN` or `UNKNOWN
 loaded only at the call site through `lacuna-quant[statistics]`; optimizer, bounds, dependency version,
 root entropy, substream derivation, and joint resampling policy are provenance. A caller-supplied
 `seed` is also recorded as `metadata.seed` (null when none was given; generated root entropy stays in
-`parameters["root_entropy"]`).
+`parameters["root_entropy"]`). Root entropy is recorded only when resampling runs: a result that
+stops at a support or direction gate draws no random numbers and leaves it null.
 
 ## Diagnostic portfolio projection
 

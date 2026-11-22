@@ -292,8 +292,10 @@ lacuna signal \
 Parquet, CSV, Arrow IPC, and Feather inputs are scanned lazily before the public services apply
 their explicit materialization boundary. For CSV, only the declared `--signal-time` and
 `--price-time` columns are parsed when Polars reads them as text: `YYYY-MM-DD` becomes `Date`, and
-ISO 8601 datetimes become `Datetime` (timezone-aware UTC when every value carries an offset, naive
-when none does; mixing is rejected). Other columns, including instrument identifiers that look like
+ISO 8601 datetimes (the date, `T` or a space, then `HH:MM[:SS[.fraction]]` and an optional UTC
+offset) become `Datetime` (timezone-aware UTC when every value carries an offset, naive when none
+does; mixing is rejected). Text in any other form, such as `01/02/2025`, is rejected; 0.14.2 left it
+to format inference, which read slash dates day-first. Other columns, including instrument identifiers that look like
 dates or numbers, keep the type Polars infers. Whole-number time columns are unchanged, and
 unparseable time text is a `DataContractError`. Reading the time column once to validate it is the
 only eager CSV read before the study's own boundary. Requested results go to stdout; file-write diagnostics and

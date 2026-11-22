@@ -65,7 +65,8 @@ separate jobs. Result names are part of the v0.1 audit contract: `labels`, `ic`,
 
 IC evidence with more than one horizon needs an `inference_horizon` policy that selects exactly one
 horizon summary; otherwise `IC_DEFINED` and `IC_PERIOD_SUPPORT` are `UNKNOWN`, because pooled
-metrics mix estimands. `BOOTSTRAP_INTERVAL` requires the bootstrap's resampled-period count
+metrics mix estimands. The policy names a horizon label such as `"5D"`; a positive integer N is
+read as `"ND"`, as `SignalStudy.audit` and `forward_returns` read it. `BOOTSTRAP_INTERVAL` requires the bootstrap's resampled-period count
 (`n_raw`) and does not pass below 30 periods. `SignalStudy.audit` supplies both the policy and a
 bootstrap over disjoint label intervals; see
 [Audit scoring](../methodology/audit-scoring.md#signal-study-assembly).

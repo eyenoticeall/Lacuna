@@ -2,6 +2,65 @@
 
 All notable changes to Lacuna will be documented here. The project intends to follow [Semantic Versioning](https://semver.org/) once its public release process begins.
 
+## [0.14.3] - 2026-11-22
+
+Corrections from the website documentation pass over 0.14.2, which reran every documented example
+against the published packages. Two entries change a reported value and carry a new method version.
+
+### Fixed
+
+- **Statistical correction:** `n_observations` in `signal.quantiles` and `signal.bucket_returns`
+  (method version 3) counts the aligned rows of the headline horizon only. Version 2 moved the
+  spread and monotonicity headline to one horizon but kept counting the rows of every horizon
+  beside them. The count is `0` when the headline horizon has no aligned rows and null when the
+  headline is undeclared, matching `signal.ic`. `signal_rows`, `matched_rows_before_policy`, and
+  `excluded_rows` remain join diagnostics over every horizon.
+- `signal.quantiles` (method version 3) reports an empty headline horizon as
+  `QUANTILE_HEADLINE_HORIZON_EMPTY`. Version 2 passed the `BUCKET_HEADLINE_HORIZON_EMPTY` code
+  through unrenamed, unlike its other findings. `signal.bucket_returns` keeps the `BUCKET_` code.
+- The `lacuna signal` CSV reader rejects time text that is not ISO 8601 with `DataContractError`.
+  0.14.2 documented ISO only but left other text to Polars format inference, which read
+  slash-separated dates day-first (`02/01/2025` as 2 January), so a month-first file was misdated
+  without an error. Accepted forms are `YYYY-MM-DD` and `YYYY-MM-DD`, `T` or a space, then
+  `HH:MM[:SS[.fraction]]` with an optional `Z` or numeric UTC offset.
+- `bias.asof_join` works on `Duration` time and revision columns, which its documentation listed as
+  supported but which always failed with a Polars `InvalidOperationError` in the evidence step.
+  Evidence tables and fingerprints record durations as ISO 8601 text (`P1D`), independent of the
+  column's time unit. `bias.future_data_check` and the other bias diagnostics accept `Duration`
+  time columns for the same reason.
+- `bias.asof_join` is method version 2. Its 0.14.2 changes (validated `tolerance`, rejected string
+  and categorical revisions, computed `future_matches`) shipped under version 1, so a version-1
+  result does not say which behavior produced it. No value changes between 0.14.2 and 0.14.3.
+- `bias.revision_diagnostics` (method version 2) rejects string and categorical revisions with
+  `DataContractError`, as `asof_join` does. They sort lexicographically (`"10"` below `"9"`), which
+  produced a false `BIAS_REVISION_ORDER_INVALID` for a correctly ordered history. It now also
+  accepts finite float and `Duration` revisions. Cast string revisions to an integer or declare an
+  Enum.
+- `signal.ic`, `signal.quantiles`, `signal.bucket_returns`, and `signal.decay` accept a bare label
+  frame produced by Lacuna together with a non-default `instrument=`. The 0.14.2 fix covered
+  `LabelResult` input only, so `ic(signal, labels.frame, instrument="ticker")` still raised
+  `missing required columns: ticker`. A bare frame is read with the declared column when it has
+  one and with the canonical `instrument` column otherwise; the label input's
+  `execution_operations` record `canonical_label_instrument` when the canonical column was used.
+- `labels.forward_returns(missing="raise")` accepts a null exit price on a row that carries a
+  delisting return. It rejected the terminal row that `delisting_return` exists to handle, so the
+  two options could not be combined. Null prices without a delisting return are still rejected, and
+  outputs of calls that already succeeded are unchanged.
+- `lc.audit(policies={"inference_horizon": N})` with a positive integer reads the horizon labelled
+  `"ND"`, as `SignalStudy.audit` already did. The integer matched no horizon row, so `IC_DEFINED`,
+  `IC_PERIOD_SUPPORT`, and `QUANTILE_MONOTONICITY` returned `UNKNOWN` and the zero-purge warning of
+  `PURGED_VALIDATION_SUPPLIED` could not fire.
+
+### Documentation
+
+- The signal guide states that `fit_decay` records `root_entropy` only when resampling runs; a
+  result that stops at a support or direction gate draws no random numbers and leaves it null.
+- The robustness guide states that `regime.analysis` stays at method version 1: its 0.14.2 change
+  added a recorded parameter and a warning and changed no value.
+- The roadmap records which reports from the documentation pass were closed without a code change.
+
+`lacuna-options` is unchanged at 0.2.2.
+
 ## [0.14.2] - 2026-11-21
 
 Corrections from a documentation-driven review of 0.14.1. Several entries change results or reject
