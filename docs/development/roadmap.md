@@ -368,6 +368,7 @@ One item from that pass stays open:
 
 | Status | Item | Why it was deferred | Starting point |
 | --- | --- | --- | --- |
+| Open | The `lacuna signal` CSV time error names only `YYYY-MM-DD` and `YYYY-MM-DDTHH:MM:SS`, while the reader also accepts a space separator, `HH:MM`, fractional seconds, and `+01` / `+0100` offsets. The message is correct but narrower than the accepted forms. | Wording only, and any change to packaged source spends the wheel's remaining headroom, so it should ride with the next CLI change. | `_parse_csv_time_column` in `python/lacuna/cli.py`. |
 | Open | A caller-built label frame cannot name its instrument column separately from the signal's. 0.14.3 reads a bare frame with the declared name when present and the canonical `instrument` otherwise, which covers Lacuna-produced frames only. | A separate label-instrument parameter changes frozen public signatures, so it belongs to the next API revision. | `_aligned_panel` in `python/lacuna/signal.py`. |
 
 ### Release follow-through

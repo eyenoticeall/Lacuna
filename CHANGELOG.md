@@ -41,7 +41,8 @@ against the published packages. Two entries change a reported value and carry a 
   `LabelResult` input only, so `ic(signal, labels.frame, instrument="ticker")` still raised
   `missing required columns: ticker`. A bare frame is read with the declared column when it has
   one and with the canonical `instrument` column otherwise; the label input's
-  `execution_operations` record `canonical_label_instrument` when the canonical column was used.
+  `execution_operations` record `canonical_label_instrument` when a bare frame was read through
+  the canonical column. A `LabelResult` always reads that column and records nothing extra.
 - `labels.forward_returns(missing="raise")` accepts a null exit price on a row that carries a
   delisting return. It rejected the terminal row that `delisting_return` exists to handle, so the
   two options could not be combined. Null prices without a delisting return are still rejected, and
